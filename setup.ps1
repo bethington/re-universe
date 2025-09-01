@@ -1,0 +1,1 @@
+# Ghidra RE Platform - Initial Setup Script

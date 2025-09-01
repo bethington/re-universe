@@ -1,0 +1,83 @@
+name: Cross-Platform Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker
+      run: |
+        # Docker Desktop should be pre-installed on windows-latest
+        docker --version
+        docker-compose --version
+    
+    - name: Test PowerShell Scripts
+      run: |
+        # Test script syntax
+        Get-ChildItem *.ps1 | ForEach-Object {
+          Write-Host "Testing syntax of $($_.Name)"
+          powershell.exe -NoProfile -NonInteractive -Command "& { try { [scriptblock]::Create((Get-Content '$($_.FullName)' -Raw)) } catch { Write-Error 'Syntax error in $($_.Name): $_'; exit 1 } }"
+        }
+      shell: powershell
+    
+    - name: Test Environment Setup
+      run: |
+        .\setup.ps1 -SkipDockerPull
+        Test-Path .env
+      shell: powershell
+
+  test-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker
+      run: |
+        docker --version
+        docker-compose --version
+    
+    - name: Make scripts executable
+      run: chmod +x *.sh
+    
+    - name: Test Bash Scripts Syntax
+      run: |
+        for script in *.sh; do
+          echo "Testing syntax of $script"
+          bash -n "$script"
+        done
+    
+    - name: Test Environment Setup
+      run: |
+        ./setup.sh
+        test -f .env
+
+  test-macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker
+      run: |
+        # Install Docker if not available
+        if ! command -v docker >/dev/null 2>&1; then
+          brew install --cask docker
+        fi
+        docker --version
+        docker-compose --version
+    
+    - name: Make scripts executable
+      run: chmod +x *.sh
+    
+    - name: Test Bash Scripts
+      run: |
+        for script in *.sh; do
+          echo "Testing syntax of $script"
+          bash -n "$script"
+        done

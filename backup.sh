@@ -1,0 +1,159 @@
+#!/bin/bash
+
+# Ghidra Repository Backup Script
+# Bash equivalent of backup.ps1
+
+set -e  # Exit on any error
+
+# Default values
+BACKUP_NAME=""
+BACKUP_PATH="./backups"
+INCREMENTAL=false
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -BackupName|--backup-name)
+            BACKUP_NAME="$2"
+            shift 2
+            ;;
+        -BackupPath|--backup-path)
+            BACKUP_PATH="$2"
+            shift 2
+            ;;
+        -Incremental|--incremental)
+            INCREMENTAL=true
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: $0 [options]"
+            echo "Options:"
+            echo "  -BackupName, --backup-name NAME    Custom backup name"
+            echo "  -BackupPath, --backup-path PATH    Backup directory (default: ./backups)"
+            echo "  -Incremental, --incremental        Create incremental backup"
+            echo "  -h, --help                         Show this help"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use -h or --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
+# Generate timestamp and default name
+TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+DEFAULT_NAME="ghidra-backup-$TIMESTAMP"
+BACKUP_NAME=${BACKUP_NAME:-$DEFAULT_NAME}
+
+echo "=== Ghidra Repository Backup ==="
+echo "Backup name: $BACKUP_NAME"
+
+# Ensure backup directory exists
+if [ ! -d "$BACKUP_PATH" ]; then
+    mkdir -p "$BACKUP_PATH"
+    echo "Created backup directory: $BACKUP_PATH"
+fi
+
+# Stop containers to ensure consistent backup
+echo ""
+echo "Stopping containers for consistent backup..."
+docker-compose stop ghidra-server
+
+# Error handling function
+cleanup() {
+    echo ""
+    echo "Restarting containers..."
+    docker-compose start ghidra-server
+    echo "Containers restarted"
+}
+
+trap cleanup EXIT
+
+try_backup() {
+    # Create backup directory
+    FULL_BACKUP_PATH="$BACKUP_PATH/$BACKUP_NAME"
+    mkdir -p "$FULL_BACKUP_PATH"
+
+    # Backup repository data
+    echo "Backing up repository data..."
+    if [ -d "./repo-data" ]; then
+        cp -r ./repo-data/* "$FULL_BACKUP_PATH/" 2>/dev/null || true
+    else
+        echo "Warning: repo-data directory not found"
+    fi
+
+    # Create metadata file
+    echo "Creating metadata file..."
+    METADATA_FILE="$FULL_BACKUP_PATH/backup-metadata.json"
+
+    # Get git commit if available
+    GIT_COMMIT=""
+    if command -v git >/dev/null 2>&1 && [ -d ".git" ]; then
+        GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
+    fi
+
+    # Get Docker image info
+    DOCKER_IMAGE=""
+    if command -v docker-compose >/dev/null 2>&1; then
+        DOCKER_IMAGE=$(docker-compose config 2>/dev/null | grep -o "image.*ghidra[^\"]*" | head -1 | sed 's/image://' | xargs 2>/dev/null || echo "blacktop/ghidra:latest")
+    fi
+
+    # Create JSON metadata
+    cat > "$METADATA_FILE" << EOF
+{
+    "BackupDate": "$(date +"%Y-%m-%d %H:%M:%S")",
+    "BackupName": "$BACKUP_NAME",
+    "BackupType": "$([ "$INCREMENTAL" = true ] && echo "Incremental" || echo "Full")",
+    "SourcePath": "$(pwd)/repo-data",
+    "GitCommit": "$GIT_COMMIT",
+    "DockerImage": "$DOCKER_IMAGE"
+}
+EOF
+
+    # Create compressed archive
+    echo "Creating compressed archive..."
+    ARCHIVE_PATH="$BACKUP_PATH/$BACKUP_NAME.zip"
+
+    if command -v zip >/dev/null 2>&1; then
+        cd "$FULL_BACKUP_PATH"
+        zip -r "../$BACKUP_NAME.zip" . >/dev/null 2>&1
+        cd - >/dev/null
+    else
+        echo "Warning: zip command not found, creating tar.gz instead"
+        ARCHIVE_PATH="$BACKUP_PATH/$BACKUP_NAME.tar.gz"
+        tar -czf "$ARCHIVE_PATH" -C "$FULL_BACKUP_PATH" .
+    fi
+
+    # Calculate size
+    if [ -f "$ARCHIVE_PATH" ]; then
+        SIZE_BYTES=$(stat -f%z "$ARCHIVE_PATH" 2>/dev/null || stat -c%s "$ARCHIVE_PATH" 2>/dev/null || echo "0")
+        SIZE_MB=$(echo "scale=2; $SIZE_BYTES / 1048576" | bc 2>/dev/null || echo "0")
+
+        echo ""
+        echo "=== Backup Complete ==="
+        echo "Archive: $ARCHIVE_PATH"
+        echo "Size: $SIZE_MB MB"
+        echo "Folder: $FULL_BACKUP_PATH"
+    else
+        echo "Warning: Could not create archive"
+    fi
+
+    # Cleanup uncompressed backup folder (automatic)
+    echo ""
+    echo "Removing uncompressed backup folder..."
+    rm -rf "$FULL_BACKUP_PATH"
+    echo "Uncompressed backup folder removed"
+}
+
+# Execute backup with error handling
+if try_backup; then
+    echo ""
+    echo "=== Usage Tips ==="
+    echo "List backups: ls -la $BACKUP_PATH/*.zip"
+    echo "Restore: ./restore.sh -BackupFile $BACKUP_PATH/$BACKUP_NAME.zip"
+else
+    echo "ERROR: Backup failed" >&2
+    exit 1
+fi

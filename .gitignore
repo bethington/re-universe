@@ -1,0 +1,51 @@
+# Data folders (keep structure but ignore contents)
+backups/*
+!backups/.gitkeep
+repo-data/*
+!repo-data/.gitkeep
+sync-logs/*
+!sync-logs/.gitkeep
+
+# Test data and temporary files
+test-backups/
+repo-data-safety-backup-*/
+*.log
+
+# IDE files
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+temp/
+tmp/
+
+# Sensitive configuration
+ghidra-config/users.conf.prod
+*.env
+.env
+
+# Docker data
+.docker/
+
+# Node modules (if any)
+node_modules/
+
+# Python cache (if any)
+__pycache__/
+*.pyc
+*.pyo
+
+# Archives and compiled files
+*.zip
+*.tar.gz
+*.exe
+*.dll
