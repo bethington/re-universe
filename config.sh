@@ -125,8 +125,14 @@ test_configuration() {
     echo -e "${CYAN}=== Configuration Validation ===${NC}"
     
     if [[ ! -f "$ENV_FILE" ]]; then
-        echo -e "${RED}❌ No .env file found${NC}"
-        return 1
+        echo -e "${YELLOW}No .env file found. Creating from example...${NC}"
+        if [[ -f "$EXAMPLE_FILE" ]]; then
+            cp "$EXAMPLE_FILE" "$ENV_FILE"
+            echo -e "${GREEN}✅ Created .env file from example${NC}"
+        else
+            echo -e "${RED}❌ No .env.example file found${NC}"
+            return 1
+        fi
     fi
     
     # Load configuration into associative array
