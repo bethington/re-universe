@@ -9,6 +9,7 @@ set -e  # Exit on any error
 BACKUP_NAME=""
 BACKUP_PATH="./backups"
 INCREMENTAL=false
+NEED_RESTART=false
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -50,6 +51,17 @@ BACKUP_NAME=${BACKUP_NAME:-$DEFAULT_NAME}
 echo "=== Ghidra Repository Backup ==="
 echo "Backup name: $BACKUP_NAME"
 
+# Docker Compose compatibility function
+get_docker_compose_cmd() {
+    if command -v docker-compose &> /dev/null; then
+        echo "docker-compose"
+    else
+        echo "docker compose"
+    fi
+}
+
+DOCKER_COMPOSE_CMD=$(get_docker_compose_cmd)
+
 # Ensure backup directory exists
 if [ ! -d "$BACKUP_PATH" ]; then
     mkdir -p "$BACKUP_PATH"
@@ -59,14 +71,30 @@ fi
 # Stop containers to ensure consistent backup
 echo ""
 echo "Stopping containers for consistent backup..."
-docker-compose stop ghidra-server
+# Check if containers are running first
+CONTAINERS_RUNNING=$($DOCKER_COMPOSE_CMD ps -q ghidra-server 2>/dev/null | wc -l)
+if [ "$CONTAINERS_RUNNING" -gt 0 ]; then
+    $DOCKER_COMPOSE_CMD stop ghidra-server >/dev/null 2>&1
+    NEED_RESTART=true
+else
+    echo "No containers running, proceeding with backup..."
+    NEED_RESTART=false
+fi
 
 # Error handling function
 cleanup() {
     echo ""
-    echo "Restarting containers..."
-    docker-compose start ghidra-server
-    echo "Containers restarted"
+    if [ "$NEED_RESTART" = "true" ]; then
+        echo "Restarting containers..."
+        if $DOCKER_COMPOSE_CMD start ghidra-server >/dev/null 2>&1; then
+            echo "Containers restarted successfully"
+        else
+            echo "⚠️ Warning: Could not restart containers"
+            # Don't exit with error - backup was successful
+        fi
+    else
+        echo "No containers to restart"
+    fi
 }
 
 trap cleanup EXIT
