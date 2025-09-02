@@ -9,6 +9,11 @@ on:
     # Run tests daily at 6 AM UTC
     - cron: '0 6 * * *'
 
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
 env:
   # Test environment variables
   GHIDRA_USERS: test-user
@@ -137,8 +142,16 @@ jobs:
     - name: Upload Trivy scan results
       uses: github/codeql-action/upload-sarif@v3
       if: always()
+      continue-on-error: true
       with:
         sarif_file: 'trivy-results.sarif'
+    
+    - name: Upload scan results as artifact (fallback)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-scan-results
+        path: 'trivy-results.sarif'
 
   integration-test:
     runs-on: ubuntu-latest
