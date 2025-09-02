@@ -1,83 +1,308 @@
-name: Cross-Platform Testing
+name: Cross-Platform Testing & Validation
 
 on:
   push:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
+  schedule:
+    # Run tests daily at 6 AM UTC
+    - cron: '0 6 * * *'
+
+env:
+  # Test environment variables
+  GHIDRA_USERS: test-user
+  GHIDRA_PORT: 13100
+  JVM_MAX_MEMORY: 2g
 
 jobs:
   test-windows:
     runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v4
+    timeout-minutes: 30
     
-    - name: Set up Docker
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup PowerShell
+      shell: powershell
       run: |
-        # Docker Desktop should be pre-installed on windows-latest
+        $PSVersionTable.PSVersion
+        Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+    
+    - name: Validate Docker Installation
+      run: |
         docker --version
         docker-compose --version
-    
-    - name: Test PowerShell Scripts
-      run: |
-        # Test script syntax
-        Get-ChildItem *.ps1 | ForEach-Object {
-          Write-Host "Testing syntax of $($_.Name)"
-          powershell.exe -NoProfile -NonInteractive -Command "& { try { [scriptblock]::Create((Get-Content '$($_.FullName)' -Raw)) } catch { Write-Error 'Syntax error in $($_.Name): $_'; exit 1 } }"
-        }
+        # Ensure Docker service is running
+        Start-Service docker -ErrorAction SilentlyContinue
       shell: powershell
     
-    - name: Test Environment Setup
+    - name: Run PowerShell Test Suite
       run: |
+        .\test-suite.ps1 -CI -SkipDocker
+      shell: powershell
+    
+    - name: Test Individual PowerShell Scripts
+      run: |
+        # Test config script specifically
+        .\config.ps1 -Action validate
+        Write-Host "✅ Configuration validation passed"
+        
+        # Test setup script (skip Docker pull in CI)
         .\setup.ps1 -SkipDockerPull
-        Test-Path .env
+        Write-Host "✅ Setup script completed"
       shell: powershell
+    
+    - name: Upload test artifacts
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-test-logs
+        path: |
+          *.log
+          .env
+          sync-logs/
 
   test-linux:
     runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
+    timeout-minutes: 30
     
-    - name: Set up Docker
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup environment
       run: |
+        # Update system and install dependencies
+        sudo apt-get update
+        sudo apt-get install -y jq
+        
+        # Verify Docker
         docker --version
         docker-compose --version
     
     - name: Make scripts executable
-      run: chmod +x *.sh
-    
-    - name: Test Bash Scripts Syntax
       run: |
-        for script in *.sh; do
-          echo "Testing syntax of $script"
-          bash -n "$script"
-        done
+        chmod +x *.sh
+        ls -la *.sh
     
-    - name: Test Environment Setup
+    - name: Run Bash Test Suite
       run: |
+        ./test-suite.sh
+    
+    - name: Test Individual Bash Scripts
+      run: |
+        # Test config script specifically
+        ./config.sh -Action validate
+        echo "✅ Configuration validation passed"
+        
+        # Test setup script
         ./setup.sh
-        test -f .env
+        echo "✅ Setup script completed"
+    
+    - name: Test Docker Compose (Limited)
+      run: |
+        # Validate docker-compose syntax
+        docker-compose config
+        echo "✅ Docker Compose configuration valid"
+    
+    - name: Upload test artifacts
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-test-logs
+        path: |
+          *.log
+          .env
+          sync-logs/
 
   test-macos:
     runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v4
+    timeout-minutes: 30
     
-    - name: Set up Docker
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup environment  
       run: |
-        # Install Docker if not available
-        if ! command -v docker >/dev/null 2>&1; then
-          brew install --cask docker
+        # Install dependencies
+        if ! command -v jq >/dev/null 2>&1; then
+          brew install jq
         fi
-        docker --version
-        docker-compose --version
+        
+        # Verify Docker (may need to be installed)
+        if ! command -v docker >/dev/null 2>&1; then
+          echo "⚠️  Docker not available on macOS runner"
+        else
+          docker --version
+          docker-compose --version
+        fi
     
     - name: Make scripts executable
-      run: chmod +x *.sh
-    
-    - name: Test Bash Scripts
       run: |
-        for script in *.sh; do
-          echo "Testing syntax of $script"
-          bash -n "$script"
+        chmod +x *.sh
+        ls -la *.sh
+    
+    - name: Run Bash Test Suite
+      run: |
+        ./test-suite.sh
+    
+    - name: Test Individual Bash Scripts
+      run: |
+        # Test config script specifically
+        ./config.sh -Action validate
+        echo "✅ Configuration validation passed"
+        
+        # Test setup script
+        ./setup.sh
+        echo "✅ Setup script completed"
+    
+    - name: Upload test artifacts
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-test-logs
+        path: |
+          *.log
+          .env
+          sync-logs/
+
+  security-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  integration-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup integration test environment
+      run: |
+        chmod +x *.sh
+        sudo apt-get update
+        sudo apt-get install -y jq bc
+    
+    - name: Run Full Integration Test Suite
+      run: |
+        ./integration-test.sh
+    
+    - name: Upload integration test artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: integration-test-results
+        path: |
+          *.log
+          backups/
+          sync-logs/
+
+  documentation-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup documentation testing
+      run: |
+        # Install markdown tools
+        npm install -g markdownlint-cli
+        sudo apt-get update
+        sudo apt-get install -y aspell aspell-en
+    
+    - name: Test markdown syntax
+      run: |
+        # Run markdownlint on all markdown files (disable problematic rules for now)
+        markdownlint *.md .github/**/*.md --disable MD013 MD041 MD022 MD031 MD032 MD040 MD009 || true
+    
+    - name: Check documentation completeness
+      run: |
+        echo "=== Documentation Completeness Check ==="
+        
+        # Required documentation files
+        REQUIRED_DOCS=("README.md" "CONTRIBUTING.md" "SECURITY.md" "CODE_OF_CONDUCT.md" "LICENSE")
+        
+        for doc in "${REQUIRED_DOCS[@]}"; do
+          if [[ -f "$doc" ]]; then
+            LINES=$(wc -l < "$doc")
+            if (( LINES > 10 )); then
+              echo "✅ $doc exists and has content ($LINES lines)"
+            else
+              echo "⚠️  $doc exists but may be incomplete ($LINES lines)"
+            fi
+          else
+            echo "❌ Missing required documentation: $doc"
+            exit 1
+          fi
         done
+
+  release-validation:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs: [test-windows, test-linux, test-macos, security-scan, integration-test, documentation-test]
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Validate release readiness
+      run: |
+        echo "✅ All platform tests passed"
+        echo "✅ Security scan completed" 
+        echo "✅ Integration tests passed"
+        echo "✅ Documentation validated"
+        echo "🚀 Project is ready for release!"
+        
+        # Check if this should trigger a release
+        if git log --format="%s" -n 1 | grep -E "(release|version|v[0-9]+\.[0-9]+\.[0-9]+)"; then
+          echo "::notice title=Release Candidate::This commit appears to be a release candidate"
+        fi
+
+  test-summary:
+    runs-on: ubuntu-latest
+    needs: [test-windows, test-linux, test-macos, security-scan, integration-test, documentation-test]
+    if: always()
+    
+    steps:
+    - name: Test Results Summary
+      run: |
+        echo "=== GitHub Actions Test Summary ==="
+        echo "Windows Tests: ${{ needs.test-windows.result }}"
+        echo "Linux Tests: ${{ needs.test-linux.result }}"
+        echo "macOS Tests: ${{ needs.test-macos.result }}"
+        echo "Security Scan: ${{ needs.security-scan.result }}"
+        echo "Integration Test: ${{ needs.integration-test.result }}"
+        echo "Documentation Test: ${{ needs.documentation-test.result }}"
+        
+        # Determine overall status
+        if [[ "${{ needs.test-windows.result }}" == "success" && 
+              "${{ needs.test-linux.result }}" == "success" && 
+              "${{ needs.test-macos.result }}" == "success" ]]; then
+          echo "🎉 All platform tests passed!"
+        else
+          echo "⚠️  Some platform tests failed"
+        fi

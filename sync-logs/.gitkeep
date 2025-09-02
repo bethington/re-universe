@@ -1,2 +1,1 @@
-# This file ensures the sync-logs directory is tracked in git
-# ret-sync synchronization logs will be stored in this directory
+# ret-sync logs directory
