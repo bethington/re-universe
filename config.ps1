@@ -71,18 +71,29 @@ function Test-Configuration {
     Write-Host "=== Configuration Validation ===" -ForegroundColor Cyan
     
     if (!(Test-Path $envFile)) {
-        Write-Host "âŒ No .env file found" -ForegroundColor Red
-        return $false
+        Write-Host "No .env file found. Creating from example..." -ForegroundColor Yellow
+        if (Test-Path $exampleFile) {
+            Copy-Item $exampleFile $envFile
+            Write-Host "✅ Created .env file from example" -ForegroundColor Green
+        } else {
+            Write-Host "❌ No .env.example file found" -ForegroundColor Red
+            return $false
+        }
     }
     
+    # Parse the .env file
     $config = @{}
-    Get-Content $envFile | Where-Object { $_ -match '^([^#][^=]*)=(.*)$' } | ForEach-Object {
-        $regexMatches = [regex]::Match($_, '^([^#][^=]*)=(.*)$')
-        $key = $regexMatches.Groups[1].Value.Trim()
-        $rawValue = $regexMatches.Groups[2].Value.Trim()
-        # Remove inline comments (everything after # if present)
-        $value = if ($rawValue -match '^([^#]*?)(\s*#.*)?$') { $Matches[1].Trim() } else { $rawValue }
-        $config[$key] = $value
+    Get-Content $envFile | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and !$line.StartsWith("#")) {
+            if ($line -match '^([A-Za-z_][A-Za-z0-9_]*)=(.*)$') {
+                $key = $Matches[1]
+                $rawValue = $Matches[2].Trim()
+                # Remove inline comments (everything after # if present)
+                $value = if ($rawValue -match '^([^#]*?)(\s*#.*)?$') { $Matches[1].Trim() } else { $rawValue }
+                $config[$key] = $value
+            }
+        }
     }
     
     $valid = $true
