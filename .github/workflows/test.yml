@@ -51,6 +51,12 @@ jobs:
     
     - name: Test Individual PowerShell Scripts
       run: |
+        # Create .env file for CI environment
+        if (!(Test-Path ".env")) {
+            Copy-Item ".env.example" ".env"
+            Write-Host "Created .env file for testing"
+        }
+        
         # Test config script specifically
         .\config.ps1 -Action validate
         Write-Host "✅ Configuration validation passed"
@@ -99,6 +105,12 @@ jobs:
     
     - name: Test Individual Bash Scripts
       run: |
+        # Create .env file for CI environment
+        if [ ! -f ".env" ]; then
+            cp ".env.example" ".env"
+            echo "Created .env file for testing"
+        fi
+        
         # Test config script specifically
         ./config.sh -Action validate
         echo "✅ Configuration validation passed"
