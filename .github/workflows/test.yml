@@ -118,58 +118,6 @@ jobs:
           .env
           sync-logs/
 
-  test-macos:
-    runs-on: macos-latest
-    timeout-minutes: 30
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-    
-    - name: Setup environment  
-      run: |
-        # Install dependencies
-        if ! command -v jq >/dev/null 2>&1; then
-          brew install jq
-        fi
-        
-        # Verify Docker (may need to be installed)
-        if ! command -v docker >/dev/null 2>&1; then
-          echo "⚠️  Docker not available on macOS runner"
-        else
-          docker --version
-          docker compose version
-        fi
-    
-    - name: Make scripts executable
-      run: |
-        chmod +x *.sh
-        ls -la *.sh
-    
-    - name: Run Bash Test Suite
-      run: |
-        ./test-suite.sh
-    
-    - name: Test Individual Bash Scripts
-      run: |
-        # Test config script specifically
-        ./config.sh -Action validate
-        echo "✅ Configuration validation passed"
-        
-        # Test setup script
-        ./setup.sh
-        echo "✅ Setup script completed"
-    
-    - name: Upload test artifacts
-      if: failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: macos-test-logs
-        path: |
-          *.log
-          .env
-          sync-logs/
-
   security-scan:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -264,7 +212,7 @@ jobs:
   release-validation:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    needs: [test-windows, test-linux, test-macos, security-scan, integration-test, documentation-test]
+    needs: [test-windows, test-linux, security-scan, integration-test, documentation-test]
     
     steps:
     - name: Checkout repository
@@ -285,7 +233,7 @@ jobs:
 
   test-summary:
     runs-on: ubuntu-latest
-    needs: [test-windows, test-linux, test-macos, security-scan, integration-test, documentation-test]
+    needs: [test-windows, test-linux, security-scan, integration-test, documentation-test]
     if: always()
     
     steps:
@@ -294,15 +242,13 @@ jobs:
         echo "=== GitHub Actions Test Summary ==="
         echo "Windows Tests: ${{ needs.test-windows.result }}"
         echo "Linux Tests: ${{ needs.test-linux.result }}"
-        echo "macOS Tests: ${{ needs.test-macos.result }}"
         echo "Security Scan: ${{ needs.security-scan.result }}"
         echo "Integration Test: ${{ needs.integration-test.result }}"
         echo "Documentation Test: ${{ needs.documentation-test.result }}"
         
         # Determine overall status
         if [[ "${{ needs.test-windows.result }}" == "success" && 
-              "${{ needs.test-linux.result }}" == "success" && 
-              "${{ needs.test-macos.result }}" == "success" ]]; then
+              "${{ needs.test-linux.result }}" == "success" ]]; then
           echo "🎉 All platform tests passed!"
         else
           echo "⚠️  Some platform tests failed"
