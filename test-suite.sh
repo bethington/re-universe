@@ -54,7 +54,7 @@ test_prerequisites() {
     fi
     
     # Docker Compose
-    if command -v docker-compose >/dev/null 2>&1; then
+    if command -v docker-compose >/dev/null 2>&1 || docker compose version >/dev/null 2>&1; then
         test_pass "Docker Compose is installed"
     else
         test_fail "Docker Compose is not installed"
@@ -193,14 +193,20 @@ test_docker_config() {
     test_start "Docker Configuration Validation"
     
     # Test docker-compose file syntax
-    if docker-compose config >/dev/null 2>&1; then
+    if command -v docker-compose >/dev/null 2>&1; then
+        DOCKER_COMPOSE_CMD="docker-compose"
+    else
+        DOCKER_COMPOSE_CMD="docker compose"
+    fi
+    
+    if $DOCKER_COMPOSE_CMD config >/dev/null 2>&1; then
         test_pass "docker-compose.yml syntax is valid"
     else
         test_fail "docker-compose.yml has syntax errors"
     fi
     
     # Test that required services are defined
-    if docker-compose config 2>/dev/null | grep -q "ghidra-server"; then
+    if $DOCKER_COMPOSE_CMD config 2>/dev/null | grep -q "ghidra-server"; then
         test_pass "ghidra-server service is defined"
     else
         test_fail "ghidra-server service not found in docker-compose.yml"

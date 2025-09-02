@@ -102,7 +102,7 @@ jobs:
       if: always()
       run: |
         ./stop.sh || true
-        docker-compose down --volumes --remove-orphans || true
+        docker compose down --volumes --remove-orphans || true
     
     - name: Upload performance artifacts
       if: always()

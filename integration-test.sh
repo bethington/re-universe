@@ -21,7 +21,11 @@ cleanup() {
     if [[ "$CLEANUP_ON_EXIT" == "true" ]]; then
         echo -e "\n${YELLOW}Cleaning up integration test...${NC}"
         ./stop.sh >/dev/null 2>&1 || true
-        docker-compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+        if command -v docker-compose &> /dev/null; then
+            docker-compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+        else
+            docker compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+        fi
         
         # Remove test backup if it exists
         rm -f "backups/${TEST_BACKUP_NAME}.zip" 2>/dev/null || true

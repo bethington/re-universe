@@ -96,11 +96,11 @@ jobs:
     - name: Test Docker Configuration
       run: |
         # Validate docker-compose syntax
-        docker-compose config > /dev/null
+        docker compose config > /dev/null
         echo "✅ docker-compose.yml syntax valid"
         
         # Check that ghidra-server service is defined
-        if docker-compose config | grep -q "ghidra-server"; then
+        if docker compose config | grep -q "ghidra-server"; then
           echo "✅ ghidra-server service defined"
         else
           echo "❌ ghidra-server service missing"
@@ -135,7 +135,7 @@ jobs:
         echo "✅ Configuration valid"
         
         # Test Docker Compose (syntax only in CI)
-        docker-compose config > /dev/null
+        docker compose config > /dev/null
         echo "✅ Docker configuration valid"
         
         # Test that .env was created properly

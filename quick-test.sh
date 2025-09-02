@@ -22,7 +22,7 @@ else
     exit 1
 fi
 
-if command -v docker-compose >/dev/null 2>&1; then
+if command -v docker-compose >/dev/null 2>&1 || docker compose version >/dev/null 2>&1; then
     echo -e "${GREEN}✅ Docker Compose available${NC}"
 else
     echo -e "${RED}❌ Docker Compose not found${NC}"

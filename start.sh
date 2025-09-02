@@ -2,7 +2,12 @@
 # RE Analysis Platform - Start Script
 
 echo -e "\033[36mStarting Ghidra Server...\033[0m"
-docker-compose up -d
+# Check if docker-compose command exists, otherwise use docker compose
+if command -v docker-compose &> /dev/null; then
+    docker-compose up -d
+else
+    docker compose up -d
+fi
 
 echo -e "\033[33mWaiting for server initialization...\033[0m"
 sleep 60

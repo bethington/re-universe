@@ -32,8 +32,9 @@ jobs:
     
     - name: Validate Docker Installation
       run: |
+        # Docker Desktop should be pre-installed on windows-latest
         docker --version
-        docker-compose --version
+        docker compose version
         # Ensure Docker service is running
         Start-Service docker -ErrorAction SilentlyContinue
       shell: powershell
@@ -80,7 +81,7 @@ jobs:
         
         # Verify Docker
         docker --version
-        docker-compose --version
+        docker compose version
     
     - name: Make scripts executable
       run: |
@@ -104,7 +105,7 @@ jobs:
     - name: Test Docker Compose (Limited)
       run: |
         # Validate docker-compose syntax
-        docker-compose config
+        docker compose config
         echo "✅ Docker Compose configuration valid"
     
     - name: Upload test artifacts
@@ -137,7 +138,7 @@ jobs:
           echo "⚠️  Docker not available on macOS runner"
         else
           docker --version
-          docker-compose --version
+          docker compose version
         fi
     
     - name: Make scripts executable

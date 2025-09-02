@@ -18,7 +18,7 @@ fi
 echo "✓ Docker is available"
 
 # Check Docker Compose
-if ! command -v docker-compose &> /dev/null; then
+if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
     echo "ERROR: Docker Compose is required but not installed"
     exit 1
 fi
@@ -51,7 +51,13 @@ echo "✓ Directory structure created"
 # Pull Docker images (unless skipped)
 if [ "$SKIP_DOCKER_PULL" != "true" ]; then
     echo "Pulling Docker images..."
-    if docker-compose pull; then
+    if command -v docker-compose &> /dev/null; then
+        DOCKER_COMPOSE_CMD="docker-compose"
+    else
+        DOCKER_COMPOSE_CMD="docker compose"
+    fi
+    
+    if $DOCKER_COMPOSE_CMD pull; then
         echo "✓ Docker images updated"
     else
         echo "WARNING: Could not pull Docker images. You may need to run this manually."
