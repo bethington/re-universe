@@ -17,6 +17,28 @@ services:
     networks:
       - backend
 
+  # PostgreSQL database for BSim functionality
+  bsim-postgres:
+    image: postgres:15
+    container_name: bsim-postgres
+    environment:
+      - POSTGRES_DB=${BSIM_DB_NAME:-bsim}
+      - POSTGRES_USER=${BSIM_DB_USER:-bsim_user}
+      - POSTGRES_PASSWORD=${BSIM_DB_PASSWORD:-bsim_password}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
+    ports:
+      - "${BSIM_DB_PORT:-5432}:5432"
+    volumes:
+      - bsim_postgres_data:/var/lib/postgresql/data
+      - ./bsim-init:/docker-entrypoint-initdb.d
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${BSIM_DB_USER:-bsim_user} -d ${BSIM_DB_NAME:-bsim}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ret-sync relay server (placeholder for future implementation)
   ret-sync-relay:
     image: alpine:latest
@@ -28,8 +50,12 @@ services:
       - ${SYNC_LOGS_PATH:-./sync-logs}:/sync-logs
     depends_on:
       - ghidra-server
+      - bsim-postgres
     networks:
       - backend
+
+volumes:
+  bsim_postgres_data:
 
 networks:
   backend:
