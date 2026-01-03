@@ -140,8 +140,17 @@ SSL certificates are automatically generated and configured:
 
 ## 📊 Database Schema
 
-### Core Tables
-- **executable**: Binary metadata (MD5, architecture, compiler)
+### Official Ghidra BSim Tables
+- **exetable**: Official executable metadata table (MD5, architecture, compiler)
+- **desctable**: Function descriptions with signatures and addresses
+- **vectable**: LSH vector storage with compressed binary data
+- **callgraphtable**: Function call graph relationships
+- **execattable**: Executable attributes and categories
+- **weighttable**: LSH weight coefficients (583 entries for large_32)
+- **idflookup**: ID mapping table for BSim operations
+
+### Additional Tables (Backwards Compatibility)
+- **executable**: Extended binary metadata (mirrors exetable with additional fields)
 - **function**: Function definitions with addresses
 - **signature**: LSH feature vectors for similarity matching
 - **vector**: Individual LSH hash values
@@ -272,7 +281,25 @@ cd ghidra/Ghidra/Features/BSim/src/lshvector
 make clean && make && sudo make install
 ```
 
-#### 5. Performance Issues
+#### 5. "Column 'architecture' does not exist"
+```bash
+# This error indicates schema compatibility issues
+# The database schema has been updated to include all required tables
+# Verify the schema includes official Ghidra BSim tables
+docker exec bsim-postgres psql -U ben -d bsim -c "\dt"
+
+# Check if exetable has architecture column
+docker exec bsim-postgres psql -U ben -d bsim -c "\d exetable" | grep architecture
+```
+
+#### 6. "Table 'exetable' does not exist"
+```bash
+# This indicates the schema wasn't properly initialized
+# Reinitialize with the updated schema
+docker exec bsim-postgres psql -U ben -d bsim -f /docker-entrypoint-initdb.d/create-bsim-schema.sql
+```
+
+#### 7. Performance Issues
 ```bash
 # Check database size
 docker exec bsim-postgres psql -U ben -d bsim -c "SELECT * FROM bsim_statistics;"

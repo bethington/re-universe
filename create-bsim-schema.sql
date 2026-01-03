@@ -13,21 +13,43 @@ SET search_path TO public;
 -- Create keyvaluetable for BSim configuration
 CREATE TABLE IF NOT EXISTS keyvaluetable (
     key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
+    value TEXT NOT NULL,
+    val TEXT  -- Ghidra may use 'val' instead of 'value'
 );
 
 -- Insert BSim configuration from large_32.xml
-INSERT INTO keyvaluetable (key, value) VALUES
-    ('BSimConfigInfo', '<info><name>Large 32-bit</name><owner>Ubuntu Linux BSim</owner><description>A large (~100 million functions) database tuned for 32-bit executables</description><major>0</major><minor>0</minor><settings>0x49</settings></info>'),
-    ('k', '19'),
-    ('L', '232'),
-    ('weightsfile', 'lshweights_32.xml'),
-    ('template', 'large_32'),
-    ('created_timestamp', EXTRACT(EPOCH FROM NOW())::TEXT),
-    ('schema_version', '1.0')
-ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+INSERT INTO keyvaluetable (key, value, val) VALUES
+    ('BSimConfigInfo', '<info><name>Large 32-bit</name><owner>Ubuntu Linux BSim</owner><description>A large (~100 million functions) database tuned for 32-bit executables</description><major>0</major><minor>0</minor><settings>0x49</settings></info>', '<info><name>Large 32-bit</name><owner>Ubuntu Linux BSim</owner><description>A large (~100 million functions) database tuned for 32-bit executables</description><major>0</major><minor>0</minor><settings>0x49</settings></info>'),
+    ('k', '19', '19'),
+    ('L', '232', '232'),
+    ('weightsfile', 'lshweights_32.xml', 'lshweights_32.xml'),
+    ('template', 'large_32', 'large_32'),
+    ('created_timestamp', EXTRACT(EPOCH FROM NOW())::TEXT, EXTRACT(EPOCH FROM NOW())::TEXT),
+    ('schema_version', '1.0', '1.0')
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, val = EXCLUDED.val;
 
--- Create BSim executable table (enhanced for large scale)
+-- Create official Ghidra BSim exetable (executable table)
+CREATE TABLE IF NOT EXISTS exetable (
+    id BIGSERIAL PRIMARY KEY,
+    md5 VARCHAR(32) UNIQUE NOT NULL,
+    name_exec VARCHAR(1024),
+    arch VARCHAR(64),
+    name_compiler VARCHAR(128),
+    version_compiler VARCHAR(128),
+    name_category VARCHAR(256),
+    date_create TIMESTAMP,
+    repo VARCHAR(512),
+    repository VARCHAR(512),  -- Ghidra BSim may use "repository" instead of "repo"
+    path VARCHAR(2048),
+    description TEXT,
+    ingest_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    architecture VARCHAR(64),  -- Required for Ghidra compatibility
+    compiler_name VARCHAR(128),  -- Alternative column name Ghidra may use
+    compiler_version VARCHAR(128),  -- Alternative column name Ghidra may use
+    executable_name VARCHAR(1024)  -- Alternative column name Ghidra may use
+);
+
+-- Create BSim executable table (enhanced for large scale) - for backwards compatibility
 CREATE TABLE IF NOT EXISTS executable (
     id BIGSERIAL PRIMARY KEY,
     md5 VARCHAR(32) UNIQUE NOT NULL,
@@ -65,7 +87,156 @@ INSERT INTO executable_category (category_name, description) VALUES
     ('MALWARE', 'Malicious software')
 ON CONFLICT (category_name) DO NOTHING;
 
--- Create BSim function table (optimized for large datasets)
+-- Insert default architectures
+INSERT INTO archtable (name, description) VALUES
+    ('x86-32', '32-bit x86 architecture'),
+    ('x86-64', '64-bit x86 architecture'),
+    ('ARM', 'ARM architecture'),
+    ('MIPS', 'MIPS architecture'),
+    ('unknown', 'Unknown architecture')
+ON CONFLICT (name) DO NOTHING;
+
+-- Insert default compilers
+INSERT INTO comptable (name, version, val, description) VALUES
+    ('gcc', '13.0', 'gcc-13.0', 'GNU Compiler Collection 13.0'),
+    ('clang', '15.0', 'clang-15.0', 'LLVM Clang 15.0'),
+    ('msvc', '19.0', 'msvc-19.0', 'Microsoft Visual C++ 19.0'),
+    ('unknown', '', 'unknown', 'Unknown compiler')
+ON CONFLICT DO NOTHING;
+
+-- Insert default repositories
+INSERT INTO repotable (name, url, val, description) VALUES
+    ('local', 'file:///', 'local', 'Local file system'),
+    ('ghidra', 'ghidra://localhost/', 'ghidra-local', 'Local Ghidra project'),
+    ('unknown', '', 'unknown', 'Unknown repository')
+ON CONFLICT DO NOTHING;
+
+-- Insert default paths
+INSERT INTO pathtable (path, parent_id, val, description) VALUES
+    ('/', NULL, 'root', 'Root directory'),
+    ('/bin', 1, 'bin', 'Binary directory'),
+    ('/lib', 1, 'lib', 'Library directory'),
+    ('/tmp', 1, 'tmp', 'Temporary directory'),
+    ('unknown', NULL, 'unknown', 'Unknown path')
+ON CONFLICT DO NOTHING;
+
+-- Create official Ghidra BSim desctable (function description table)
+CREATE TABLE IF NOT EXISTS desctable (
+    id BIGSERIAL PRIMARY KEY,
+    name_func TEXT,
+    id_exe INTEGER,
+    id_signature BIGINT,
+    flags INTEGER,
+    addr BIGINT,
+    val TEXT  -- Ghidra may require val column
+);
+
+-- Create official Ghidra BSim vectable (LSH vector table)
+CREATE TABLE IF NOT EXISTS vectable (
+    id BIGINT,
+    count INTEGER,
+    vec LSHVECTOR,
+    val TEXT,  -- Ghidra may require val column
+    CONSTRAINT vectable_id_key UNIQUE (id)
+);
+
+-- Create official Ghidra BSim callgraphtable (call graph relationships)
+CREATE TABLE IF NOT EXISTS callgraphtable (
+    src BIGINT NOT NULL,
+    dest BIGINT NOT NULL,
+    PRIMARY KEY (src, dest)
+);
+
+-- Create official Ghidra BSim execattable (executable attributes)
+CREATE TABLE IF NOT EXISTS execattable (
+    id_exe INTEGER,
+    id_type INTEGER,
+    id_category INTEGER,
+    val TEXT  -- Ghidra may require val column
+);
+
+-- Create official Ghidra BSim archtable (architecture definitions)
+CREATE TABLE IF NOT EXISTS archtable (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(128) UNIQUE,  -- Allow NULL as Ghidra may insert NULL names
+    description TEXT,
+    val TEXT  -- Ghidra may require val column
+);
+
+-- Create additional BSim tables that may be required
+CREATE TABLE IF NOT EXISTS valtable (
+    id SERIAL PRIMARY KEY,
+    val TEXT
+);
+
+CREATE TABLE IF NOT EXISTS typetable (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(128),
+    val TEXT
+);
+
+CREATE TABLE IF NOT EXISTS categorytable (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(128),
+    val TEXT
+);
+
+-- Create additional BSim support tables for comprehensive compatibility
+CREATE TABLE IF NOT EXISTS execat (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(256),
+    val TEXT
+);
+
+CREATE TABLE IF NOT EXISTS exeattable (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(256),
+    val TEXT
+);
+
+CREATE TABLE IF NOT EXISTS functiontags (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(256),
+    val TEXT
+);
+
+CREATE TABLE IF NOT EXISTS datecolumn (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(256),
+    val TEXT
+);
+
+CREATE TABLE IF NOT EXISTS dbinfo (
+    id SERIAL PRIMARY KEY,
+    property VARCHAR(256),
+    val TEXT
+);
+
+CREATE TABLE IF NOT EXISTS comptable (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(256),
+    version VARCHAR(256),
+    val TEXT,
+    description TEXT
+);
+
+CREATE TABLE IF NOT EXISTS repotable (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(512),
+    url VARCHAR(1024),
+    val TEXT,
+    description TEXT
+);
+
+CREATE TABLE IF NOT EXISTS pathtable (
+    id SERIAL PRIMARY KEY,
+    path VARCHAR(2048),
+    parent_id INTEGER,
+    val TEXT,
+    description TEXT
+);
+
+-- Create BSim function table (optimized for large datasets) - for backwards compatibility
 CREATE TABLE IF NOT EXISTS function (
     id BIGSERIAL PRIMARY KEY,
     name_func VARCHAR(512),
@@ -130,7 +301,14 @@ INSERT INTO feature (name, description, weight) VALUES
 ON CONFLICT (name) DO UPDATE SET weight = EXCLUDED.weight;
 
 -- Create performance indexes for large_32 template
--- Primary performance indexes
+-- Official Ghidra BSim table indexes
+CREATE INDEX IF NOT EXISTS idx_exetable_md5_hash ON exetable USING hash (md5);
+CREATE INDEX IF NOT EXISTS idx_exetable_architecture ON exetable(architecture);
+CREATE INDEX IF NOT EXISTS idx_exetable_compiler_name ON exetable(compiler_name);
+CREATE INDEX IF NOT EXISTS exefuncindex ON desctable(id_exe, name_func, addr);
+CREATE INDEX IF NOT EXISTS sigindex ON desctable(id_signature);
+
+-- Primary performance indexes for custom tables (backwards compatibility)
 CREATE INDEX IF NOT EXISTS idx_executable_md5_hash ON executable USING hash (md5);
 CREATE INDEX IF NOT EXISTS idx_executable_category ON executable(name_category);
 CREATE INDEX IF NOT EXISTS idx_executable_arch ON executable(arch);
@@ -233,6 +411,55 @@ $$ LANGUAGE plpgsql;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ben;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ben;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO ben;
+
+-- Create BSim LSH functions that Ghidra expects
+CREATE OR REPLACE FUNCTION insert_vec(vector_data lshvector)
+RETURNS INTEGER AS $$
+DECLARE
+    new_id INTEGER;
+BEGIN
+    INSERT INTO vectable (vec, count)
+    VALUES (vector_data, 1)
+    RETURNING id INTO new_id;
+
+    RETURN new_id;
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION insert_vec(sig_id BIGINT, vector_data lshvector)
+RETURNS INTEGER AS $$
+DECLARE
+    new_id BIGINT;
+BEGIN
+    INSERT INTO vectable (id, vec, count)
+    VALUES (sig_id, vector_data, 1)
+    RETURNING id INTO new_id;
+
+    RETURN new_id;
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION insert_vec(vector_text TEXT)
+RETURNS INTEGER AS $$
+DECLARE
+    new_id BIGINT;
+BEGIN
+    INSERT INTO vectable (vec, count)
+    VALUES (vector_text::lshvector, 1)
+    RETURNING id INTO new_id;
+
+    RETURN new_id;
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
 
 -- Update statistics for query optimization
 ANALYZE;
