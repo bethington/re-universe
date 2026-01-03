@@ -54,11 +54,31 @@ check_env_file() {
         cat > "$ENV_FILE" << 'EOF'
 # BSim Database Configuration
 BSIM_DB_NAME=bsim
-BSIM_DB_USER=ben
-BSIM_DB_PASSWORD=***REMOVED***
+BSIM_DB_USER=bsim_user
+BSIM_DB_PASSWORD=CHANGE_ME_SECURE_PASSWORD
 BSIM_DB_PORT=5432
 EOF
         print_success "Created $ENV_FILE with default BSim configuration"
+        print_error "SECURITY WARNING: Default credentials created!"
+        print_error "You MUST change BSIM_DB_PASSWORD before production use!"
+        print_error "See PRODUCTION-SECURITY.md for guidance."
+    fi
+}
+
+# Function to validate security settings
+validate_security() {
+    if [[ -f "$ENV_FILE" ]]; then
+        if grep -q "CHANGE_ME_SECURE_PASSWORD\|***REMOVED***\|bsim_password" "$ENV_FILE"; then
+            print_error "SECURITY WARNING: Default/insecure passwords detected!"
+            print_error "Change credentials in $ENV_FILE before production use."
+            print_error "See PRODUCTION-SECURITY.md for guidance."
+
+            read -p "Continue anyway? (NOT recommended for production) [y/N]: " confirm
+            if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+                print_status "Stopped for security. Please update credentials in $ENV_FILE"
+                exit 1
+            fi
+        fi
     fi
 }
 
@@ -223,6 +243,7 @@ main() {
     # Pre-flight checks
     check_docker
     check_env_file
+    validate_security
     check_compose_file
 
     # Start the container

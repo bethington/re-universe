@@ -2,7 +2,15 @@
 
 This project provides a complete, production-ready setup for Ghidra BSim (Binary Similarity) analysis with a PostgreSQL database backend. BSim enables you to find similar functions across different binaries, making it invaluable for malware analysis, code reuse detection, and reverse engineering.
 
+## 🚨 **SECURITY WARNING**
+
+> **⚠️ CRITICAL**: This setup contains default credentials for development/testing only.
+> **NEVER use default credentials in production environments.**
+> **See [PRODUCTION-SECURITY.md](PRODUCTION-SECURITY.md) for production deployment guidance.**
+
 ## 🚀 Quick Start
+
+### Development/Testing Setup
 
 1. **Start the BSim database:**
    ```bash
@@ -11,13 +19,22 @@ This project provides a complete, production-ready setup for Ghidra BSim (Binary
 
 2. **Connect from Ghidra:**
    - Open Ghidra → Tools → BSim Search
-   - Server: `postgresql://ben:***REMOVED***@localhost:5432/bsim`
+   - Server: `postgresql://[username]:[password]@localhost:5432/bsim`
    - Check "Use SSL"
 
 3. **Ingest your first binary:**
    ```bash
    ./ingest-binary.sh /path/to/your/executable.exe
    ```
+
+### Production Deployment
+
+**🔒 For production use:**
+1. **Read [PRODUCTION-SECURITY.md](PRODUCTION-SECURITY.md) first**
+2. **Change ALL default credentials in `.env`**
+3. **Generate secure SSL certificates**
+4. **Configure firewall and monitoring**
+5. **Test security controls**
 
 ## 📋 Prerequisites
 
