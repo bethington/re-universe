@@ -3,6 +3,8 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://docker.com)
 [![Ghidra](https://img.shields.io/badge/Ghidra_BSim-PostgreSQL-orange.svg)](https://ghidra-sre.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue.svg)](https://postgresql.org)
+[![Security](https://img.shields.io/badge/Security-Production_Ready-green.svg)](PRODUCTION-SECURITY.md)
+[![Version](https://img.shields.io/badge/Version-v1.0.0-blue.svg)](VERSION)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 A comprehensive Docker-based platform for **Ghidra BSim (Binary Similarity)** analysis with PostgreSQL backend. This setup enables large-scale binary similarity analysis, malware family classification, and code reuse detection using Ghidra's official BSim tools with a production-ready PostgreSQL database.
