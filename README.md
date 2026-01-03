@@ -51,14 +51,14 @@ cd re-universe
 
 ### 2. Connect from Ghidra
 1. Open Ghidra → **Tools** → **BSim Search**
-2. Server: `postgresql://ben:goodyx12@localhost:5432/bsim`
+2. Server: `postgresql://[username]:[password]@localhost:5432/bsim`
 3. Enable **"Use SSL"**
 4. Test connection
 
 ### 3. Ingest Your First Binary
 ```bash
 # Using Ghidra BSim tools
-./ghidra/Ghidra/RuntimeScripts/Linux/support/bsim postgresql://ben:goodyx12@localhost:5432/bsim -addexe /path/to/your/binary.exe
+./ghidra/Ghidra/RuntimeScripts/Linux/support/bsim postgresql://[username]:[password]@localhost:5432/bsim -addexe /path/to/your/binary.exe
 
 # Or use the included script
 ./ingest-binary.sh /path/to/your/binary.exe
@@ -117,8 +117,8 @@ Edit `.env` to customize your setup:
 ```bash
 # BSim Database Configuration
 BSIM_DB_NAME=bsim
-BSIM_DB_USER=ben
-BSIM_DB_PASSWORD=goodyx12
+BSIM_DB_USER=bsim_user
+BSIM_DB_PASSWORD=your_secure_password
 BSIM_DB_PORT=5432
 
 # Database Template (large_32, large_64, medium_32, etc.)
@@ -397,8 +397,8 @@ conn = psycopg2.connect(
     host="localhost",
     port=5432,
     database="bsim",
-    user="ben",
-    password="goodyx12",
+    user="your_username",
+    password="your_password",
     sslmode="require"
 )
 
@@ -422,10 +422,18 @@ print(json.dumps(results, indent=2))
 
 ## 📄 Documentation
 
-### Detailed Setup Guide
+### Setup & Configuration
 - **[BSIM-SETUP.md](BSIM-SETUP.md)** - Comprehensive setup and configuration guide
+- **[PRODUCTION-SECURITY.md](PRODUCTION-SECURITY.md)** - **Critical security requirements for production**
+- **[PRODUCTION-DEPLOYMENT.md](PRODUCTION-DEPLOYMENT.md)** - **Step-by-step production deployment guide**
+
+### Operations & Troubleshooting
 - **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Detailed troubleshooting procedures
 - **[API.md](API.md)** - Database schema and API reference
+
+### 🚨 **Security Notice**
+> **⚠️ IMPORTANT**: This platform contains default credentials for development only.
+> **Read [PRODUCTION-SECURITY.md](PRODUCTION-SECURITY.md) before production deployment.**
 
 ### Script Reference
 - **[start-bsim.sh](start-bsim.sh)** - Start BSim database (`--help` for options)
