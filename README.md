@@ -15,6 +15,7 @@ A comprehensive Docker-based platform for **Ghidra BSim (Binary Similarity)** an
 - **Large-Scale Analysis** - Supports ~100 million functions with large_32 template
 - **PostgreSQL Backend** - Production-ready database with SSL support
 - **Official LSH Extension** - Built from Ghidra source for optimal performance
+- **Schema Compatibility** - Official Ghidra BSim tables (exetable, desctable, vectable) with full compatibility
 - **Automated Setup** - One-command database initialization and schema creation
 - **Comprehensive Testing** - Automated validation of all components
 
