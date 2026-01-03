@@ -54,7 +54,9 @@ This project provides a complete, production-ready setup for Ghidra BSim (Binary
 The PostgreSQL LSH extension must be built from Ghidra source:
 
 ```bash
-# Clone official Ghidra repository
+# Clone official Ghidra repository (OUTSIDE the re-universe project)
+# Do this in a separate directory (e.g., /opt or ~/projects)
+cd /opt  # or your preferred location for external projects
 git clone https://github.com/NationalSecurityAgency/ghidra.git
 cd ghidra
 

@@ -89,15 +89,19 @@ cd re-universe
 ### Manual Setup (For Custom Configurations)
 
 #### 1. LSH Extension Build
+
+**Important**: Ghidra is a separate project. Clone it outside this repository.
+
 ```bash
 # Clone Ghidra source (required for LSH extension)
+# Do this OUTSIDE the re-universe project directory
+cd /opt  # or your preferred location for external projects
 git clone https://github.com/NationalSecurityAgency/ghidra.git
 cd ghidra/Ghidra/Features/BSim/src/lshvector
 
 # Build and install LSH extension
 make
 sudo make install
-cd ../../../../..
 ```
 
 #### 2. Database Setup
