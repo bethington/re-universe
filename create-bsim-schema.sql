@@ -33,8 +33,12 @@ CREATE TABLE IF NOT EXISTS executable (
     md5 VARCHAR(32) UNIQUE NOT NULL,
     name_exec VARCHAR(1024),
     arch VARCHAR(64),
+    architecture VARCHAR(64),  -- Ghidra BSim expects this column name
     name_compiler VARCHAR(128),
+    compiler_name VARCHAR(128),  -- Alternative column name Ghidra may use
     version_compiler VARCHAR(128),
+    compiler_version VARCHAR(128),  -- Alternative column name Ghidra may use
+    executable_name VARCHAR(1024),  -- Alternative column name Ghidra may use
     name_category VARCHAR(256),
     date_create TIMESTAMP,
     repo VARCHAR(512),
@@ -130,6 +134,8 @@ ON CONFLICT (name) DO UPDATE SET weight = EXCLUDED.weight;
 CREATE INDEX IF NOT EXISTS idx_executable_md5_hash ON executable USING hash (md5);
 CREATE INDEX IF NOT EXISTS idx_executable_category ON executable(name_category);
 CREATE INDEX IF NOT EXISTS idx_executable_arch ON executable(arch);
+CREATE INDEX IF NOT EXISTS idx_executable_architecture ON executable(architecture);
+CREATE INDEX IF NOT EXISTS idx_executable_compiler_name ON executable(compiler_name);
 CREATE INDEX IF NOT EXISTS idx_executable_ingest_date ON executable(ingest_date);
 
 -- Function indexes
