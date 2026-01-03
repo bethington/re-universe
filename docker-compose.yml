@@ -18,23 +18,28 @@ services:
       - backend
 
   # PostgreSQL database for BSim functionality
+  # This provides the database backend that will be used by Ghidra BSim tools
   bsim-postgres:
     image: postgres:15
     container_name: bsim-postgres
     environment:
       - POSTGRES_DB=${BSIM_DB_NAME:-bsim}
-      - POSTGRES_USER=${BSIM_DB_USER:-bsim_user}
-      - POSTGRES_PASSWORD=${BSIM_DB_PASSWORD:-bsim_password}
+      - POSTGRES_USER=${BSIM_DB_USER:-ben}
+      - POSTGRES_PASSWORD=${BSIM_DB_PASSWORD:-goodyx12}
       - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
     ports:
       - "${BSIM_DB_PORT:-5432}:5432"
     volumes:
       - bsim_postgres_data:/var/lib/postgresql/data
-      - ./bsim-init:/docker-entrypoint-initdb.d
+    command: >
+      postgres
+      -c password_encryption=scram-sha-256
+      -c log_statement=all
+      -c log_line_prefix='%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
     networks:
       - backend
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${BSIM_DB_USER:-bsim_user} -d ${BSIM_DB_NAME:-bsim}"]
+      test: ["CMD-SHELL", "pg_isready -U ${BSIM_DB_USER:-ben} -d ${BSIM_DB_NAME:-bsim}"]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -1,145 +1,110 @@
-# 🔍 Reverse Engineering Analysis Platform
+# 🔍 Ghidra BSim PostgreSQL Database Platform
 
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://docker.com)
-[![Cross Platform](https://img.shields.io/badge/Cross_Platform-Windows%20%7C%20Linux%20%7C%20macOS-green.svg)](https://github.com/topics/cross-platform)
-[![Ghidra](https://img.shields.io/badge/Ghidra-Server-orange.svg)](https://ghidra-sre.org)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Ghidra](https://img.shields.io/badge/Ghidra_BSim-PostgreSQL-orange.svg)](https://ghidra-sre.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue.svg)](https://postgresql.org)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A comprehensive Docker-based reverse engineering platform that integrates **Ghidra Server**, **ret-sync**, and **x64dbg** for collaborative static and dynamic analysis. Supports cross-platform development with PowerShell (Windows) and Bash (Linux/macOS) scripts.
+A comprehensive Docker-based platform for **Ghidra BSim (Binary Similarity)** analysis with PostgreSQL backend. This setup enables large-scale binary similarity analysis, malware family classification, and code reuse detection using Ghidra's official BSim tools with a production-ready PostgreSQL database.
 
-## ✨ Features
+## ✨ Key Features
 
-### 🚀 Core Functionality
+### 🚀 BSim Database Platform
+- **Large-Scale Analysis** - Supports ~100 million functions with large_32 template
+- **PostgreSQL Backend** - Production-ready database with SSL support
+- **Official LSH Extension** - Built from Ghidra source for optimal performance
+- **Automated Setup** - One-command database initialization and schema creation
+- **Comprehensive Testing** - Automated validation of all components
 
-- **Ghidra Server Backend** - Collaborative reverse engineering with shared repositories
-- **Cross-Platform Support** - Windows, Linux, and macOS compatibility
-- **Automated Backup System** - Scheduled backups with retention policies
-- **Safety-First Operations** - Confirmation prompts and dry-run modes
-- **Comprehensive Testing** - Automated connectivity and health checks
+### 🛠️ Management & Operations
+- **Automated Backups** - Scheduled weekly backups with retention policies
+- **Real-time Monitoring** - Database performance and capacity monitoring
+- **Health Alerts** - Proactive monitoring with configurable thresholds
+- **SSL Security** - Full SSL/TLS encryption with certificate management
+- **Cross-Platform** - Ubuntu Linux optimized, Windows/macOS compatible
 
-### 🛠️ Management Tools
-
-- **Backup & Restore** - Full and incremental backups with metadata
-- **Data Cleanup** - Safe cleanup while preserving .gitkeep files
-- **Configuration Management** - Environment-based configuration
-- **Connectivity Testing** - Multi-method port and service validation
-- **Automated Scheduling** - Cron-based backup scheduling
-
-### 🔧 Technical Features
-
-- **Docker Integration** - Containerized infrastructure
-- **Environment Variables** - Flexible configuration management
-- **Error Handling** - Comprehensive error handling and logging
-- **Tool Detection** - Graceful handling of missing dependencies
-- **Colored Output** - Enhanced user experience with colored terminal output
-
----
+### 🔬 Analysis Capabilities
+- **Binary Similarity** - Find similar functions across different executables
+- **Malware Analysis** - Classify and cluster malware families
+- **Code Reuse Detection** - Identify shared code libraries and components
+- **Large Dataset Support** - Optimized for enterprise-scale analysis
+- **Ghidra Integration** - Seamless integration with Ghidra BSim tools
 
 ---
 
 ## 🚀 Quick Start
 
-### Windows (PowerShell)
+### Prerequisites
+- Docker and Docker Compose
+- Ghidra 11.4.2 or newer
+- Git for cloning Ghidra source (for LSH extension)
+- 8GB+ RAM recommended
 
-```powershell
-# Clone and navigate to project
+### 1. Start BSim Database
+```bash
 git clone <repository-url>
 cd re-universe
 
-# Start the platform
-.\start.ps1
-
-# Test connectivity
-.\test-connectivity.ps1
-
-# Create a backup
-.\backup.ps1 -BackupName "initial-backup"
+# Start the database
+./start-bsim.sh
 ```
 
-### Linux/macOS (Bash)
+### 2. Connect from Ghidra
+1. Open Ghidra → **Tools** → **BSim Search**
+2. Server: `postgresql://ben:goodyx12@localhost:5432/bsim`
+3. Enable **"Use SSL"**
+4. Test connection
 
+### 3. Ingest Your First Binary
 ```bash
-# Clone and navigate to project
-git clone <repository-url>
-cd re-universe
+# Using Ghidra BSim tools
+./ghidra/Ghidra/RuntimeScripts/Linux/support/bsim postgresql://ben:goodyx12@localhost:5432/bsim -addexe /path/to/your/binary.exe
 
-# Make scripts executable
-chmod +x *.sh
-
-# Start the platform
-./start.sh
-
-# Test connectivity
-./test-connectivity.sh
-
-# Create a backup
-./backup.sh -BackupName "initial-backup"
-```
-
-### Docker Only
-
-```bash
-# Quick start with Docker Compose
-docker-compose up -d
-
-# Check status
-docker-compose ps
+# Or use the included script
+./ingest-binary.sh /path/to/your/binary.exe
 ```
 
 ---
 
----
+## 📋 Installation & Setup
 
-## 📋 Prerequisites
-
-### Required Software
-- **Docker Desktop** (or Docker Engine on Linux)
-- **Git** for cloning the repository
-- **PowerShell 5.1+** (Windows) or **Bash** (Linux/macOS)
-
-### Optional Software
-- **Ghidra** - For client connections to the server
-- **x64dbg** - For dynamic analysis integration
-- **ret-sync** - For Ghidra ↔ debugger synchronization
-
-### System Requirements
-- **RAM**: Minimum 4GB, Recommended 8GB+
-- **Disk Space**: 2GB+ for Docker images and analysis data
-- **Network**: Internet connection for Docker image downloads
-
----
-
-## 📦 Installation
-
-### 1. Clone the Repository
+### Quick Setup (Recommended)
 ```bash
+# Clone the repository
 git clone <repository-url>
 cd re-universe
+
+# Start BSim database
+./start-bsim.sh
+
+# Test the setup
+./test-bsim-setup.sh
+
+# Monitor database status
+./monitor-bsim.sh
 ```
 
-### 2. Environment Setup
+### Manual Setup (For Custom Configurations)
+
+#### 1. LSH Extension Build
 ```bash
-# Copy environment template
-cp .env.example .env
+# Clone Ghidra source (required for LSH extension)
+git clone https://github.com/NationalSecurityAgency/ghidra.git
+cd ghidra/Ghidra/Features/BSim/src/lshvector
 
-# Edit configuration (optional)
-nano .env  # Linux/macOS
-# or
-notepad .env  # Windows
+# Build and install LSH extension
+make
+sudo make install
+cd ../../../../..
 ```
 
-### 3. Make Scripts Executable (Linux/macOS)
+#### 2. Database Setup
 ```bash
-chmod +x *.sh
-```
+# Start PostgreSQL container
+docker-compose up -d bsim-postgres
 
-### 4. First-Time Setup
-```powershell
-# Windows
-.\setup.ps1
-
-# Linux/macOS
-./setup.sh
+# Verify installation
+./test-bsim-setup.sh --comprehensive
 ```
 
 ---
@@ -147,32 +112,34 @@ chmod +x *.sh
 ## ⚙️ Configuration
 
 ### Environment Variables
-
-Create a `.env` file with the following variables:
+Edit `.env` to customize your setup:
 
 ```bash
-# Core Configuration
-GHIDRA_USERS=admin
-GHIDRA_PORT=13100
-GHIDRA_IP=localhost
+# BSim Database Configuration
+BSIM_DB_NAME=bsim
+BSIM_DB_USER=ben
+BSIM_DB_PASSWORD=goodyx12
+BSIM_DB_PORT=5432
+
+# Database Template (large_32, large_64, medium_32, etc.)
+BSIM_TEMPLATE=large_32
 
 # Backup Configuration
-BACKUP_FREQUENCY=hourly
-BACKUP_PATH=./backups
-RETENTION_DAYS=30
-
-# Advanced Settings
-BACKUP_HOUR=02
-BACKUP_MINUTE=00
-LOG_LEVEL=INFO
+BACKUP_RETENTION_WEEKS=4
+BACKUP_SCHEDULE="0 2 * * 0"  # Weekly on Sunday at 2 AM
 ```
 
-### Configuration Files
+### Database Templates
 
-- **`.env`** - Runtime configuration
-- **`docker-compose.yml`** - Container orchestration
-- **`repo-data/`** - Ghidra repository data
-- **`backups/`** - Backup storage location
+| Template | Description | Architecture | Capacity |
+|----------|-------------|--------------|----------|
+| `large_32` | Large database | 32-bit | ~100M functions |
+| `large_64` | Large database | 64-bit | ~100M functions |
+| `medium_32` | Medium database | 32-bit | ~10M functions |
+| `medium_64` | Medium database | 64-bit | ~10M functions |
+| `medium_nosize` | Size-agnostic | Mixed | ~10M functions |
+
+**Recommended**: `large_32` for production use with mixed 32/64-bit binaries.
 
 ---
 
@@ -180,193 +147,130 @@ LOG_LEVEL=INFO
 
 ### Platform Management
 
-#### Start the Platform
-```powershell
-# Windows
-.\start.ps1
-
-# Linux/macOS
-./start.sh
-```
-
-#### Stop the Platform
-```powershell
-# Windows
-.\stop.ps1
-
-# Linux/macOS
-./stop.sh
-```
-
-#### Check Status
+#### Start/Stop Database
 ```bash
-# Docker containers
-docker-compose ps
+# Start BSim database
+./start-bsim.sh
 
-# Detailed status
-docker stats
+# Stop BSim database
+./stop-bsim.sh
+
+# Restart with clean volumes (DATA LOSS!)
+./stop-bsim.sh --remove --volumes
+./start-bsim.sh
 ```
 
-### Connectivity Testing
-
-#### Automated Testing
-```powershell
-# Windows
-.\test-connectivity.ps1
-
-# Linux/macOS
-./test-connectivity.sh
-```
-
-#### Manual Testing
+#### Database Monitoring
 ```bash
-# Test port connectivity
-nc -z localhost 13100
+# Basic status
+./monitor-bsim.sh
 
-# Check Docker logs
-docker logs ghidra-server
+# Detailed metrics
+./monitor-bsim.sh metrics
+
+# Performance monitoring
+./monitor-bsim.sh performance
+
+# Continuous monitoring
+./monitor-bsim.sh watch performance
+
+# Check for alerts
+./monitor-bsim.sh alerts
 ```
 
-### Ghidra Client Connection
+### Binary Analysis Workflows
 
-1. **Open Ghidra Client**
-2. **File → New Project → Shared Project**
-3. **Server**: `localhost:13100`
-4. **Username**: `admin` (or configured user)
-5. **Password**: `changeme`
-6. **Create project**: `my-analysis-project`
+#### 1. Single Binary Analysis
+```bash
+# Ingest binary into BSim database
+./ingest-binary.sh /path/to/malware.exe
 
----
-
-## 💾 Backup & Restore
-
-### Creating Backups
-
-#### Manual Backup
-```powershell
-# Windows - Simple backup
-.\backup.ps1
-
-# Windows - Named backup
-.\backup.ps1 -BackupName "weekly-backup"
-
-# Linux/macOS - Simple backup
-./backup.sh
-
-# Linux/macOS - Named backup
-./backup.sh -BackupName "weekly-backup"
+# Query similar functions in Ghidra
+# Tools → BSim Search → Query Functions
+# Set similarity threshold (0.7+ recommended)
 ```
 
-#### Scheduled Backups
-```powershell
-# Windows - Check schedule
-.\backup-scheduler.ps1
+#### 2. Batch Analysis
+```bash
+# Ingest multiple binaries
+find /malware/samples -name "*.exe" -exec ./ingest-binary.sh {} \;
 
-# Windows - Force backup
-.\backup-scheduler.ps1 --force
-
-# Linux/macOS - Check schedule
-./backup-scheduler.sh
-
-# Linux/macOS - Force backup
-./backup-scheduler.sh --force
+# Parallel ingestion for large datasets
+./parallel-ingest.sh --directory /large/dataset --threads 8
 ```
 
-### Restoring from Backups
+#### 3. Similarity Search
+```bash
+# Command-line similarity query
+./query-bsim.sh --function "main" --threshold 0.8 --output results.json
 
-#### Interactive Restore
-```powershell
-# Windows
-.\restore.ps1 -BackupFile ".\backups\backup-name.zip"
-
-# Linux/macOS
-./restore.sh -BackupFile "./backups/backup-name.zip"
+# Batch similarity analysis
+./batch-similarity.sh --input-list binaries.txt --output similarity-report.json
 ```
 
-#### Force Restore (Skip Confirmation)
-```powershell
-# Windows
-.\restore.ps1 -BackupFile ".\backups\backup-name.zip" -Force
+### Database Administration
 
-# Linux/macOS
-./restore.sh -BackupFile "./backups/backup-name.zip" --force
+#### Backup Management
+```bash
+# Create manual backup
+./bsim-backup.sh --name "pre-analysis-backup"
+
+# List available backups
+ls -la backups/bsim/
+
+# Restore from backup
+./restore-bsim.sh --backup "pre-analysis-backup"
+
+# Automated backup status
+crontab -l | grep bsim
 ```
 
-### Backup Management
+#### Performance Optimization
+```bash
+# Update database statistics
+./maintain-bsim.sh --update-stats
 
-#### List Available Backups
-```powershell
-# Windows
-Get-ChildItem .\backups\*.zip
+# Reindex for better performance
+./maintain-bsim.sh --reindex
 
-# Linux/macOS
-ls -la ./backups/*.zip
-```
-
-#### Backup Information
-```powershell
-# Windows
-.\backup.ps1 -BackupName "test" -BackupPath ".\backups"
-
-# Linux/macOS
-./backup.sh -BackupName "test" -BackupPath "./backups"
+# Clean up orphaned data
+./maintain-bsim.sh --cleanup
 ```
 
 ---
 
-## 🧹 Maintenance
+## 🧪 Testing & Validation
 
-### Data Cleanup
-
-#### Preview Cleanup
-```powershell
-# Windows - Dry run
-.\cleanup.ps1 -DryRun
-
-# Linux/macOS - Dry run
-./cleanup.sh --dry-run
-```
-
-#### Execute Cleanup
-```powershell
-# Windows - With confirmation
-.\cleanup.ps1
-
-# Windows - Force cleanup
-.\cleanup.ps1 -Force
-
-# Linux/macOS - With confirmation
-./cleanup.sh
-
-# Linux/macOS - Force cleanup
-./cleanup.sh --force
-```
-
-#### Selective Cleanup
-```powershell
-# Skip specific folders
-.\cleanup.ps1 -SkipFolders "backups","sync-logs"
-./cleanup.sh --skip-folders backups,sync-logs
-```
-
-### Log Management
-
-#### View Logs
+### Automated Testing
 ```bash
-# Docker container logs
-docker logs ghidra-server
+# Run all tests
+./test-bsim-setup.sh
 
-# Follow logs in real-time
-docker logs -f ghidra-server
+# Run comprehensive tests (includes performance)
+./test-bsim-setup.sh --comprehensive
 
-# Backup scheduler logs
-cat backup-scheduler.log
+# Test specific components
+./test-bsim-setup.sh --test ssl
+./test-bsim-setup.sh --test lsh
+./test-bsim-setup.sh --test schema
+
+# Verbose testing
+./test-bsim-setup.sh --verbose
 ```
 
-#### Log Rotation
+### Manual Validation
 ```bash
-# Manual log cleanup
-find ./sync-logs -name "*.log" -mtime +30 -delete
+# Test database connection
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT version();"
+
+# Verify BSim schema
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT * FROM bsim_database_info();"
+
+# Check LSH extension
+docker exec bsim-postgres psql -U ben -d bsim -c "\dx lsh"
+
+# Test LSH functions
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT lsh_compare('{1,2,3}', '{1,2,4}');"
 ```
 
 ---
@@ -375,213 +279,220 @@ find ./sync-logs -name "*.log" -mtime +30 -delete
 
 ### Common Issues
 
-#### Port Already in Use
-```powershell
-# Windows - Check port usage
-netstat -an | findstr :13100
-
-# Linux/macOS - Check port usage
-netstat -tlnp | grep :13100
-
-# Kill process using port (replace PID)
-taskkill /PID <PID> /F  # Windows
-kill -9 <PID>           # Linux/macOS
-```
-
-#### Container Won't Start
+#### 1. "Database does not exist"
 ```bash
 # Check container status
-docker ps -a
+docker ps | grep bsim-postgres
 
-# View detailed logs
-docker logs ghidra-server
+# Restart container if needed
+docker-compose restart bsim-postgres
 
-# Restart containers
-docker-compose restart
+# Reinitialize if corrupted
+docker-compose down
+docker volume rm re-universe_bsim_postgres_data
+docker-compose up -d bsim-postgres
 ```
 
-#### Connection Refused
+#### 2. "LSH functions not found"
 ```bash
-# Test basic connectivity
-ping localhost
+# Check if LSH extension is installed
+docker exec bsim-postgres psql -U ben -d bsim -c "\dx lsh"
 
-# Test port specifically
-telnet localhost 13100
-
-# Check firewall settings
-# Windows: Windows Defender Firewall
-# Linux: sudo ufw status
-# macOS: System Preferences > Security & Privacy > Firewall
+# Rebuild LSH extension if needed
+cd ghidra/Ghidra/Features/BSim/src/lshvector
+make clean && make && sudo make install
 ```
 
-#### Permission Issues
+#### 3. "SSL connection failed"
 ```bash
-# Fix script permissions (Linux/macOS)
-chmod +x *.sh
+# Check SSL status
+docker exec bsim-postgres psql -U ben -d bsim -c "SHOW ssl;"
 
-# Check file ownership
-ls -la repo-data/
+# Verify certificates
+ls -la ssl/
 
-# Fix ownership if needed
-sudo chown -R $USER:$USER repo-data/
+# Test SSL connection
+PGPASSWORD=goodyx12 psql -h localhost -p 5432 -U ben -d bsim -c "SELECT 'SSL test';" --set=sslmode=require
 ```
 
-### Docker Issues
-
-#### Docker Not Running
+#### 4. Performance Issues
 ```bash
-# Start Docker service
-# Windows: Start Docker Desktop
-# Linux: sudo systemctl start docker
-# macOS: Start Docker Desktop
+# Check database size and usage
+./monitor-bsim.sh metrics
 
-# Verify Docker is running
-docker version
+# Monitor resource usage
+docker stats bsim-postgres
+
+# Consider upgrading template for large datasets
+./migrate-bsim.sh --from large_32 --to large_64
 ```
 
-#### Image Pull Issues
+### Debug Commands
 ```bash
-# Manual image pull
-docker pull blacktop/ghidra:latest
+# Container logs
+docker logs bsim-postgres
 
-# Check disk space
-df -h
+# PostgreSQL logs
+docker exec bsim-postgres tail -f /var/log/postgresql/postgresql-15-main.log
 
-# Clear Docker cache
-docker system prune -a
-```
+# Database diagnostics
+./monitor-bsim.sh alerts
 
-### Performance Issues
-
-#### High Memory Usage
-```bash
-# Check container resource usage
-docker stats
-
-# Limit container memory
-# Edit docker-compose.yml and add memory limits
-```
-
-#### Slow Analysis
-```bash
-# Check system resources
-top  # Linux/macOS
-# Task Manager > Performance  # Windows
-
-# Optimize Ghidra settings
-# Edit ghidra.properties for performance tuning
+# Connection testing
+nc -z localhost 5432
+telnet localhost 5432
 ```
 
 ---
 
-## 🛠️ Development
+## 📚 Advanced Usage
 
-### VS Code Integration
+### Custom Templates
+```bash
+# Create custom BSim template
+./create-bsim-template.sh \
+    --name "malware_analysis" \
+    --k 15 \
+    --L 128 \
+    --description "Optimized for malware analysis"
 
-This project includes comprehensive VS Code configurations:
-
-#### Launch Configurations
-- **🚀 Start Ghidra Server** - Launch the complete platform
-- **🛑 Stop Ghidra Server** - Shutdown all containers
-- **🔧 Setup Environment** - First-time setup
-- **💾 Create Backup** - Manual backup creation
-- **🔄 Restore Backup** - Interactive backup restoration
-- **🔍 Test Connectivity** - Comprehensive testing
-
-#### Recommended Extensions
-```json
-{
-    "recommendations": [
-        "ms-vscode.powershell",
-        "ms-azuretools.vscode-docker",
-        "redhat.vscode-yaml",
-        "ms-vscode.hexeditor",
-        "ms-python.python"
-    ]
-}
+# Use custom template
+./setup-bsim.sh --template "malware_analysis"
 ```
 
-### Project Structure
+### Integration Examples
 
+#### CI/CD Pipeline Integration
+```yaml
+# .github/workflows/malware-analysis.yml
+name: Automated Malware Analysis
+
+on:
+  push:
+    paths: ['samples/**']
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Start BSim Database
+        run: ./start-bsim.sh
+      - name: Analyze New Samples
+        run: ./ci-bsim-analysis.sh --new-samples samples/ --report reports/
+      - name: Upload Results
+        uses: actions/upload-artifact@v2
+        with:
+          name: analysis-results
+          path: reports/
 ```
-re-universe/
-├── .github/
-│   └── copilot-instructions.md
-├── backups/                    # Backup storage
-├── repo-data/                  # Ghidra repository data
-│   ├── server.log             # Server logs
-│   ├── users                  # User database
-│   ├── ~admin/               # Admin user data
-│   └── ~ssh/                 # SSH configuration
-├── sync-logs/                 # ret-sync logs
-├── docker-compose.yml         # Container orchestration
-├── .env                       # Environment configuration
-├── .env.example              # Configuration template
-├── *.ps1                     # PowerShell scripts (Windows)
-├── *.sh                      # Bash scripts (Linux/macOS)
-└── README.md                 # This file
+
+#### Python API Integration
+```python
+import psycopg2
+import json
+
+# Connect to BSim database
+conn = psycopg2.connect(
+    host="localhost",
+    port=5432,
+    database="bsim",
+    user="ben",
+    password="goodyx12",
+    sslmode="require"
+)
+
+# Query similar functions
+cursor = conn.cursor()
+cursor.execute("""
+    SELECT e.name_exec, f.name_func, s.significance
+    FROM executable e
+    JOIN function f ON e.id = f.executable_id
+    JOIN signature s ON f.id = s.function_id
+    WHERE s.significance > 0.8
+    ORDER BY s.significance DESC
+    LIMIT 100
+""")
+
+results = cursor.fetchall()
+print(json.dumps(results, indent=2))
 ```
 
-### Script Categories
+---
 
-#### Management Scripts
-- `start.ps1` / `start.sh` - Start the platform
-- `stop.ps1` / `stop.sh` - Stop the platform
-- `setup.ps1` / `setup.sh` - Initial setup
+## 📄 Documentation
 
-#### Backup & Recovery
-- `backup.ps1` / `backup.sh` - Create backups
-- `restore.ps1` / `restore.sh` - Restore from backups
-- `backup-scheduler.ps1` / `backup-scheduler.sh` - Automated scheduling
+### Detailed Setup Guide
+- **[BSIM-SETUP.md](BSIM-SETUP.md)** - Comprehensive setup and configuration guide
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Detailed troubleshooting procedures
+- **[API.md](API.md)** - Database schema and API reference
 
-#### Maintenance
-- `cleanup.ps1` / `cleanup.sh` - Data cleanup
-- `test-connectivity.ps1` / `test-connectivity.sh` - Connectivity testing
+### Script Reference
+- **[start-bsim.sh](start-bsim.sh)** - Start BSim database (`--help` for options)
+- **[stop-bsim.sh](stop-bsim.sh)** - Stop BSim database
+- **[test-bsim-setup.sh](test-bsim-setup.sh)** - Comprehensive testing
+- **[monitor-bsim.sh](monitor-bsim.sh)** - Database monitoring and alerts
+- **[bsim-backup.sh](bsim-backup.sh)** - Backup management
+
+### Configuration Files
+- **[docker-compose.yml](docker-compose.yml)** - Container orchestration
+- **[create-bsim-schema.sql](create-bsim-schema.sql)** - Database schema definition
+- **[.env.example](.env.example)** - Configuration template
 
 ---
 
 ## 🤝 Contributing
 
 ### Development Setup
-
-1. **Fork the repository**
-2. **Clone your fork**
-   ```bash
-   git clone https://github.com/your-username/re-universe.git
-   cd re-universe
-   ```
-3. **Create a feature branch**
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-4. **Make your changes**
-5. **Test your changes**
-   ```bash
-   # Run tests
-   ./test-connectivity.sh
-
-   # Create test backup
-   ./backup.sh -BackupName "test-feature"
-   ```
-6. **Submit a pull request**
-
-### Guidelines
-
-- **Cross-platform compatibility** - Test on Windows, Linux, and macOS
-- **Documentation** - Update README.md for new features
-- **Testing** - Include tests for new functionality
-- **Code style** - Follow existing patterns in PowerShell and Bash scripts
-- **Commits** - Use descriptive commit messages
+1. Fork the repository
+2. Clone your fork: `git clone https://github.com/your-username/re-universe.git`
+3. Test the setup: `./test-bsim-setup.sh --comprehensive`
+4. Make your changes
+5. Test on multiple platforms (Ubuntu, Windows, macOS)
+6. Submit a pull request
 
 ### Testing Checklist
-
-- [ ] Scripts work on Windows (PowerShell)
-- [ ] Scripts work on Linux (Bash)
-- [ ] Scripts work on macOS (Bash)
+- [ ] BSim database starts correctly
+- [ ] LSH extension functions properly
+- [ ] SSL connections work
 - [ ] Backup/restore cycle works
-- [ ] Cleanup operations work correctly
-- [ ] Error handling is robust
+- [ ] Monitoring scripts function
 - [ ] Documentation is updated
+
+---
+
+## 📞 Support
+
+### Getting Help
+1. **Read the documentation** - [BSIM-SETUP.md](BSIM-SETUP.md) has detailed instructions
+2. **Run diagnostics** - `./test-bsim-setup.sh --verbose`
+3. **Check logs** - `./monitor-bsim.sh logs`
+4. **Search GitHub Issues** - Check existing issues and discussions
+5. **Create new issue** - Provide full error output and system information
+
+### Quick Diagnostics
+```bash
+# Complete system status
+./monitor-bsim.sh alerts
+
+# Database connectivity test
+./test-bsim-setup.sh --test database
+
+# Performance check
+./monitor-bsim.sh performance
+
+# Log analysis
+./monitor-bsim.sh logs
+```
+
+---
+
+## 🙏 Acknowledgments
+
+- **[Ghidra Team](https://github.com/NationalSecurityAgency/ghidra)** - For the excellent BSim framework
+- **[PostgreSQL](https://postgresql.org)** - For robust database backend
+- **[Docker](https://docker.com)** - For containerization platform
+- **Security Research Community** - For feedback and contributions
 
 ---
 
@@ -591,41 +502,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 🙏 Acknowledgments
+*Built with ❤️ for the binary analysis and reverse engineering community*
 
-- **Ghidra Team** - For the excellent reverse engineering framework
-- **ret-sync** - For Ghidra/debugger synchronization
-- **x64dbg** - For dynamic analysis capabilities
-- **Docker** - For containerization technology
-
----
-
-## 📞 Support
-
-### Getting Help
-
-1. **Check the documentation** - This README and inline script help
-2. **Review logs** - Check `sync-logs/` and Docker logs
-3. **Test connectivity** - Run `./test-connectivity.sh`
-4. **Check GitHub Issues** - Search existing issues
-5. **Create an issue** - For bugs or feature requests
-
-### Useful Commands
-
-```bash
-# System status
-docker-compose ps
-docker stats
-
-# Log analysis
-tail -f sync-logs/*.log
-docker logs ghidra-server
-
-# Backup management
-ls -la backups/*.zip
-./backup.sh --help
-```
-
----
-
-*Built with ❤️ for the reverse engineering community*
+> **Security Note**: This platform is designed for defensive security research and malware analysis. Ensure compliance with your organization's security policies and legal requirements when analyzing potentially malicious code.
