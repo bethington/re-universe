@@ -25,7 +25,7 @@ services:
     environment:
       - POSTGRES_DB=${BSIM_DB_NAME:-bsim}
       - POSTGRES_USER=${BSIM_DB_USER:-ben}
-      - POSTGRES_PASSWORD=${BSIM_DB_PASSWORD:-***REMOVED***}
+      - POSTGRES_PASSWORD=${BSIM_DB_PASSWORD}
       - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
     ports:
       - "${BSIM_DB_PORT:-5432}:5432"
