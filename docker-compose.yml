@@ -36,6 +36,15 @@ services:
       -c password_encryption=scram-sha-256
       -c log_statement=all
       -c log_line_prefix='%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c work_mem=16MB
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=4
+      -c checkpoint_timeout=15min
+      -c log_min_duration_statement=1000
+      -c log_checkpoints=on
+      -c log_lock_waits=on
     networks:
       - backend
     healthcheck:
