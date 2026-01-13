@@ -23,6 +23,7 @@
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.HashSet;
 import java.util.List;
@@ -230,7 +231,14 @@ public class CreateProjectBSimDatabaseScript extends GhidraScript {
             }
 
             // ================================================================
-            // STEP 3: Install/verify function tags (idempotent)
+            // STEP 3: Verify/Create BSim helper functions (insert_vec, remove_vec)
+            // ================================================================
+            println("");
+            println("Verifying BSim helper functions...");
+            ensureBSimFunctions();
+
+            // ================================================================
+            // STEP 4: Install/verify function tags (idempotent)
             // ================================================================
             println("");
             println("Verifying function tags...");
@@ -266,7 +274,7 @@ public class CreateProjectBSimDatabaseScript extends GhidraScript {
             println("  Tags: " + tagsExisted + " existed, " + tagsAdded + " added, " + tagsFailed + " failed");
 
             // ================================================================
-            // STEP 4: Install/verify executable categories (idempotent)
+            // STEP 5: Install/verify executable categories (idempotent)
             // ================================================================
             println("");
             println("Verifying executable categories...");
@@ -302,7 +310,7 @@ public class CreateProjectBSimDatabaseScript extends GhidraScript {
             println("  Categories: " + catsExisted + " existed, " + catsAdded + " added, " + catsFailed + " failed");
 
             // ================================================================
-            // STEP 5: Final verification and summary
+            // STEP 6: Final verification and summary
             // ================================================================
             println("");
             println("Performing final verification...");
@@ -412,6 +420,101 @@ public class CreateProjectBSimDatabaseScript extends GhidraScript {
         } catch (Exception e) {
             println("  ERROR dropping database: " + e.getMessage());
             return false;
+        }
+    }
+    
+    /**
+     * Ensures that BSim helper functions (insert_vec, remove_vec) exist in the database.
+     * These functions are normally created by Ghidra's PostgresFunctionDatabase.createVectorFunctions()
+     * but may be missing if the database was created externally or initialization was incomplete.
+     * 
+     * This method is IDEMPOTENT - uses CREATE OR REPLACE to safely handle existing functions.
+     */
+    private void ensureBSimFunctions() {
+        String jdbcUrl = "jdbc:postgresql://" + DB_HOST + ":" + DB_PORT + "/" + DB_NAME;
+        
+        try {
+            Class.forName("org.postgresql.Driver");
+        } catch (ClassNotFoundException e) {
+            println("  ERROR: PostgreSQL JDBC driver not found: " + e.getMessage());
+            return;
+        }
+        
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, DB_USERNAME, DB_PASSWORD);
+             Statement stmt = conn.createStatement()) {
+            
+            // Check if insert_vec exists
+            boolean insertVecExists = false;
+            boolean removeVecExists = false;
+            
+            try (ResultSet rs = stmt.executeQuery(
+                    "SELECT proname FROM pg_proc WHERE proname IN ('insert_vec', 'remove_vec')")) {
+                while (rs.next()) {
+                    String name = rs.getString(1);
+                    if ("insert_vec".equals(name)) insertVecExists = true;
+                    if ("remove_vec".equals(name)) removeVecExists = true;
+                }
+            }
+            
+            // Create insert_vec if missing
+            if (!insertVecExists) {
+                println("  + Creating insert_vec function...");
+                stmt.execute(
+                    "CREATE OR REPLACE FUNCTION insert_vec(newvec lshvector, OUT ourhash BIGINT) AS $$ " +
+                    "DECLARE " +
+                    "  curs1 CURSOR (key BIGINT) FOR SELECT count FROM vectable WHERE id = key FOR UPDATE; " +
+                    "  ourcount INTEGER; " +
+                    "BEGIN " +
+                    "  ourhash := lshvector_hash(newvec); " +
+                    "  OPEN curs1( ourhash ); " +
+                    "  FETCH curs1 INTO ourcount; " +
+                    "  IF FOUND THEN " +
+                    "    UPDATE vectable SET count = ourcount + 1 WHERE CURRENT OF curs1; " +
+                    "  ELSE " +
+                    "    INSERT INTO vectable (id,count,vec) VALUES(ourhash,1,newvec); " +
+                    "  END IF; " +
+                    "  CLOSE curs1; " +
+                    "END; " +
+                    "$$ LANGUAGE plpgsql"
+                );
+                println("    ✓ insert_vec created");
+            } else {
+                println("  ✓ insert_vec (exists)");
+            }
+            
+            // Create remove_vec if missing
+            if (!removeVecExists) {
+                println("  + Creating remove_vec function...");
+                stmt.execute(
+                    "CREATE OR REPLACE FUNCTION remove_vec(vecid BIGINT, countdiff INTEGER) RETURNS INTEGER AS $$ " +
+                    "DECLARE " +
+                    "  curs1 CURSOR (key BIGINT) FOR SELECT count FROM vectable WHERE id = key FOR UPDATE; " +
+                    "  ourcount INTEGER; " +
+                    "  rescode INTEGER; " +
+                    "BEGIN " +
+                    "  rescode = -1; " +
+                    "  OPEN curs1( vecid ); " +
+                    "  FETCH curs1 INTO ourcount; " +
+                    "  IF FOUND AND ourcount > countdiff THEN " +
+                    "    UPDATE vectable SET count = ourcount - countdiff WHERE CURRENT OF curs1; " +
+                    "    rescode = 0; " +
+                    "  ELSIF FOUND THEN " +
+                    "    DELETE FROM vectable WHERE CURRENT OF curs1; " +
+                    "    rescode = 1; " +
+                    "  END IF; " +
+                    "  CLOSE curs1; " +
+                    "  RETURN rescode; " +
+                    "END; " +
+                    "$$ LANGUAGE plpgsql"
+                );
+                println("    ✓ remove_vec created");
+            } else {
+                println("  ✓ remove_vec (exists)");
+            }
+            
+        } catch (Exception e) {
+            println("  ⚠ Could not verify/create BSim functions: " + e.getMessage());
+            println("    This may cause ingestion to fail. Check database connectivity.");
         }
     }
 }
