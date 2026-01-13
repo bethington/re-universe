@@ -45,6 +45,7 @@ services:
       -c log_min_duration_statement=1000
       -c log_checkpoints=on
       -c log_lock_waits=on
+      -c ssl=on
     networks:
       - backend
     healthcheck:
