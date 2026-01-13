@@ -133,14 +133,10 @@ public class GenerateCrossVersionFunctionMapScript extends GhidraScript {
 					String exeName = exe.getNameExec();
 
 					// Get version from executable category
-					String version = null;
-					CategoryRecord catRec = exe.getExeCategoryAlpha();
-					if (catRec != null) {
-						version = catRec.getCategory();
-						if (version != null && !version.isEmpty()) {
-							executableVersionMap.put(exeName, version);
-							allVersions.add(version);
-						}
+					String version = exe.getExeCategoryAlphabetic("Version");
+					if (version != null && !version.isEmpty()) {
+						executableVersionMap.put(exeName, version);
+						allVersions.add(version);
 					}
 
 					if (!exeName.equals(currentProgram.getName())) {

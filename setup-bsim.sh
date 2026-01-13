@@ -77,7 +77,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --port PORT             Database port (default: 5432)"
             echo "  --database NAME         Database name (default: bsim)"
             echo "  --user USER             Database user (default: ben)"
-            echo "  --password PASS         Database password (default: goodyx12)"
+            echo "  --password PASS         Database password (default: bsim)"
             echo "  --template TEMPLATE     BSim database template (default: medium_32)"
             echo "  --force                 Force database creation even if exists"
             echo "  -v, --verbose           Verbose output"
