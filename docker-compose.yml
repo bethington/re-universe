@@ -5,7 +5,7 @@ services:
     container_name: ghidra-server
     command: server
     ports:
-      - ${GHIDRA_PORT:-13100}:13100  # Ghidra server port
+      - ${GHIDRA_PORT:-13100}:13100 # Ghidra server port
       - ${GHIDRA_PORT_RANGE_START:-13101}:13101
       - ${GHIDRA_PORT_RANGE_END:-13102}:13102
     volumes:
@@ -17,15 +17,18 @@ services:
     networks:
       - backend
 
-  # PostgreSQL database for BSim functionality
-  # This provides the database backend that will be used by Ghidra BSim tools
+  # PostgreSQL database for BSim functionality with lshvector extension
+  # Built from custom Dockerfile that includes Ghidra's lshvector extension
   bsim-postgres:
-    image: postgres:15
+    build:
+      context: ./bsim-postgres
+      dockerfile: Dockerfile
+    image: bsim-postgres:15-lshvector
     container_name: bsim-postgres
     environment:
       - POSTGRES_DB=${BSIM_DB_NAME:-bsim}
       - POSTGRES_USER=${BSIM_DB_USER:-ben}
-      - POSTGRES_PASSWORD=${BSIM_DB_PASSWORD:-***REMOVED***}
+      - POSTGRES_PASSWORD=${BSIM_DB_PASSWORD:-bsim}
       - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
     ports:
       - "${BSIM_DB_PORT:-5432}:5432"
@@ -48,7 +51,11 @@ services:
     networks:
       - backend
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${BSIM_DB_USER:-ben} -d ${BSIM_DB_NAME:-bsim}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${BSIM_DB_USER:-ben} -d ${BSIM_DB_NAME:-bsim}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -57,9 +64,9 @@ services:
   ret-sync-relay:
     image: alpine:latest
     container_name: ret-sync-relay
-    command: sleep infinity  # Placeholder - will be replaced with actual ret-sync server
+    command: sleep infinity # Placeholder - will be replaced with actual ret-sync server
     ports:
-      - "${RETSYNC_PORT:-9100}:9100"   # ret-sync default port
+      - "${RETSYNC_PORT:-9100}:9100" # ret-sync default port
     volumes:
       - ${SYNC_LOGS_PATH:-./sync-logs}:/sync-logs
     depends_on:
