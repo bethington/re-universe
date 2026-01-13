@@ -180,11 +180,7 @@ public class PropagateFunctionNamesWithReportScript extends GhidraScript {
 					String exeName = exe.getNameExec();
 
 					// Get version from executable category (first category)
-					String version = null;
-					CategoryRecord catRec = exe.getExeCategoryAlpha();
-					if (catRec != null) {
-						version = catRec.getCategory();
-					}
+					String version = exe.getExeCategoryAlphabetic("Version");
 
 					// Track version info
 					if (version != null && !version.isEmpty()) {
