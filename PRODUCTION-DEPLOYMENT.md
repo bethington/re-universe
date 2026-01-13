@@ -398,7 +398,7 @@ openssl s_client -connect localhost:5432 -starttls postgres
 PGPASSWORD=wrong_password psql -h localhost -p 5432 -U wrong_user -d bsim_production
 
 # Check for default credentials
-grep -r "goodyx12\|bsim_password" /path/to/project/ && echo "❌ Default credentials found!" || echo "✅ No default credentials"
+grep -r "bsim\|bsim_password" /path/to/project/ && echo "❌ Default credentials found!" || echo "✅ No default credentials"
 ```
 
 ### Performance Validation

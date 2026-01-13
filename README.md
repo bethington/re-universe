@@ -319,7 +319,7 @@ docker exec bsim-postgres psql -U ben -d bsim -c "SHOW ssl;"
 ls -la ssl/
 
 # Test SSL connection
-PGPASSWORD=goodyx12 psql -h localhost -p 5432 -U ben -d bsim -c "SELECT 'SSL test';" --set=sslmode=require
+PGPASSWORD=bsim psql -h localhost -p 5432 -U ben -d bsim -c "SELECT 'SSL test';" --set=sslmode=require
 ```
 
 #### 4. Performance Issues

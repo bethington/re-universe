@@ -29,4 +29,4 @@ SELECT bsim_connectivity_test() AS initialization_status;
 \echo 'Next steps:'
 \echo '  1. Ensure Ghidra is installed with BSim extension built (make-postgres.sh)'
 \echo '  2. Use Ghidra bsim createdatabase command to create the actual BSim schema'
-\echo '  3. Example: ./bsim createdatabase postgresql://ben:goodyx12@localhost:5432/bsim medium_32'
+\echo '  3. Example: ./bsim createdatabase postgresql://ben:bsim@localhost:5432/bsim medium_32'

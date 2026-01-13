@@ -122,7 +122,7 @@ apply_config() {
     BACKUP_PATH=${BACKUP_PATH:-${BACKUP_PATH_CONFIG:-"./backups"}}
     BSIM_DB_NAME=${BSIM_DB_NAME:-"bsim"}
     BSIM_DB_USER=${BSIM_DB_USER:-"ben"}
-    BSIM_DB_PASSWORD=${BSIM_DB_PASSWORD:-"goodyx12"}
+    BSIM_DB_PASSWORD=${BSIM_DB_PASSWORD:-"bsim"}
     BSIM_DB_PORT=${BSIM_DB_PORT:-"5432"}
 }
 

@@ -48,7 +48,7 @@ This is the first production-ready release of the Ghidra BSim PostgreSQL Platfor
 
 #### Security
 **Critical Security Improvements**
-- Removed all hardcoded credentials (ben:goodyx12) from platform
+- Removed all hardcoded credentials (ben:bsim) from platform
 - Implemented runtime credential validation and user warnings
 - Added secure credential generation with 32+ character passwords
 - SSL/TLS enforcement with TLS 1.2+ minimum requirements

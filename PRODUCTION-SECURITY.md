@@ -13,7 +13,7 @@ The following credentials **MUST** be changed before production deployment:
 ```bash
 # ❌ NEVER USE THESE IN PRODUCTION:
 BSIM_DB_USER=ben
-BSIM_DB_PASSWORD=goodyx12
+BSIM_DB_PASSWORD=bsim
 BSIM_DB_USER=bsim_user
 BSIM_DB_PASSWORD=bsim_password
 
@@ -197,7 +197,7 @@ git checkout main
 # security-check.sh - Run daily security validation
 
 # Check for default credentials
-if grep -r "ben:goodyx12\|bsim_password" . 2>/dev/null; then
+if grep -r "ben:bsim\|bsim_password" . 2>/dev/null; then
     echo "CRITICAL: Default credentials found!"
     exit 1
 fi
