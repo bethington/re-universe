@@ -47,10 +47,10 @@ public class IngestReferenceProgramScript extends GhidraScript {
     // ========================================================================
     // CONNECTION CONFIGURATION - Edit these values before running
     // ========================================================================
-    private static final String DB_HOST = "localhost";
+    private static final String DB_HOST = "***REMOVED***";
     private static final int DB_PORT = 5432;
-    private static final String DB_NAME = "bsim_project";
-    private static final String DB_USERNAME = "ben";  // Change to your PostgreSQL username
+    private static final String DB_NAME = "bsim";
+    private static final String DB_USERNAME = "ben";
     
     // ========================================================================
     // INGESTION CONFIGURATION
@@ -162,18 +162,8 @@ public class IngestReferenceProgramScript extends GhidraScript {
             gensig.addExecutableCategories(dbInfo.execats);
             gensig.addFunctionTags(dbInfo.functionTags);
 
-            // Set categories for reference program
-            List<String> categories = new ArrayList<>();
-            categories.add("ReferenceLibrary");  // Mark as reference
-            categories.add(version);             // Version category
-            if (platform != null) {
-                categories.add(platform);        // Platform category
-            }
-
-            URL programUrl = GhidraURL.toURL(currentProgram.getDomainFile().getProjectLocator(),
-                currentProgram.getDomainFile().getPathname());
-
-            gensig.openProgram(currentProgram, null, null, null, programUrl, categories);
+            // Open program for signature generation (null params use defaults)
+            gensig.openProgram(currentProgram, null, null, null, null, null);
 
             // Scan functions
             int scanned = 0;
