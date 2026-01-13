@@ -107,12 +107,17 @@ sudo make install
 
 #### 2. Database Setup
 ```bash
-# Start PostgreSQL container
+# Start PostgreSQL container (SSL enabled for BSim compatibility)
 docker-compose up -d bsim-postgres
+
+# Verify SSL is enabled (required for Ghidra BSim)
+docker exec bsim-postgres psql -U ben -d bsim -c "SHOW ssl;"
 
 # Verify installation
 ./test-bsim-setup.sh --comprehensive
 ```
+
+> **⚠️ Important:** Ghidra BSim requires SSL-enabled PostgreSQL connections. The docker-compose.yml is configured with `ssl=on` by default. See [BSIM-SSL-SETUP.md](BSIM-SSL-SETUP.md) for troubleshooting SSL issues.
 
 ---
 
@@ -310,16 +315,22 @@ cd ghidra/Ghidra/Features/BSim/src/lshvector
 make clean && make && sudo make install
 ```
 
-#### 3. "SSL connection failed"
+#### 3. "The server does not support SSL" (BSim Creation Error)
 ```bash
+# This error occurs when Ghidra BSim tries to connect to PostgreSQL without SSL
+# ERROR: Cannot create PoolableConnectionFactory (The server does not support SSL.)
+
 # Check SSL status
 docker exec bsim-postgres psql -U ben -d bsim -c "SHOW ssl;"
 
-# Verify certificates
-ls -la ssl/
+# If SSL is off, enable it in docker-compose.yml:
+# Add "-c ssl=on" to postgres command and restart:
+docker-compose restart bsim-postgres
 
-# Test SSL connection
-PGPASSWORD=***REMOVED*** psql -h localhost -p 5432 -U ben -d bsim -c "SELECT 'SSL test';" --set=sslmode=require
+# Verify SSL is working
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT 'SSL enabled' as status;"
+
+# See BSIM-SSL-SETUP.md for detailed SSL configuration guide
 ```
 
 #### 4. Performance Issues

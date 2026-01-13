@@ -20,7 +20,9 @@ This project provides a complete, production-ready setup for Ghidra BSim (Binary
 2. **Connect from Ghidra:**
    - Open Ghidra → Tools → BSim Search
    - Server: `postgresql://[username]:[password]@localhost:5432/bsim`
-   - Check "Use SSL"
+   - **⚠️ Important:** Check "Use SSL" (required for BSim database creation)
+
+   > **SSL Requirement:** Ghidra BSim requires SSL-enabled PostgreSQL connections. The database is automatically configured with SSL enabled. See [BSIM-SSL-SETUP.md](BSIM-SSL-SETUP.md) for troubleshooting.
 
 3. **Ingest your first binary:**
    ```bash
