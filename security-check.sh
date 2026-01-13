@@ -86,8 +86,8 @@ check_default_credentials() {
     print_header "=== Credential Security Checks ==="
 
     # Check for hardcoded default credentials in files
-    run_security_check "No hardcoded ben:***REDACTED*** credentials" \
-        "! grep -r 'ben:***REDACTED***' . --include='*.sh' --include='*.md' --include='*.yml' 2>/dev/null" \
+    run_security_check "No hardcoded ben:bsim credentials" \
+        "! grep -r 'ben:bsim' . --include='*.sh' --include='*.md' --include='*.yml' 2>/dev/null" \
         "critical"
 
     run_security_check "No default bsim_password credentials" \
@@ -365,12 +365,12 @@ show_security_recommendations() {
         print_error "Security issues found! Recommendations:"
         echo ""
 
-        if grep -r "ben:***REDACTED***" . --include="*.sh" --include="*.md" --include="*.yml" 2>/dev/null; then
-            echo "🔴 CRITICAL: Remove all hardcoded credentials (ben:***REDACTED***)"
-            echo "   → Run: sed -i 's/ben:***REDACTED***/[username]:[password]/g' \$(find . -name '*.md' -o -name '*.sh')"
+        if grep -r "ben:bsim" . --include="*.sh" --include="*.md" --include="*.yml" 2>/dev/null; then
+            echo "🔴 CRITICAL: Remove all hardcoded credentials (ben:bsim)"
+            echo "   → Run: sed -i 's/ben:bsim/[username]:[password]/g' \$(find . -name '*.md' -o -name '*.sh')"
         fi
 
-        if [[ -f ".env" ]] && grep -q "CHANGE_ME\|***REDACTED***\|bsim_password" .env; then
+        if [[ -f ".env" ]] && grep -q "CHANGE_ME\|bsim\|bsim_password" .env; then
             echo "🔴 CRITICAL: Generate secure credentials"
             echo "   → Run: ./generate-prod-credentials.sh"
         fi
