@@ -55,10 +55,10 @@ public class PropagateFullDocumentationScript extends GhidraScript {
     // ========================================================================
     // CONNECTION CONFIGURATION - Edit these values before running
     // ========================================================================
-    private static final String DB_HOST = "localhost";
+    private static final String DB_HOST = "***REMOVED***";
     private static final int DB_PORT = 5432;
-    private static final String DB_NAME = "bsim_project";
-    private static final String DB_USERNAME = "ben";  // Change to your PostgreSQL username
+    private static final String DB_NAME = "bsim";
+    private static final String DB_USERNAME = "ben";
     
     // ========================================================================
     // SIMILARITY THRESHOLDS
@@ -253,16 +253,15 @@ public class PropagateFullDocumentationScript extends GhidraScript {
                 String exeName = exe.getNameExec();
 
                 if (exeName.equals(referenceProgram)) {
-                    CategoryRecord catRec = exe.getExeCategoryAlpha();
-                    if (catRec != null) {
-                        referenceVersion = catRec.getCategory();
+                    String version = exe.getExeCategoryAlphabetic("Version");
+                    if (version != null && !version.isEmpty()) {
+                        referenceVersion = version;
                     }
                     continue;
                 }
 
                 if (TARGET_VERSION_FILTER != null) {
-                    CategoryRecord catRec = exe.getExeCategoryAlpha();
-                    String version = catRec != null ? catRec.getCategory() : null;
+                    String version = exe.getExeCategoryAlphabetic("Version");
                     if (version == null || !version.equals(TARGET_VERSION_FILTER)) {
                         continue;
                     }
@@ -631,7 +630,7 @@ public class PropagateFullDocumentationScript extends GhidraScript {
             return;
         }
 
-        if (dt instanceof Enum) {
+        if (dt instanceof ghidra.program.model.data.Enum) {
             types.add(dt);
             return;
         }

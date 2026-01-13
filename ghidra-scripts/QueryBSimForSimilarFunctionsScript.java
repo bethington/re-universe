@@ -176,9 +176,9 @@ public class QueryBSimForSimilarFunctionsScript extends GhidraScript {
 				monitor.setMessage("Querying: " + func.getName());
 
 				try {
-					// Create description manager for this function
-					DescriptionManager manager = new DescriptionManager();
-					gensig.scanFunction(func, manager);
+					// Scan function and get description manager
+					gensig.scanFunction(func);
+					DescriptionManager manager = gensig.getDescriptionManager();
 
 					if (manager.numFunctions() == 0) {
 						continue;
@@ -198,25 +198,26 @@ public class QueryBSimForSimilarFunctionsScript extends GhidraScript {
 					}
 
 					List<SimilarityResult> results = new ArrayList<>();
-					Iterator<SimilarityNote> noteIter = response.result.listAllSimilarity();
-					while (noteIter.hasNext()) {
-						SimilarityNote note = noteIter.next();
-						FunctionDescription matchFunc = note.getFunctionDescription();
-						ExecutableRecord matchExe = matchFunc.getExecutableRecord();
+					// Iterate over each SimilarityResult, then over each SimilarityNote within
+					for (ghidra.features.bsim.query.protocol.SimilarityResult simResult : response.result) {
+						for (SimilarityNote note : simResult) {
+							FunctionDescription matchFunc = note.getFunctionDescription();
+							ExecutableRecord matchExe = matchFunc.getExecutableRecord();
 
-						// Skip self-matches (same program)
-						String matchExeName = matchExe.getNameExec();
-						if (matchExeName.equals(currentProgram.getName())) {
-							continue;
+							// Skip self-matches (same program)
+							String matchExeName = matchExe.getNameExec();
+							if (matchExeName.equals(currentProgram.getName())) {
+								continue;
+							}
+
+							SimilarityResult result = new SimilarityResult();
+							result.matchedFunctionName = matchFunc.getFunctionName();
+							result.matchedFunctionAddress = "0x" + Long.toHexString(matchFunc.getAddress());
+							result.matchedExecutable = matchExeName;
+							result.similarity = note.getSimilarity();
+							result.confidence = note.getSignificance();
+							results.add(result);
 						}
-
-						SimilarityResult result = new SimilarityResult();
-						result.matchedFunctionName = matchFunc.getFunctionName();
-						result.matchedFunctionAddress = "0x" + Long.toHexString(matchFunc.getAddress());
-						result.matchedExecutable = matchExeName;
-						result.similarity = note.getSimilarity();
-						result.confidence = note.getSignificance();
-						results.add(result);
 					}
 
 					if (!results.isEmpty()) {

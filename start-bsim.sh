@@ -68,7 +68,7 @@ EOF
 # Function to validate security settings
 validate_security() {
     if [[ -f "$ENV_FILE" ]]; then
-        if grep -q "CHANGE_ME_SECURE_PASSWORD\|***REMOVED***\|bsim_password" "$ENV_FILE"; then
+        if grep -q "CHANGE_ME_SECURE_PASSWORD\|bsim\|bsim_password" "$ENV_FILE"; then
             print_error "SECURITY WARNING: Default/insecure passwords detected!"
             print_error "Change credentials in $ENV_FILE before production use."
             print_error "See PRODUCTION-SECURITY.md for guidance."
@@ -177,12 +177,12 @@ show_connection_info() {
     echo "  Port:     5432"
     echo "  Database: bsim"
     echo "  User:     ben"
-    echo "  Password: ***REMOVED***"
-    echo "  URL:      postgresql://ben:***REMOVED***@localhost:5432/bsim"
+    echo "  Password: bsim"
+    echo "  URL:      postgresql://ben:bsim@localhost:5432/bsim"
     echo ""
     echo "Ghidra BSim Connection:"
     echo "  1. Open Ghidra → Tools → BSim Search"
-    echo "  2. Server: postgresql://ben:***REMOVED***@localhost:5432/bsim"
+    echo "  2. Server: postgresql://ben:bsim@localhost:5432/bsim"
     echo "  3. Enable 'Use SSL'"
     echo ""
     echo "Useful Commands:"

@@ -118,19 +118,19 @@ docker exec bsim-postgres psql -U ben -d bsim -c "SELECT * FROM bsim_database_in
 ## 🔗 Database Connection
 
 ### Connection Details
-- **URL**: `postgresql://ben:***REMOVED***@localhost:5432/bsim`
+- **URL**: `postgresql://ben:bsim@localhost:5432/bsim`
 - **Host**: `localhost`
 - **Port**: `5432`
 - **Database**: `bsim`
 - **Username**: `ben`
-- **Password**: `***REMOVED***`
+- **Password**: `bsim`
 - **SSL**: Required (certificates auto-generated)
 
 ### From Ghidra BSim
 1. Open Ghidra
 2. Go to **Tools** → **Binary Similarity** → **BSim**
 3. Create new server configuration:
-   - **URL**: `postgresql://ben:***REMOVED***@localhost:5432/bsim`
+   - **URL**: `postgresql://ben:bsim@localhost:5432/bsim`
    - **SSL**: Enable "Use SSL"
    - Test connection
 
