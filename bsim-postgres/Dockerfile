@@ -20,7 +20,7 @@ RUN git clone --depth 1 --filter=blob:none --sparse \
 
 # Build the lshvector extension
 WORKDIR /build/ghidra/Ghidra/Features/BSim/src/lshvector
-RUN make
+RUN cp c/*.c c/*.h . && PG_CONFIG=/usr/bin/pg_config make -f Makefile.lshvector
 
 # Final image
 FROM postgres:15
