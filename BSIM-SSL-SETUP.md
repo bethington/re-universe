@@ -156,3 +156,26 @@ The working BSim SSL configuration requires:
 5. **Verification** of SSL status and BSim functionality
 
 This configuration enables Ghidra BSim tools to successfully connect and create databases without SSL-related errors.
+
+## LSH Vector Extension Verification
+
+The BSim database includes the required `lshvector` extension for locality-sensitive hashing:
+
+### Check Extension Status
+```bash
+# Verify lshvector extension is installed
+docker exec bsim-postgres psql -U ben -d bsim -c "\dx lshvector"
+
+# Check lshvector data type availability
+docker exec bsim-postgres psql -U ben -d bsim -c "\dT lshvector"
+
+# Verify BSim tables with LSHVECTOR columns exist
+docker exec bsim-postgres psql -U ben -d bsim -c "\d vectable"
+```
+
+### Extension Details
+- **Source**: Compiled from Ghidra's BSim lshvector C extension
+- **Version**: 1.0
+- **Installation**: Automatically built via custom Dockerfile
+- **Functions**: 13 lshvector-related functions available
+- **Tables**: `vectable` and `signature` tables support LSHVECTOR data type
