@@ -12,11 +12,12 @@ A comprehensive Docker-based platform for **Ghidra BSim (Binary Similarity)** an
 ## ✨ Key Features
 
 ### 🚀 BSim Database Platform
+- **Auto-Initialization** - BSim schema automatically created on first startup (NEW!)
 - **Large-Scale Analysis** - Supports ~100 million functions with large_32 template
 - **PostgreSQL Backend** - Production-ready database with SSL support
 - **Official LSH Extension** - Built from Ghidra source for optimal performance
 - **Schema Compatibility** - Official Ghidra BSim tables (exetable, desctable, vectable) with full compatibility
-- **Automated Setup** - One-command database initialization and schema creation
+- **One-Command Setup** - Start and go - no manual schema setup required
 - **Comprehensive Testing** - Automated validation of all components
 
 ### 🛠️ Management & Operations
@@ -25,6 +26,7 @@ A comprehensive Docker-based platform for **Ghidra BSim (Binary Similarity)** an
 - **Health Alerts** - Proactive monitoring with configurable thresholds
 - **SSL Security** - Full SSL/TLS encryption with certificate management
 - **Cross-Platform** - Ubuntu Linux optimized, Windows/macOS compatible
+- **Flexible Deployment** - Auto or manual schema creation modes
 
 ### 🔬 Analysis Capabilities
 - **Binary Similarity** - Find similar functions across different executables
@@ -39,85 +41,127 @@ A comprehensive Docker-based platform for **Ghidra BSim (Binary Similarity)** an
 
 ### Prerequisites
 - Docker and Docker Compose
-- Ghidra 11.4.2 or newer
-- Git for cloning Ghidra source (for LSH extension)
+- Ghidra 11.4.2 or newer (for analysis only - not required for database setup)
 - 8GB+ RAM recommended
 
-### 1. Start BSim Database
+### 1. Start BSim Database (Auto-Initialization)
 ```bash
 git clone <repository-url>
 cd re-universe
 
-# Start the database
+# Configure environment (first time only)
+cp .env.example .env
+# Edit .env and set BSIM_DB_PASSWORD
+
+# Start the database (BSim schema auto-created!)
 ./start-bsim.sh
+
+# Wait ~30 seconds for initialization
+docker logs bsim-postgres -f
+
+# Verify BSim schema is ready
+docker exec -it bsim-postgres psql -U ben -d bsim -c "\dt"
+```
+
+**Expected output:**
+```
+            List of relations
+ Schema |       Name       | Type  | Owner 
+--------+------------------+-------+-------
+ public | archtable        | table | ben
+ public | callgraph        | table | ben
+ public | callgraphtable   | table | ben
+ public | cattable         | table | ben
+ public | desctable        | table | ben
+ public | exetable         | table | ben
+ ...
+(18 rows)
 ```
 
 ### 2. Connect from Ghidra
 1. Open Ghidra → **Tools** → **BSim Search**
-2. Server: `postgresql://[username]:[password]@localhost:5432/bsim`
+2. Server: `postgresql://ben:[password]@localhost:5432/bsim`
 3. Enable **"Use SSL"**
-4. Test connection
+4. Test connection - **Schema already created, ready to use!**
 
 ### 3. Ingest Your First Binary
 ```bash
 # Using Ghidra BSim tools
-./ghidra/Ghidra/RuntimeScripts/Linux/support/bsim postgresql://[username]:[password]@localhost:5432/bsim -addexe /path/to/your/binary.exe
+cd /path/to/ghidra
+./support/bsim generatesigs postgresql://ben:[password]@localhost:5432/bsim /path/to/your/binary.exe
 
-# Or use the included script
-./ingest-binary.sh /path/to/your/binary.exe
+# Query for similar functions
+./support/bsim query postgresql://ben:[password]@localhost:5432/bsim --function "FUN_00401000"
 ```
 
 ---
 
 ## 📋 Installation & Setup
 
-### Quick Setup (Recommended)
+### Automatic Setup (Recommended - NEW!)
+
+**Default behavior**: BSim schema is **automatically created** on first container startup.
+
 ```bash
 # Clone the repository
 git clone <repository-url>
 cd re-universe
 
-# Start BSim database
+# Configure environment
+cp .env.example .env
+# Edit .env: Set BSIM_DB_PASSWORD and optionally AUTO_CREATE_BSIM_SCHEMA=true
+
+# Start BSim database (auto-creates schema)
 ./start-bsim.sh
 
-# Test the setup
+# Wait for initialization (~30 seconds)
+docker logs bsim-postgres -f
+
+# Test the setup (validates BSim schema exists)
 ./test-bsim-setup.sh
 
 # Monitor database status
 ./monitor-bsim.sh
 ```
 
+**Result**: Database ready with:
+- ✅ 18 BSim tables (exetable, desctable, vectable, etc.)
+- ✅ Helper functions (insert_vec, remove_vec)
+- ✅ LSH extension enabled
+- ✅ SSL certificates configured
+- ✅ Ready for Ghidra BSim tools
+
 ### Manual Setup (For Custom Configurations)
 
-#### 1. LSH Extension Build
-
-**Important**: Ghidra is a separate project. Clone it outside this repository.
+If you prefer manual schema creation or need a custom template:
 
 ```bash
-# Clone Ghidra source (required for LSH extension)
-# Do this OUTSIDE the re-universe project directory
-cd /opt  # or your preferred location for external projects
-git clone https://github.com/NationalSecurityAgency/ghidra.git
-cd ghidra/Ghidra/Features/BSim/src/lshvector
+# In .env file
+AUTO_CREATE_BSIM_SCHEMA=false
 
-# Build and install LSH extension
-make
-sudo make install
+# Start container (minimal initialization only)
+./start-bsim.sh
+
+# Option 1: Use Ghidra CLI to create schema
+cd /path/to/ghidra
+./support/bsim createdatabase postgresql://ben:[password]@localhost:5432/bsim medium_32
+# Templates: medium_32, large_32, medium_64, large_64
+
+# Option 2: Manual SQL execution
+docker exec -i bsim-postgres psql -U ben -d bsim < bsim-init/04-create-bsim-schema.sql
 ```
 
-#### 2. Database Setup
+#### LSH Extension (Included in Docker Image)
+
+**No manual build required!** The LSH extension is pre-built into the Docker image.
+
+If you need to rebuild the image:
+
 ```bash
-# Start PostgreSQL container (SSL enabled for BSim compatibility)
-docker-compose up -d bsim-postgres
-
-# Verify SSL is enabled (required for Ghidra BSim)
-docker exec bsim-postgres psql -U ben -d bsim -c "SHOW ssl;"
-
-# Verify installation
-./test-bsim-setup.sh --comprehensive
+# LSH extension source in: bsim-postgres/Dockerfile
+# Build command:
+docker-compose build bsim-postgres
 ```
-
-> **⚠️ Important:** Ghidra BSim requires SSL-enabled PostgreSQL connections. The docker-compose.yml is configured with `ssl=on` by default. See [BSIM-SSL-SETUP.md](BSIM-SSL-SETUP.md) for troubleshooting SSL issues.
 
 ---
 
@@ -129,25 +173,38 @@ Edit `.env` to customize your setup:
 ```bash
 # BSim Database Configuration
 BSIM_DB_NAME=bsim
-BSIM_DB_USER=bsim_user
-BSIM_DB_PASSWORD=your_secure_password
+BSIM_DB_USER=ben                       # Default user (change as needed)
+BSIM_DB_PASSWORD=your_secure_password  # REQUIRED: Set a secure password
 BSIM_DB_PORT=5432
 
-# Database Template (large_32, large_64, medium_32, etc.)
-BSIM_TEMPLATE=large_32
+# Auto-Initialization (NEW!)
+AUTO_CREATE_BSIM_SCHEMA=true           # Auto-create BSim schema on first startup
+                                       # Options: true (auto), false (manual)
+                                       # Default: true (recommended)
 
 # Backup Configuration
 BACKUP_RETENTION_WEEKS=4
-BACKUP_SCHEDULE="0 2 * * 0"  # Weekly on Sunday at 2 AM
+BACKUP_SCHEDULE="0 2 * * 0"            # Weekly on Sunday at 2 AM
 ```
+
+### Schema Template
+
+The auto-creation uses **large_32** template (100M functions, 32-bit executables).
+
+To use a different template:
+1. Set `AUTO_CREATE_BSIM_SCHEMA=false` in `.env`
+2. Manually create schema with desired template:
+   ```bash
+   ./support/bsim createdatabase postgresql://ben:pass@localhost:5432/bsim medium_32
+   ```
 
 ### Database Templates
 
-| Template | Description | Architecture | Capacity |
-|----------|-------------|--------------|----------|
-| `large_32` | Large database | 32-bit | ~100M functions |
-| `large_64` | Large database | 64-bit | ~100M functions |
-| `medium_32` | Medium database | 32-bit | ~10M functions |
+| Template | Description | Architecture | Capacity | Auto-Created |
+|----------|-------------|--------------|----------|--------------|
+| `large_32` | Large database | 32-bit | ~100M functions | ✅ Default |
+| `large_64` | Large database | 64-bit | ~100M functions | ❌ Manual |
+| `medium_32` | Medium database | 32-bit | ~10M functions | ❌ Manual |
 | `medium_64` | Medium database | 64-bit | ~10M functions |
 | `medium_nosize` | Size-agnostic | Mixed | ~10M functions |
 

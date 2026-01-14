@@ -72,3 +72,4 @@ populate_idflookup_fixed.sql
 populate_weights.sql
 ssl-entrypoint.sh
 bsim-local
+passwords-to-remove.txt
