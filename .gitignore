@@ -78,3 +78,5 @@ bsim-local
 credential-backups/
 ssl/*.key
 *.pem
+
+reports/functions_v2/
