@@ -35,7 +35,6 @@ services:
       - "${BSIM_DB_PORT:-5432}:5432"
     volumes:
       - bsim_postgres_data:/var/lib/postgresql/data
-      - ./bsim-init:/docker-entrypoint-initdb.d:ro
     command: >
       postgres
       -c password_encryption=scram-sha-256

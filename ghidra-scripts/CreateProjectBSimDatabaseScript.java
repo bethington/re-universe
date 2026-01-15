@@ -53,24 +53,16 @@ import ghidra.util.Msg;
 public class CreateProjectBSimDatabaseScript extends GhidraScript {
 
     // ========================================================================
-    // CONNECTION CONFIGURATION
-    // Values are read from environment variables with fallback defaults.
-    // Set these in your environment or .env file before running:
-    //   BSIM_DB_HOST, BSIM_DB_PORT, BSIM_DB_NAME, BSIM_DB_USER, BSIM_DB_PASSWORD
+    // CONNECTION CONFIGURATION - Edit these values before running
     // ========================================================================
-    private static final String DB_HOST = getEnvOrDefault("BSIM_DB_HOST", "localhost");
-    private static final int DB_PORT = Integer.parseInt(getEnvOrDefault("BSIM_DB_PORT", "5432"));
-    private static final String DB_NAME = getEnvOrDefault("BSIM_DB_NAME", "bsim");
-    private static final String DB_USERNAME = getEnvOrDefault("BSIM_DB_USER", "bsim_user");
-    private static final String DB_PASSWORD = getEnvOrDefault("BSIM_DB_PASSWORD", "");  // REQUIRED - set in environment
-
+    private static final String DB_HOST = "10.0.0.30";
+    private static final int DB_PORT = 5432;
+    private static final String DB_NAME = "bsim";
+    private static final String DB_USERNAME = "ben";
+    private static final String DB_PASSWORD = "goodyx12";  // Required for DROP operation
+    
     // If true, drops and recreates DB when it exists but has no valid BSim schema
     private static final boolean DROP_IF_INVALID = true;
-
-    private static String getEnvOrDefault(String name, String defaultValue) {
-        String value = System.getenv(name);
-        return (value != null && !value.isEmpty()) ? value : defaultValue;
-    }
     
     // ========================================================================
     // DATABASE CONFIGURATION
