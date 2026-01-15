@@ -2892,21 +2892,6 @@
         let currentFuncBaseName = null;
         let categoryFilter = 'all';  // 'all', 'game_logic', 'crt_runtime', 'import_thunk', 'exception', 'other'
 
-        // Compiler boundary versions (major toolchain changes)
-        const COMPILER_BOUNDARY_VERSIONS = [
-            'LoD/1.11',      // CRT/compiler changed significantly at 1.11
-            'Classic/1.11'
-        ];
-
-        // Pre-1.11 versions (before compiler boundary)
-        const PRE_111_VERSIONS = [
-            'LoD/1.07', 'LoD/1.08', 'LoD/1.09', 'LoD/1.09b', 'LoD/1.09d', 'LoD/1.10',
-            'Classic/1.00', 'Classic/1.01', 'Classic/1.02', 'Classic/1.03',
-            'Classic/1.04b', 'Classic/1.04c', 'Classic/1.05', 'Classic/1.05b',
-            'Classic/1.06', 'Classic/1.06b', 'Classic/1.08', 'Classic/1.09',
-            'Classic/1.09b', 'Classic/1.09d', 'Classic/1.10'
-        ];
-
         // Detect function category based on name patterns
         function getFunctionCategory(name) {
             if (!name) return 'other';
