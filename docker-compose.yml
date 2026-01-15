@@ -114,7 +114,7 @@ services:
       - "traefik.http.routers.d2docs.tls.certresolver=le"
       - "traefik.http.routers.d2docs.tls.domains[0].main=d2docs.xebyte.us"
       - "traefik.http.routers.d2docs.tls.domains[1].main=d2docs.xebyte.com"
-      - "traefik.http.services.d2docs.loadbalancer.server.port=8000"
+      - "traefik.http.services.d2docs.loadbalancer.server.port=80"
       # HTTP router with redirect
       - "traefik.http.routers.d2docs-http.rule=Host(`d2docs.xebyte.us`) || Host(`d2docs.xebyte.com`)"
       - "traefik.http.routers.d2docs-http.entrypoints=web"
@@ -123,9 +123,11 @@ services:
       test:
         [
           "CMD",
-          "python",
-          "-c",
-          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/')",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://127.0.0.1:80/health",
         ]
       interval: 30s
       timeout: 10s
@@ -158,13 +160,23 @@ services:
       - proxy
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE:-false}"
-      - "traefik.http.routers.ghidra-api.rule=Host(`api.xebyte.us`) || Host(`api.xebyte.com`)"
-      - "traefik.http.routers.ghidra-api.entrypoints=websecure"
-      - "traefik.http.routers.ghidra-api.tls.certresolver=le"
-      - "traefik.http.services.ghidra-api.loadbalancer.server.port=8080"
-      - "traefik.http.routers.ghidra-api-http.rule=Host(`api.xebyte.us`) || Host(`api.xebyte.com`)"
-      - "traefik.http.routers.ghidra-api-http.entrypoints=web"
-      - "traefik.http.routers.ghidra-api-http.middlewares=redirect-to-https@file"
+      # HTTPS router
+      - "traefik.http.routers.d2api.rule=Host(`api.xebyte.us`) || Host(`api.xebyte.com`)"
+      - "traefik.http.routers.d2api.entrypoints=websecure"
+      - "traefik.http.routers.d2api.tls.certresolver=le"
+      - "traefik.http.routers.d2api.tls.domains[0].main=api.xebyte.us"
+      - "traefik.http.routers.d2api.tls.domains[1].main=api.xebyte.com"
+      - "traefik.http.services.d2api.loadbalancer.server.port=8080"
+      # HTTP router with redirect
+      - "traefik.http.routers.d2api-http.rule=Host(`api.xebyte.us`) || Host(`api.xebyte.com`)"
+      - "traefik.http.routers.d2api-http.entrypoints=web"
+      - "traefik.http.routers.d2api-http.middlewares=redirect-to-https@file"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 
 volumes:
