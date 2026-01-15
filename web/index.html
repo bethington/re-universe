@@ -1238,13 +1238,16 @@
         .exports-table tbody tr.compare-active-row {
             background-color: rgba(0, 200, 83, 0.15) !important;
         }
+
         .exports-table tbody tr.compare-active-row .fn-name-cell {
             background-color: rgba(0, 200, 83, 0.15) !important;
         }
+
         .exports-table td.compare-active-cell {
             background-color: rgba(0, 200, 83, 0.3) !important;
             box-shadow: inset 0 0 0 2px var(--color-set);
         }
+
         .exports-table thead th.compare-active-column {
             background-color: rgba(0, 200, 83, 0.2) !important;
             box-shadow: inset 0 -2px 0 var(--color-set);
@@ -1512,9 +1515,17 @@
             font-weight: 700;
         }
 
-        .compare-score-value.high { color: var(--color-set); }
-        .compare-score-value.medium { color: var(--color-rare); }
-        .compare-score-value.low { color: var(--color-crafted); }
+        .compare-score-value.high {
+            color: var(--color-set);
+        }
+
+        .compare-score-value.medium {
+            color: var(--color-rare);
+        }
+
+        .compare-score-value.low {
+            color: var(--color-crafted);
+        }
 
         .compare-score-tier {
             font-size: 0.55rem;
@@ -1588,10 +1599,23 @@
             letter-spacing: 0.5px;
         }
 
-        .compare-col-label.source { text-align: right; color: var(--color-magic); }
-        .compare-col-label.metric { text-align: center; }
-        .compare-col-label.target { text-align: left; color: var(--color-rare); }
-        .compare-col-label.match { text-align: center; }
+        .compare-col-label.source {
+            text-align: right;
+            color: var(--color-magic);
+        }
+
+        .compare-col-label.metric {
+            text-align: center;
+        }
+
+        .compare-col-label.target {
+            text-align: left;
+            color: var(--color-rare);
+        }
+
+        .compare-col-label.match {
+            text-align: center;
+        }
 
         /* Compare Row */
         .compare-row {
@@ -1641,10 +1665,21 @@
             font-size: 0.8rem;
         }
 
-        .compare-row .match-icon.exact { color: var(--color-set); }
-        .compare-row .match-icon.close { color: var(--color-rare); }
-        .compare-row .match-icon.diff { color: var(--color-crafted); }
-        .compare-row .match-icon.missing { color: var(--text-muted); }
+        .compare-row .match-icon.exact {
+            color: var(--color-set);
+        }
+
+        .compare-row .match-icon.close {
+            color: var(--color-rare);
+        }
+
+        .compare-row .match-icon.diff {
+            color: var(--color-crafted);
+        }
+
+        .compare-row .match-icon.missing {
+            color: var(--text-muted);
+        }
 
         /* List Comparison (for callees, strings, etc.) */
         .compare-list {
@@ -1743,23 +1778,28 @@
             padding: 1px 3px;
             margin: -1px -3px;
         }
+
         .copyable:hover {
             background: rgba(255, 255, 255, 0.1);
         }
+
         .copyable.copied {
             background: rgba(0, 200, 83, 0.3) !important;
         }
+
         .copyable::after {
             content: '';
             opacity: 0;
             transition: opacity 0.15s ease;
         }
+
         .copyable:hover::after {
             content: ' [click to copy]';
             opacity: 0.5;
             font-size: 0.65rem;
             color: var(--text-muted);
         }
+
         .copyable.copied::after {
             content: ' copied!';
             opacity: 1;
@@ -1775,9 +1815,11 @@
         .compare-paired-row.match-exact {
             background: rgba(0, 200, 83, 0.08);
         }
+
         .compare-paired-row.match-exact .paired-col-match {
             color: var(--color-set);
         }
+
         .compare-paired-row.match-exact .paired-col-source,
         .compare-paired-row.match-exact .paired-col-target {
             color: var(--color-set);
@@ -1786,9 +1828,11 @@
         .compare-paired-row.match-normalized {
             background: rgba(255, 199, 0, 0.08);
         }
+
         .compare-paired-row.match-normalized .paired-col-match {
             color: var(--color-rare);
         }
+
         .compare-paired-row.match-normalized .paired-col-source,
         .compare-paired-row.match-normalized .paired-col-target {
             color: var(--color-rare);
@@ -1797,12 +1841,15 @@
         .compare-paired-row.match-source-only {
             opacity: 0.75;
         }
+
         .compare-paired-row.match-source-only .paired-col-match {
             color: var(--color-magic);
         }
+
         .compare-paired-row.match-source-only .paired-col-source {
             color: var(--color-magic);
         }
+
         .compare-paired-row.match-source-only .paired-col-target {
             color: var(--text-muted);
         }
@@ -1810,12 +1857,15 @@
         .compare-paired-row.match-target-only {
             opacity: 0.75;
         }
+
         .compare-paired-row.match-target-only .paired-col-match {
             color: var(--color-crafted);
         }
+
         .compare-paired-row.match-target-only .paired-col-source {
             color: var(--text-muted);
         }
+
         .compare-paired-row.match-target-only .paired-col-target {
             color: var(--color-crafted);
         }
@@ -2071,9 +2121,17 @@
             transition: width 0.2s;
         }
 
-        .contrib-bar-fill.high { background: var(--color-set); }
-        .contrib-bar-fill.medium { background: var(--color-rare); }
-        .contrib-bar-fill.low { background: var(--color-crafted); }
+        .contrib-bar-fill.high {
+            background: var(--color-set);
+        }
+
+        .contrib-bar-fill.medium {
+            background: var(--color-rare);
+        }
+
+        .contrib-bar-fill.low {
+            background: var(--color-crafted);
+        }
 
         .contrib-value {
             font-size: 0.55rem;
@@ -2165,9 +2223,17 @@
             font-weight: 700;
         }
 
-        .score-final.high { color: var(--color-set); }
-        .score-final.medium { color: var(--color-rare); }
-        .score-final.low { color: var(--color-crafted); }
+        .score-final.high {
+            color: var(--color-set);
+        }
+
+        .score-final.medium {
+            color: var(--color-rare);
+        }
+
+        .score-final.low {
+            color: var(--color-crafted);
+        }
 
         /* Validation warnings */
         .score-warnings {
@@ -2244,9 +2310,17 @@
             font-weight: 700;
         }
 
-        .alternate-match-btn .alt-score.high { color: var(--color-set); }
-        .alternate-match-btn .alt-score.medium { color: var(--color-rare); }
-        .alternate-match-btn .alt-score.low { color: var(--color-crafted); }
+        .alternate-match-btn .alt-score.high {
+            color: var(--color-set);
+        }
+
+        .alternate-match-btn .alt-score.medium {
+            color: var(--color-rare);
+        }
+
+        .alternate-match-btn .alt-score.low {
+            color: var(--color-crafted);
+        }
 
         .alternate-match-btn .alt-addr {
             font-size: 0.55rem;
@@ -2755,14 +2829,14 @@
 
                 // Basic categories fallback
                 FILE_CATEGORIES = {
-                    "Game Logic": {"color": "#00FF00", "short": "GL"},
-                    "Graphics": {"color": "#6969FF", "short": "GR"},
-                    "Audio": {"color": "#A59263", "short": "AU"},
-                    "Network": {"color": "#FF6600", "short": "NW"},
-                    "Launcher": {"color": "#FFFF00", "short": "LA"},
-                    "MPQ": {"color": "#C7B377", "short": "MPQ"},
-                    "Utility": {"color": "#808080", "short": "UT"},
-                    "Other": {"color": "#FFFFFF", "short": "OT"}
+                    "Game Logic": { "color": "#00FF00", "short": "GL" },
+                    "Graphics": { "color": "#6969FF", "short": "GR" },
+                    "Audio": { "color": "#A59263", "short": "AU" },
+                    "Network": { "color": "#FF6600", "short": "NW" },
+                    "Launcher": { "color": "#FFFF00", "short": "LA" },
+                    "MPQ": { "color": "#C7B377", "short": "MPQ" },
+                    "Utility": { "color": "#808080", "short": "UT" },
+                    "Other": { "color": "#FFFFFF", "short": "OT" }
                 };
 
                 console.log('Fallback data loaded:', {
@@ -3133,11 +3207,11 @@
 
         // Value match bonus configuration
         const VALUE_BONUS_CONFIG = {
-            string_overlap:      { max_bonus: 10, min_items: 1 },   // Strings are highly distinctive
-            instruction_overlap: { max_bonus: 8,  min_items: 3 },   // Instruction patterns
-            constant_overlap:    { max_bonus: 5,  min_items: 2 },   // Constants (filtered)
-            global_overlap:      { max_bonus: 5,  min_items: 1 },   // Global values
-            tag_overlap:         { max_bonus: 5,  min_items: 1 }    // Function tags
+            string_overlap: { max_bonus: 10, min_items: 1 },   // Strings are highly distinctive
+            instruction_overlap: { max_bonus: 8, min_items: 3 },   // Instruction patterns
+            constant_overlap: { max_bonus: 5, min_items: 2 },   // Constants (filtered)
+            global_overlap: { max_bonus: 5, min_items: 1 },   // Global values
+            tag_overlap: { max_bonus: 5, min_items: 1 }    // Function tags
         };
 
         // Compute value-based match bonuses
