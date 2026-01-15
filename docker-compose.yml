@@ -84,8 +84,8 @@ services:
       dockerfile: Dockerfile
     image: ghidra-web:latest
     container_name: ghidra-web
-    ports:
-      - "${GHIDRA_WEB_PORT:-8000}:8000"
+    # ports:
+      # - "${GHIDRA_WEB_PORT:-8000}:8000"  # Not needed when using Traefik
     environment:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-change-me-in-production}
       - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
@@ -104,15 +104,21 @@ services:
         condition: service_healthy
     networks:
       - backend
-      - traefik
+      - proxy
     labels:
       # Traefik Configuration (enable by setting TRAEFIK_ENABLE=true in .env)
       - "traefik.enable=${TRAEFIK_ENABLE:-false}"
-      - "traefik.http.routers.ghidra-web.rule=Host(`${TRAEFIK_HOST:-ghidra.localhost}`)"
-      - "traefik.http.routers.ghidra-web.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
-      - "traefik.http.routers.ghidra-web.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
-      - "traefik.http.services.ghidra-web.loadbalancer.server.port=8000"
-      - "traefik.docker.network=${TRAEFIK_NETWORK:-traefik}"
+      # HTTPS router
+      - "traefik.http.routers.d2docs.rule=Host(`d2docs.xebyte.us`) || Host(`d2docs.xebyte.com`)"
+      - "traefik.http.routers.d2docs.entrypoints=websecure"
+      - "traefik.http.routers.d2docs.tls.certresolver=le"
+      - "traefik.http.routers.d2docs.tls.domains[0].main=d2docs.xebyte.us"
+      - "traefik.http.routers.d2docs.tls.domains[1].main=d2docs.xebyte.com"
+      - "traefik.http.services.d2docs.loadbalancer.server.port=8000"
+      # HTTP router with redirect
+      - "traefik.http.routers.d2docs-http.rule=Host(`d2docs.xebyte.us`) || Host(`d2docs.xebyte.com`)"
+      - "traefik.http.routers.d2docs-http.entrypoints=web"
+      - "traefik.http.routers.d2docs-http.middlewares=redirect-to-https@file"
     healthcheck:
       test:
         [
@@ -131,6 +137,6 @@ volumes:
 
 networks:
   backend:
-  traefik:
+  proxy:
     external: true
-    name: ${TRAEFIK_NETWORK:-traefik}
+    name: proxy
