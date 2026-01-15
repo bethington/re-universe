@@ -132,6 +132,41 @@ services:
       retries: 3
       start_period: 10s
 
+  # Spring Boot API - Ghidra Analysis API
+  ghidra-api:
+    build:
+      context: ./websites/spring-api
+      dockerfile: Dockerfile
+    image: ghidra-api:latest
+    container_name: ghidra-api
+    environment:
+      - BSIM_DB_HOST=bsim-postgres
+      - BSIM_DB_PORT=5432
+      - BSIM_DB_NAME=${BSIM_DB_NAME:-bsim}
+      - BSIM_DB_USER=${BSIM_DB_USER:-ben}
+      - BSIM_DB_PASSWORD=${BSIM_DB_PASSWORD}
+      - GHIDRA_SERVER_HOST=ghidra-server
+      - GHIDRA_SERVER_PORT=13100
+      - GHIDRA_PROJECTS_PATH=/repos
+    volumes:
+      - ${REPO_DATA_PATH:-./repo-data}:/repos:ro
+    depends_on:
+      - ghidra-server
+      - bsim-postgres
+    networks:
+      - backend
+      - proxy
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE:-false}"
+      - "traefik.http.routers.ghidra-api.rule=Host(`api.xebyte.us`) || Host(`api.xebyte.com`)"
+      - "traefik.http.routers.ghidra-api.entrypoints=websecure"
+      - "traefik.http.routers.ghidra-api.tls.certresolver=le"
+      - "traefik.http.services.ghidra-api.loadbalancer.server.port=8080"
+      - "traefik.http.routers.ghidra-api-http.rule=Host(`api.xebyte.us`) || Host(`api.xebyte.com`)"
+      - "traefik.http.routers.ghidra-api-http.entrypoints=web"
+      - "traefik.http.routers.ghidra-api-http.middlewares=redirect-to-https@file"
+
+
 volumes:
   bsim_postgres_data:
 
