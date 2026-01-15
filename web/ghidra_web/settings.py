@@ -19,9 +19,23 @@ SECRET_KEY = os.getenv(
 )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1", "yes")
+DEBUG = os.getenv("DJANGO_DEBUG", "True").lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+
+# Reverse proxy settings
+USE_X_FORWARDED_HOST = os.getenv("DJANGO_USE_X_FORWARDED_HOST", "False").lower() in ("true", "1", "yes")
+USE_X_FORWARDED_PORT = os.getenv("DJANGO_USE_X_FORWARDED_PORT", "False").lower() in ("true", "1", "yes")
+
+# For HTTPS behind reverse proxy (e.g., nginx, Traefik, Caddy)
+SECURE_PROXY_SSL_HEADER_ENABLED = os.getenv("DJANGO_SECURE_PROXY_SSL_HEADER", "False").lower() in ("true", "1", "yes")
+if SECURE_PROXY_SSL_HEADER_ENABLED:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# CSRF trusted origins for reverse proxy (Django 4.0+)
+# Example: https://ghidra.example.com,https://re.example.com
+_csrf_origins = os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "")
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in _csrf_origins.split(",") if origin.strip()]
 
 # Application definition
 INSTALLED_APPS = [
