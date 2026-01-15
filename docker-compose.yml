@@ -90,6 +90,10 @@ services:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-change-me-in-production}
       - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
       - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      - DJANGO_USE_X_FORWARDED_HOST=${DJANGO_USE_X_FORWARDED_HOST:-False}
+      - DJANGO_USE_X_FORWARDED_PORT=${DJANGO_USE_X_FORWARDED_PORT:-False}
+      - DJANGO_SECURE_PROXY_SSL_HEADER=${DJANGO_SECURE_PROXY_SSL_HEADER:-False}
+      - DJANGO_CSRF_TRUSTED_ORIGINS=${DJANGO_CSRF_TRUSTED_ORIGINS:-}
       - BSIM_DB_NAME=${BSIM_DB_NAME:-bsim}
       - BSIM_DB_USER=${BSIM_DB_USER:-ben}
       - BSIM_DB_PASSWORD=${BSIM_DB_PASSWORD}
@@ -100,6 +104,15 @@ services:
         condition: service_healthy
     networks:
       - backend
+      - traefik
+    labels:
+      # Traefik Configuration (enable by setting TRAEFIK_ENABLE=true in .env)
+      - "traefik.enable=${TRAEFIK_ENABLE:-false}"
+      - "traefik.http.routers.ghidra-web.rule=Host(`${TRAEFIK_HOST:-ghidra.localhost}`)"
+      - "traefik.http.routers.ghidra-web.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.ghidra-web.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.http.services.ghidra-web.loadbalancer.server.port=8000"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:-traefik}"
     healthcheck:
       test:
         [
@@ -118,3 +131,6 @@ volumes:
 
 networks:
   backend:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik}
