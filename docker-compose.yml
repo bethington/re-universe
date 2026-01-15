@@ -30,6 +30,7 @@ services:
       - POSTGRES_USER=${BSIM_DB_USER:-ben}
       - POSTGRES_PASSWORD=${BSIM_DB_PASSWORD}
       - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
+      - AUTO_CREATE_BSIM_SCHEMA=${AUTO_CREATE_BSIM_SCHEMA:-true}
     ports:
       - "${BSIM_DB_PORT:-5432}:5432"
     volumes:
@@ -75,6 +76,42 @@ services:
       - bsim-postgres
     networks:
       - backend
+
+  # Django Web Application - RE Platform Dashboard
+  ghidra-web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    image: ghidra-web:latest
+    container_name: ghidra-web
+    ports:
+      - "${GHIDRA_WEB_PORT:-8000}:8000"
+    environment:
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-change-me-in-production}
+      - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      - BSIM_DB_NAME=${BSIM_DB_NAME:-bsim}
+      - BSIM_DB_USER=${BSIM_DB_USER:-ben}
+      - BSIM_DB_PASSWORD=${BSIM_DB_PASSWORD}
+      - BSIM_DB_HOST=bsim-postgres
+      - BSIM_DB_PORT=5432
+    depends_on:
+      bsim-postgres:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/')",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
 volumes:
   bsim_postgres_data:
