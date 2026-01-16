@@ -149,10 +149,19 @@ public class AddProgramToBSimDatabase extends GhidraScript {
         }
 
         String programName = currentProgram.getName();
-        String programPath = currentProgram.getExecutablePath();
+        
+        // Get the project path (e.g., /PD2/D2Client.dll) instead of filesystem path
+        String programPath = "";
+        DomainFile domainFile = state.getCurrentDomainFile();
+        if (domainFile != null) {
+            programPath = domainFile.getPathname();
+        } else {
+            // Fallback to executable path if domain file not available
+            programPath = currentProgram.getExecutablePath();
+        }
 
         println("Program: " + programName);
-        println("Path: " + programPath);
+        println("Project Path: " + programPath);
         println("Functions: " + currentProgram.getFunctionManager().getFunctionCount());
 
         boolean proceed = askYesNo("Confirm BSim Addition",
