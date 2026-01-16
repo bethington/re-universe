@@ -28,6 +28,82 @@ public class AddProgramToBSimDatabase extends GhidraScript {
     private static final String MODE_ALL = "All Programs in Project";
     private static final String MODE_VERSION = "Programs by Version Filter";
 
+    // Helper class for game info parsing
+    private static class GameInfo {
+        String gameType = "Unknown";
+        String gameVersion = "Unknown";
+        String versionFamily = "Unknown";
+        
+        GameInfo(String path) {
+            parsePath(path);
+        }
+        
+        private void parsePath(String path) {
+            if (path == null || path.isEmpty()) return;
+            
+            String lowerPath = path.toLowerCase();
+            String[] parts = path.split("/");
+            
+            // Detect game type from path folders
+            for (String part : parts) {
+                String lowerPart = part.toLowerCase();
+                
+                // Project Diablo 2
+                if (lowerPart.equals("pd2") || lowerPart.contains("projectdiablo")) {
+                    gameType = "PD2";
+                    versionFamily = "PD2";
+                }
+                // Diablo 2 Resurrected
+                else if (lowerPart.equals("d2r") || lowerPart.contains("resurrected")) {
+                    gameType = "D2R";
+                    versionFamily = "D2R";
+                }
+                // Classic Diablo 2
+                else if (lowerPart.equals("classic") || lowerPart.equals("d2classic")) {
+                    gameType = "Classic";
+                    versionFamily = "Classic";
+                }
+                // Lord of Destruction
+                else if (lowerPart.equals("lod") || lowerPart.equals("d2lod")) {
+                    gameType = "LoD";
+                    versionFamily = "LoD";
+                }
+                // Median XL
+                else if (lowerPart.equals("medianxl") || lowerPart.equals("median")) {
+                    gameType = "MedianXL";
+                    versionFamily = "MedianXL";
+                }
+                // Path of Diablo
+                else if (lowerPart.equals("pod") || lowerPart.contains("pathofdiablo")) {
+                    gameType = "PoD";
+                    versionFamily = "PoD";
+                }
+                
+                // Extract version patterns (e.g., 1.14d, 1.09, S9, etc.)
+                java.util.regex.Pattern versionPattern = java.util.regex.Pattern.compile(
+                    "(1\\.\\d{2}[a-z]?|[sS]\\d+|v?\\d+\\.\\d+\\.\\d+)"
+                );
+                java.util.regex.Matcher matcher = versionPattern.matcher(part);
+                if (matcher.find() && gameVersion.equals("Unknown")) {
+                    gameVersion = matcher.group(1);
+                }
+            }
+            
+            // If still unknown, try to detect from program name
+            if (gameType.equals("Unknown")) {
+                String lastPart = parts[parts.length - 1].toLowerCase();
+                if (lastPart.contains("d2client") || lastPart.contains("d2game") || 
+                    lastPart.contains("d2common") || lastPart.contains("d2win")) {
+                    // Likely vanilla D2 - check for version in path
+                    if (lowerPath.contains("1.14") || lowerPath.contains("1.13")) {
+                        gameType = "LoD";
+                        versionFamily = "LoD";
+                    }
+                }
+            }
+        }
+    }
+
     @Override
     public void run() throws Exception {
 
@@ -286,7 +362,7 @@ public class AddProgramToBSimDatabase extends GhidraScript {
             println("Executable ID: " + executableId);
 
             // Process functions
-            processFunctions(conn, executableId, programName, program);
+            processFunctions(conn, executableId, programName, programPath, program);
 
             // Update materialized views for cross-version analysis
             refreshMaterializedViews(conn);
@@ -301,6 +377,8 @@ public class AddProgramToBSimDatabase extends GhidraScript {
      * Get or create executable record in database
      */
     private int getOrCreateExecutable(Connection conn, String programName, String programPath) throws SQLException {
+        // Parse game info from path
+        GameInfo gameInfo = new GameInfo(programPath);
 
         // Check if executable already exists
         String selectSql = "SELECT id FROM exetable WHERE name_exec = ?";
@@ -311,6 +389,16 @@ public class AddProgramToBSimDatabase extends GhidraScript {
             if (rs.next()) {
                 int existingId = rs.getInt("id");
                 println("Executable already exists in database with ID: " + existingId);
+                
+                // Update game_version and version_family if they were missing
+                String updateSql = "UPDATE exetable SET game_version = COALESCE(NULLIF(game_version, ''), ?), " +
+                    "version_family = COALESCE(NULLIF(version_family, ''), ?) WHERE id = ?";
+                try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
+                    updateStmt.setString(1, gameInfo.gameVersion);
+                    updateStmt.setString(2, gameInfo.versionFamily);
+                    updateStmt.setInt(3, existingId);
+                    updateStmt.executeUpdate();
+                }
 
                 // Ask if user wants to update
                 boolean update = askYesNo("Executable Exists",
@@ -322,17 +410,21 @@ public class AddProgramToBSimDatabase extends GhidraScript {
             }
         }
 
-        // Create new executable record
-        String insertSql = "INSERT INTO exetable (name_exec, md5, architecture, ingest_date, repository, path) VALUES (?, ?, ?, NOW(), 1, 1) RETURNING id";
+        // Create new executable record with game version info
+        String insertSql = "INSERT INTO exetable (name_exec, md5, architecture, ingest_date, repository, path, game_version, version_family) " +
+            "VALUES (?, ?, ?, NOW(), 1, 1, ?, ?) RETURNING id";
         try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
             stmt.setString(1, programName);
             stmt.setString(2, generateMD5(programName)); // Simple MD5 placeholder
             stmt.setInt(3, getArchitecture()); // Detect architecture
+            stmt.setString(4, gameInfo.gameVersion);
+            stmt.setString(5, gameInfo.versionFamily);
 
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
                 int newId = rs.getInt("id");
                 println("Created new executable record with ID: " + newId);
+                println("  Game Type: " + gameInfo.gameType + ", Version: " + gameInfo.gameVersion);
                 return newId;
             } else {
                 throw new SQLException("Failed to create executable record");
@@ -343,7 +435,7 @@ public class AddProgramToBSimDatabase extends GhidraScript {
     /**
      * Process all functions in the program and add to database
      */
-    private void processFunctions(Connection conn, int executableId, String programName, Program program) throws Exception {
+    private void processFunctions(Connection conn, int executableId, String programName, String programPath, Program program) throws Exception {
 
         println("Processing functions...");
         monitor.setMessage("Processing functions for BSim");
@@ -423,7 +515,7 @@ public class AddProgramToBSimDatabase extends GhidraScript {
             functionCount, addedCount, skippedCount));
 
         // Log program metadata
-        logProgramMetadata(programName, functionCount, addedCount);
+        logProgramMetadata(programName, programPath, functionCount, addedCount);
     }
 
     /**
@@ -496,29 +588,16 @@ public class AddProgramToBSimDatabase extends GhidraScript {
     /**
      * Log program metadata for analysis
      */
-    private void logProgramMetadata(String programName, int functionCount, int addedCount) {
-
-        // Parse version information from program name
-        String gameType = "Unknown";
-        String version = "Unknown";
-
-        if (programName.toLowerCase().contains("classic")) {
-            gameType = "Classic";
-        } else if (programName.toLowerCase().contains("lod")) {
-            gameType = "LoD";
-        }
-
-        // Extract version pattern (e.g., 1.14d)
-        java.util.regex.Pattern versionPattern = java.util.regex.Pattern.compile("1\\.(\\d{2}[a-z]?)");
-        java.util.regex.Matcher matcher = versionPattern.matcher(programName);
-        if (matcher.find()) {
-            version = matcher.group();
-        }
+    private void logProgramMetadata(String programName, String programPath, int functionCount, int addedCount) {
+        // Parse version information from path
+        GameInfo gameInfo = new GameInfo(programPath);
 
         println("=== Program Analysis Summary ===");
         println("Program: " + programName);
-        println("Game Type: " + gameType);
-        println("Version: " + version);
+        println("Path: " + programPath);
+        println("Game Type: " + gameInfo.gameType);
+        println("Version: " + gameInfo.gameVersion);
+        println("Version Family: " + gameInfo.versionFamily);
         println("Total Functions: " + functionCount);
         println("Added to Database: " + addedCount);
         println("Architecture: " + getArchitecture() + "-bit");
