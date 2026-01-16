@@ -1,9 +1,33 @@
-// Populate function parameters and return types into BSim database
-// Creates extended schema for function signature analysis
+// STEP 3d: Populate Function Signatures (OPTIONAL ENRICHMENT)
+//
+// Extracts detailed function signature information and stores it in the BSim database
+// for enhanced type-based analysis. Function signatures provide strong matching criteria
+// through parameter types, return values, and calling conventions.
+//
+// SIGNATURE EXTRACTION:
+// - Function parameter types and counts
+// - Return value types and calling conventions
+// - Stack frame analysis and local variable patterns
+// - Function prototype information from analysis
+//
+// TYPE-BASED MATCHING:
+// - Enables signature-based function identification
+// - Improves matching accuracy through type information
+// - Supports detection of compiler-optimized functions
+// - Facilitates API and library function recognition
+//
+// ENHANCED ANALYSIS:
+// - Identifies functions with identical interfaces across versions
+// - Supports refactoring detection through signature preservation
+// - Enables detection of ABI-compatible function changes
+//
+// WORKFLOW POSITION: Optional after Step1-2, enhances Step4-5 results
+// DEPENDENCIES: Requires functions to be added via Step1
+//
 // @author Claude Code Assistant
 // @category BSim
 // @keybinding ctrl shift S
-// @menupath Tools.BSim.Populate Function Signatures
+// @menupath Tools.BSim.Step3d - Populate Function Signatures (Optional)
 
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.*;
@@ -17,7 +41,7 @@ import java.util.*;
 
 // Note: Using ParameterDefinition for signature arguments
 
-public class PopulateFunctionSignatures extends GhidraScript {
+public class Step3d_PopulateFunctionSignatures extends GhidraScript {
 
     private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
     private static final String DEFAULT_DB_USER = "ben";

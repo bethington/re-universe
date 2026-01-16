@@ -1,8 +1,33 @@
-// Populate function comments into BSim database for enhanced analysis
+// STEP 3a: Populate Function Comments (OPTIONAL ENRICHMENT)
+//
+// Extracts function comments from Ghidra analysis and stores them in the BSim database
+// for enhanced similarity analysis. Comments provide valuable context for function
+// identification and can improve matching accuracy across different versions.
+//
+// COMMENT EXTRACTION:
+// - Pre-comments: Comments placed before function entry points
+// - Post-comments: Comments placed after function definitions
+// - Plate comments: Function header documentation blocks
+// - Inline comments: Comments within function bodies (selected)
+//
+// ANALYSIS ENHANCEMENT:
+// - Improves function matching by providing semantic context
+// - Enables comment-based filtering and search capabilities
+// - Supports analyst workflow by preserving documentation
+// - Facilitates cross-version function tracking through consistent naming
+//
+// DATA STORAGE:
+// - Links comments to specific functions via function IDs
+// - Preserves comment types and positions for context
+// - Maintains version associations for cross-version analysis
+//
+// WORKFLOW POSITION: Optional after Step1-2, enhances Step4-5 results
+// DEPENDENCIES: Requires functions to be added via Step1
+//
 // @author Claude Code Assistant
 // @category BSim
 // @keybinding ctrl shift C
-// @menupath Tools.BSim.Populate Comments
+// @menupath Tools.BSim.Step3a - Populate Comments (Optional)
 
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.*;
@@ -13,7 +38,7 @@ import ghidra.framework.model.*;
 import java.sql.*;
 import java.util.*;
 
-public class PopulateCommentsIntoBSim extends GhidraScript {
+public class Step3a_PopulateCommentsIntoBSim extends GhidraScript {
 
     private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
     private static final String DEFAULT_DB_USER = "ben";

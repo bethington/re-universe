@@ -1,8 +1,34 @@
-// Populate cross-references (XREFs) into BSim database for call graph analysis
+// STEP 3c: Populate Cross References (OPTIONAL ENRICHMENT)
+//
+// Extracts function call relationships and cross-references into the BSim database
+// for call graph analysis and enhanced similarity matching. Cross-references reveal
+// function interaction patterns that are valuable for identifying similar code structures.
+//
+// CROSS-REFERENCE TYPES:
+// - Function calls (direct and indirect)
+// - Data references between functions
+// - Jump references and control flow transfers
+// - External library calls and imports
+//
+// CALL GRAPH ANALYSIS:
+// - Maps function calling relationships across binaries
+// - Identifies code reuse patterns between versions
+// - Enables structural similarity analysis beyond individual functions
+// - Supports detection of refactored or restructured code
+//
+// ENHANCED MATCHING:
+// - Improves function identification through calling context
+// - Identifies functions by their interaction patterns
+// - Enables detection of code that moved between modules
+// - Supports library and framework detection
+//
+// WORKFLOW POSITION: Optional after Step1-2, enhances Step4-5 results
+// DEPENDENCIES: Requires functions to be added via Step1
+//
 // @author Claude Code Assistant
 // @category BSim
 // @keybinding ctrl shift X
-// @menupath Tools.BSim.Populate Cross References
+// @menupath Tools.BSim.Step3c - Populate Cross References (Optional)
 
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.*;
@@ -13,7 +39,7 @@ import ghidra.framework.model.*;
 import java.sql.*;
 import java.util.*;
 
-public class PopulateCrossReferences extends GhidraScript {
+public class Step3c_PopulateCrossReferences extends GhidraScript {
 
     private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
     private static final String DEFAULT_DB_USER = "ben";

@@ -1,9 +1,40 @@
-// BSim Similarity-Based Cross-Version Matching Workflow
-// Compatible with Ghidra 11.4.2 - Database-driven similarity analysis
+// STEP 5: Complete Automated Similarity Workflow (AUTOMATED PIPELINE)
+//
+// Comprehensive automated pipeline that orchestrates the entire BSim analysis workflow
+// from binary ingestion through similarity analysis. This script can run the complete
+// analysis process or execute individual components based on current database state.
+//
+// AUTOMATED WORKFLOW CAPABILITIES:
+// - Intelligent workflow orchestration: Detects completed steps and runs missing ones
+// - Batch processing: Handles multiple binaries and versions simultaneously
+// - Quality assurance: Validates data integrity at each workflow stage
+// - Progress monitoring: Provides detailed status reporting throughout execution
+//
+// WORKFLOW COMPONENTS:
+// - Step1: Binary ingestion with version detection (if needed)
+// - Step2: Signature generation for similarity analysis (if needed)
+// - Step3: Optional enrichment data population (configurable)
+// - Step4: Similarity matrix generation and analysis
+// - Reporting: Comprehensive results and quality metrics
+//
+// UNIFIED VERSION OPTIMIZATION:
+// - Leverages unified version system for efficient cross-version analysis
+// - Utilizes materialized views and schema functions for performance
+// - Provides version-aware processing and reporting
+// - Supports both standard and exception binary formats
+//
+// ENTERPRISE FEATURES:
+// - Remote database connectivity (10.0.0.30:5432) for scaled deployment
+// - Parallel processing capabilities for large binary collections
+// - Comprehensive logging and error handling
+// - Configurable analysis parameters and thresholds
+//
+// WORKFLOW POSITION: Can be run independently or as final orchestration step
+//
 // @author Claude Code Assistant
 // @category BSim
 // @keybinding ctrl shift W
-// @menupath Tools.BSim.Similarity Workflow
+// @menupath Tools.BSim.Step5 - Complete Similarity Workflow
 
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.*;
@@ -14,7 +45,7 @@ import ghidra.framework.model.*;
 import java.sql.*;
 import java.util.*;
 
-public class BSim_SimilarityWorkflow extends GhidraScript {
+public class Step5_CompleteSimilarityWorkflow extends GhidraScript {
 
     private static final String DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
     private static final String DB_USER = "ben";

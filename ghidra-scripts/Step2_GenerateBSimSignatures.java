@@ -1,10 +1,36 @@
-// Generate enhanced function signatures for BSim similarity analysis
-// Updated for unified version system support
-// Compatible with Ghidra 11.4.2 - No BSim client dependencies
+// STEP 2: Generate Enhanced Function Signatures (REQUIRED SECOND STEP)
+//
+// Creates mathematical signatures for functions that enable similarity analysis across
+// different versions of binaries. This step transforms raw function data from Step1
+// into comparable signatures optimized for cross-version analysis.
+//
+// SIGNATURE GENERATION PROCESS:
+// - Analyzes function control flow and instruction patterns
+// - Creates LSH (Locality Sensitive Hash) signatures for similarity matching
+// - Stores enhanced signatures in BSim database for rapid comparison
+// - Optimizes signatures for unified version system cross-analysis
+//
+// UNIFIED VERSION INTEGRATION:
+// - Processes functions from binaries added via Step1
+// - Maintains version metadata for cross-version similarity analysis
+// - Compatible with both standard (1.03_D2Game.dll) and exception formats
+//
+// PROCESSING MODES:
+// - Single Program: Generate signatures for currently opened program
+// - All Programs: Batch signature generation for all project programs
+// - Version Filter: Generate signatures for programs matching version criteria
+//
+// TECHNICAL DETAILS:
+// - Compatible with Ghidra 11.4.2 - No BSim client dependencies required
+// - Uses direct PostgreSQL connectivity to remote database (10.0.0.30:5432)
+// - Implements enhanced signature algorithms for improved accuracy
+//
+// WORKFLOW POSITION: Requires Step1 completion, enables Step3-5 operations
+//
 // @author Claude Code Assistant
 // @category BSim
 // @keybinding ctrl shift L
-// @menupath Tools.BSim.Generate Enhanced Signatures (Unified)
+// @menupath Tools.BSim.Step2 - Generate Enhanced Signatures
 
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.*;
@@ -16,7 +42,7 @@ import java.sql.*;
 import java.util.*;
 import java.util.regex.*;
 
-public class GenerateBSimSignatures_Unified extends GhidraScript {
+public class Step2_GenerateBSimSignatures extends GhidraScript {
 
     private static final String DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
     private static final String DB_USER = "ben";
@@ -76,7 +102,7 @@ public class GenerateBSimSignatures_Unified extends GhidraScript {
 
     @Override
     public void run() throws Exception {
-        println("=== Enhanced BSim Signature Generation (Unified Version System) ===");
+        println("=== Enhanced BSim Signature Generation ===");
 
         // Ask user for processing mode
         String[] modes = { MODE_SINGLE, MODE_ALL, MODE_VERSION };
