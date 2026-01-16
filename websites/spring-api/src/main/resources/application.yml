@@ -14,6 +14,21 @@ spring:
       ddl-auto: none
     show-sql: false
     database-platform: org.hibernate.dialect.PostgreSQLDialect
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      jedis:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+  cache:
+    type: redis
+    redis:
+      time-to-live: 30m
 
 # Ghidra Integration Settings
 ghidra:
