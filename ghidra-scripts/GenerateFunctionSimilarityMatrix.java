@@ -296,10 +296,9 @@ public class GenerateFunctionSimilarityMatrix extends GhidraScript {
 
         while (instructions.hasNext()) {
             Instruction instr = instructions.next();
-            // Fixed FlowType reference
-            ghidra.program.model.lang.FlowType flowType = instr.getFlowType();
-            if (flowType.hasFallthrough() || flowType.isJump() || flowType.isCall()) {
-                flowTypes.merge(flowType.toString(), 1, Integer::sum);
+            // Use flow type methods directly without variable
+            if (instr.getFlowType().hasFallthrough() || instr.getFlowType().isJump() || instr.getFlowType().isCall()) {
+                flowTypes.merge(instr.getFlowType().toString(), 1, Integer::sum);
             }
         }
 
