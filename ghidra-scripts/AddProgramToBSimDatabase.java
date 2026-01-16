@@ -28,6 +28,9 @@ public class AddProgramToBSimDatabase extends GhidraScript {
     private static final String MODE_ALL = "All Programs in Project";
     private static final String MODE_VERSION = "Programs by Version Filter";
 
+    // Flag to auto-update existing executables without prompting
+    private boolean autoUpdateExisting = false;
+
     // Helper class for game info parsing
     private static class GameInfo {
         String gameType = "Unknown";
@@ -208,6 +211,14 @@ public class AddProgramToBSimDatabase extends GhidraScript {
             return;
         }
 
+        // Ask if user wants to auto-update existing executables
+        autoUpdateExisting = askYesNo("Auto-Update Existing",
+            "Automatically update existing executables without prompting for each one?");
+        
+        if (autoUpdateExisting) {
+            println("Auto-update mode enabled - existing executables will be updated automatically");
+        }
+
         int successCount = 0;
         int errorCount = 0;
 
@@ -288,6 +299,14 @@ public class AddProgramToBSimDatabase extends GhidraScript {
         if (!proceed) {
             println("Operation cancelled by user");
             return;
+        }
+
+        // Ask if user wants to auto-update existing executables
+        autoUpdateExisting = askYesNo("Auto-Update Existing",
+            "Automatically update existing executables without prompting for each one?");
+        
+        if (autoUpdateExisting) {
+            println("Auto-update mode enabled - existing executables will be updated automatically");
         }
 
         int successCount = 0;
@@ -409,11 +428,15 @@ public class AddProgramToBSimDatabase extends GhidraScript {
                     updateStmt.executeUpdate();
                 }
 
-                // Ask if user wants to update
-                boolean update = askYesNo("Executable Exists",
-                    "Executable already exists in database. Update function data?");
-                if (!update) {
-                    throw new RuntimeException("Operation cancelled - executable exists");
+                // Check if auto-update is enabled, otherwise ask user
+                if (!autoUpdateExisting) {
+                    boolean update = askYesNo("Executable Exists",
+                        "Executable already exists in database. Update function data?");
+                    if (!update) {
+                        throw new RuntimeException("Operation cancelled - executable exists");
+                    }
+                } else {
+                    println("  Auto-updating existing executable...");
                 }
                 return existingId;
             }
