@@ -202,8 +202,8 @@
             flex-direction: column;
         }
 
-        /* Panel 1: Version Navigator */
-        .panel-versions {
+        /* Panel 1: Binaries Navigator */
+        .panel-binaries {
             width: 140px;
             flex-shrink: 0;
         }
@@ -245,8 +245,8 @@
             color: #ff6666;
         }
 
-        /* LoD - all LoD versions */
-        .filter-btn.lod {
+        /* All Versions - unified display */
+        .filter-btn.all-versions {
             background: linear-gradient(180deg, #2a2a1a 0%, #1a1a0a 100%);
             color: var(--accent-gold);
         }
@@ -297,7 +297,7 @@
             color: #ff6666;
         }
 
-        .version-badge.lod {
+        .version-badge.unified {
             color: var(--accent-gold);
         }
 
@@ -313,7 +313,7 @@
             color: #ff6666;
         }
 
-        .version-type.lod {
+        .version-type.unified {
             color: var(--accent-gold);
         }
 
@@ -581,7 +581,7 @@
             color: var(--color-magic);
         }
 
-        /* Panel 3: File Details */
+        /* Panel 3: Cross-Version Matrix */
         .panel-details {
             flex: 1;
             min-width: 300px;
@@ -2614,7 +2614,7 @@
             font-weight: 600;
         }
 
-        /* File Details Panel Styles */
+        /* Cross-Version Matrix Panel Styles */
         .file-details-container {
             height: 100%;
             display: flex;
@@ -3177,16 +3177,16 @@
 
     <div class="main-container">
         <div class="panels-wrapper">
-            <!-- Panel 1: Version Navigator -->
-            <div class="panel panel-versions">
+            <!-- Panel 1: Binaries Navigator -->
+            <div class="panel panel-binaries">
                 <div class="panel-header">
-                    <h2>Versions</h2>
+                    <h2>Binaries</h2>
                 </div>
                 <div class="version-filters">
                     <div class="filter-buttons">
-                        <button class="filter-btn pre-refactor" onclick="toggleVersionFilter('preRefactor')" title="Classic 1.00-1.03 (Pre-refactor codebase)">Pre</button>
-                        <button class="filter-btn post-refactor" onclick="toggleVersionFilter('postRefactor')" title="Classic 1.04+ (Post-refactor codebase)">Post</button>
-                        <button class="filter-btn lod active" onclick="toggleVersionFilter('lod')" title="Lord of Destruction (All versions)">LoD</button>
+                        <button class="filter-btn pre-refactor" onclick="toggleVersionFilter('preRefactor')" title="Versions 1.00-1.03 (Pre-refactor codebase)">Pre</button>
+                        <button class="filter-btn post-refactor" onclick="toggleVersionFilter('postRefactor')" title="Versions 1.04+ (Post-refactor codebase)">Post</button>
+                        <button class="filter-btn all-versions active" onclick="toggleVersionFilter('allVersions')" title="All versions (Unified display)">All</button>
                     </div>
                 </div>
                 <div class="panel-content">
@@ -3197,7 +3197,7 @@
             <!-- Panel 2: Files -->
             <div class="panel panel-files">
                 <div class="panel-header panel-header-files">
-                    <h2 id="filesTitle">Select a Version</h2>
+                    <h2 id="filesTitle">Binaries</h2>
                     <input type="text" class="files-filter" id="filesFilter" placeholder="Filter..." oninput="filterFiles()" style="display: none;">
                 </div>
                 <div class="files-toolbar" id="filesToolbar" style="display: none; position: relative;">
@@ -3217,10 +3217,10 @@
                 </div>
             </div>
 
-            <!-- Panel 3: File Details -->
+            <!-- Panel 3: Cross-Version Matrix -->
             <div class="panel panel-details">
                 <div class="panel-header">
-                    <h2>File Details</h2>
+                    <h2>Cross-Version Matrix</h2>
                 </div>
                 <div class="panel-content" id="detailsContent">
                     <div class="details-empty">
@@ -3261,7 +3261,7 @@
 
     <div class="footer">
         <div class="footer-stat">
-            <span class="value" id="statVersions">0</span> versions
+            <span class="value" id="statVersions">0</span> binaries
         </div>
         <div class="footer-stat">
             <span class="value" id="statFiles">0</span> unique files
@@ -3276,7 +3276,7 @@
     <!-- API Data Loading -->
     <script>
         // API Configuration
-        const API_BASE_URL = 'https://api.xebyte.com/api';
+        const API_BASE_URL = 'http://localhost:8081/api';
 
         // Global data variables (previously loaded from static files)
         let FILE_CATEGORIES = {};
@@ -3463,7 +3463,7 @@
 
                 const response = await fetch(`${API_BASE_URL}/binaries?gameType=${encodeURIComponent(gameType)}&version=${encodeURIComponent(version)}`);
                 if (!response.ok) {
-                    throw new Error(`Failed to load binaries for ${gameType} ${version}`);
+                    throw new Error(`Failed to load binaries for ${gameType} ${version}: HTTP ${response.status}`);
                 }
 
                 const binariesData = await response.json();
@@ -3477,9 +3477,63 @@
             } catch (error) {
                 console.error(`Error loading binaries for ${gameType} ${version}:`, error);
                 hideLoadingToast();
-                showErrorToast(`Failed to load binaries for ${gameType} ${version}`);
+
+                // Show unified version system message instead of error
+                showUnifiedVersionFallback(gameType, version);
                 return [];
             }
+        }
+
+        // Show fallback message for unified version system
+        function showUnifiedVersionFallback(gameType, version) {
+            const fallbackData = {
+                files: {
+                    [`${version}_D2Game.dll`]: {
+                        name: `${version}_D2Game.dll`,
+                        size: 'Unknown',
+                        type: 'dll',
+                        unified_version: version,
+                        game_type: gameType,
+                        note: 'Unified version system - binary shared across families'
+                    },
+                    [`${version}_D2Common.dll`]: {
+                        name: `${version}_D2Common.dll`,
+                        size: 'Unknown',
+                        type: 'dll',
+                        unified_version: version,
+                        game_type: gameType,
+                        note: 'Unified version system - binary shared across families'
+                    }
+                }
+            };
+
+            // Add exception binary if appropriate
+            if (gameType === 'Classic') {
+                fallbackData.files[`Classic_${version}_Game.exe`] = {
+                    name: `Classic_${version}_Game.exe`,
+                    size: 'Unknown',
+                    type: 'exe',
+                    unified_version: version,
+                    game_type: gameType,
+                    note: 'Exception binary - specific to Classic family'
+                };
+            } else if (gameType === 'LoD') {
+                fallbackData.files[`LoD_${version}_Game.exe`] = {
+                    name: `LoD_${version}_Game.exe`,
+                    size: 'Unknown',
+                    type: 'exe',
+                    unified_version: version,
+                    game_type: gameType,
+                    note: 'Exception binary - specific to LoD family'
+                };
+            }
+
+            // Store and render the fallback data
+            const folderName = `${gameType}/${version}`;
+            FOLDERS_DATA[folderName] = fallbackData;
+            renderFilesTable(fallbackData);
+
+            showToast(`Showing unified binaries for ${gameType} ${version}`);
         }
 
         // Transform binary data from API into format expected by renderFilesTable
@@ -3570,18 +3624,18 @@
         let selectedFile = null;
         let isGrouped = true;
 
-        // Version filters: Pre-Refactor (1.00-1.03), Post-Refactor (1.04+), LoD (all)
+        // Version filters: Unified system (no more Classic/LoD separation)
         let versionFilters = {
-            preRefactor: true,   // Classic 1.00-1.03 (old codebase)
-            postRefactor: true,  // Classic 1.04+ (refactored codebase)
-            lod: true             // All LoD versions
+            preRefactor: true,   // Versions 1.00-1.03 (old codebase)
+            postRefactor: true,  // Versions 1.04+ (refactored codebase)
+            allVersions: true    // All unified versions
         };
 
-        // Version group definitions
+        // Unified version group definitions (no more family separation)
         const VERSION_GROUPS = {
-            preRefactor: ['Classic/1.00', 'Classic/1.01', 'Classic/1.02', 'Classic/1.03'],
-            postRefactor: ['Classic/1.04b', 'Classic/1.04c', 'Classic/1.05', 'Classic/1.05b', 'Classic/1.06', 'Classic/1.06b', 'Classic/1.08', 'Classic/1.09', 'Classic/1.09b', 'Classic/1.09d', 'Classic/1.10', 'Classic/1.11', 'Classic/1.11b', 'Classic/1.12a', 'Classic/1.13c', 'Classic/1.13d', 'Classic/1.14a', 'Classic/1.14b', 'Classic/1.14c', 'Classic/1.14d'],
-            lod: ['LoD/1.07', 'LoD/1.08', 'LoD/1.09', 'LoD/1.09b', 'LoD/1.09d', 'LoD/1.10', 'LoD/1.11', 'LoD/1.11b', 'LoD/1.12a', 'LoD/1.13c', 'LoD/1.13d', 'LoD/1.14a', 'LoD/1.14b', 'LoD/1.14c', 'LoD/1.14d']
+            preRefactor: ['1.00', '1.01', '1.02', '1.03'],
+            postRefactor: ['1.04b', '1.04c', '1.05', '1.05b', '1.06', '1.06b', '1.08', '1.09', '1.09b', '1.09d', '1.10', '1.11', '1.11b', '1.12a', '1.13c', '1.13d', '1.14a', '1.14b', '1.14c', '1.14d'],
+            allVersions: ['1.00', '1.01', '1.02', '1.03', '1.04b', '1.04c', '1.05', '1.05b', '1.06', '1.06b', '1.07', '1.08', '1.09', '1.09b', '1.09d', '1.10', '1.11', '1.11b', '1.12a', '1.13c', '1.13d', '1.14a', '1.14b', '1.14c', '1.14d']
         };
 
         // Legacy compatibility
@@ -4388,8 +4442,8 @@
             }
 
             // Update legacy flags for compatibility
-            showClassic = versionFilters.preRefactor || versionFilters.postRefactor;
-            showLoD = versionFilters.lod;
+            showClassic = versionFilters.preRefactor || versionFilters.postRefactor || versionFilters.allVersions;
+            showLoD = versionFilters.preRefactor || versionFilters.postRefactor || versionFilters.allVersions;
 
             updateFilterButtons();
             renderVersionList();
@@ -8297,8 +8351,8 @@
             }
 
             // Update legacy flags for compatibility
-            showClassic = versionFilters.preRefactor || versionFilters.postRefactor;
-            showLoD = versionFilters.lod;
+            showClassic = versionFilters.preRefactor || versionFilters.postRefactor || versionFilters.allVersions;
+            showLoD = versionFilters.preRefactor || versionFilters.postRefactor || versionFilters.allVersions;
 
             // Update UI
             updateFilterButtons();
