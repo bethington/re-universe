@@ -1,8 +1,39 @@
-// Populate import/export tables into BSim database for API usage analysis
+// STEP 3e: Populate Import/Export Tables (OPTIONAL ENRICHMENT)
+//
+// Extracts import and export table information into the BSim database for API usage
+// analysis and external dependency tracking. Import/export data provides valuable
+// context for function identification and binary characterization.
+//
+// IMPORT TABLE EXTRACTION:
+// - External library dependencies and API calls
+// - System function imports and their usage patterns
+// - Dynamic linking information and library versions
+// - Ordinal-based imports for obfuscated binaries
+//
+// EXPORT TABLE EXTRACTION:
+// - Public functions exposed by the binary
+// - DLL export information and function ordinals
+// - API surface analysis for library binaries
+// - Entry point and initialization function identification
+//
+// API USAGE ANALYSIS:
+// - Identifies binaries by their API usage patterns
+// - Enables library and framework detection
+// - Supports malware family classification through API fingerprinting
+// - Facilitates version identification through API changes
+//
+// CROSS-VERSION TRACKING:
+// - Tracks API usage changes between software versions
+// - Identifies deprecated or newly introduced functions
+// - Supports compatibility analysis across versions
+//
+// WORKFLOW POSITION: Optional after Step1-2, enhances Step4-5 results
+// DEPENDENCIES: Requires functions to be added via Step1
+//
 // @author Claude Code Assistant
 // @category BSim
 // @keybinding ctrl shift I
-// @menupath Tools.BSim.Populate Import/Export Tables
+// @menupath Tools.BSim.Step3e - Populate Import/Export Tables (Optional)
 
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.*;
@@ -13,7 +44,7 @@ import ghidra.framework.model.*;
 import java.sql.*;
 import java.util.*;
 
-public class PopulateImportExports extends GhidraScript {
+public class Step3e_PopulateImportExports extends GhidraScript {
 
     private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
     private static final String DEFAULT_DB_USER = "ben";

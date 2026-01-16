@@ -1,9 +1,32 @@
-// Add programs to PostgreSQL BSim database with unified version system support
-// Updated for unified naming convention: 1.03_D2Game.dll, Classic_1.03_Game.exe
+// STEP 1: Add Programs to BSim Database (REQUIRED FIRST STEP)
+//
+// Primary ingestion script for adding executables to the PostgreSQL BSim database.
+// This is the mandatory first step in the BSim analysis workflow - all other scripts
+// depend on binaries being successfully added to the database through this script.
+//
+// UNIFIED VERSION SYSTEM SUPPORT:
+// - Standard binaries: 1.03_D2Game.dll → version: 1.03, family: Unified
+// - Exception binaries: Classic_1.03_Game.exe → version: 1.03, family: Classic
+// - Automatic version detection and database field population
+// - Validates naming conventions and prompts for non-standard formats
+//
+// PROCESSING MODES:
+// - Single Program: Process currently opened program in Ghidra
+// - All Programs: Batch process all programs in current project
+// - Version Filter: Process programs matching specific version pattern
+//
+// DATABASE OPERATIONS:
+// - Creates executable records with unified version metadata
+// - Extracts and stores function information for similarity analysis
+// - Populates base tables required for subsequent BSim operations
+// - Uses remote PostgreSQL database (10.0.0.30:5432) for enterprise deployment
+//
+// WORKFLOW POSITION: Must be run before Step2 (signature generation)
+//
 // @author Claude Code Assistant
 // @category BSim
 // @keybinding ctrl shift B
-// @menupath Tools.BSim.Add Program to Database (Unified)
+// @menupath Tools.BSim.Step1 - Add Program to Database
 // @toolbar
 
 import ghidra.app.script.GhidraScript;
@@ -17,7 +40,7 @@ import java.util.*;
 import java.sql.*;
 import java.util.regex.*;
 
-public class AddProgramToBSimDatabase_Unified extends GhidraScript {
+public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
     // Default BSim database configuration
     private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
@@ -113,8 +136,8 @@ public class AddProgramToBSimDatabase_Unified extends GhidraScript {
     @Override
     public void run() throws Exception {
 
-        println("=== BSim Database Population Script (Unified Version System) ===");
-        println("Supports unified naming: 1.03_D2Game.dll, Classic_1.03_Game.exe");
+        println("=== BSim Database Population Script ===");
+        println("Supports version-aware naming: 1.03_D2Game.dll, Classic_1.03_Game.exe");
 
         // Ask user which mode to use
         String[] modes = { MODE_SINGLE, MODE_ALL, MODE_VERSION };

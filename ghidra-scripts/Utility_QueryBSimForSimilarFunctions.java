@@ -13,9 +13,44 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-//Queries a PostgreSQL BSim database to find similar functions across all indexed programs.
-//Useful for matching functions across different versions of the same software.
+// UTILITY: Query BSim for Similar Functions (INTERACTIVE ANALYSIS TOOL)
+//
+// Interactive utility for querying the BSim database to find functions similar to a
+// specified target function. Provides real-time similarity analysis and detailed
+// matching results across all indexed programs and versions.
+//
+// QUERY CAPABILITIES:
+// - Function-to-function similarity searches across all indexed binaries
+// - Cross-version function tracking and identification
+// - Similarity threshold filtering for precision control
+// - Multiple similarity algorithm results comparison
+//
+// INTERACTIVE FEATURES:
+// - User-guided function selection from current program
+// - Configurable similarity thresholds and result limits
+// - Detailed match reporting with confidence scores
+// - Export capabilities for further analysis
+//
+// ANALYSIS OUTPUTS:
+// - Ranked similarity results with confidence scores
+// - Cross-version function mapping tables
+// - Detailed match explanations and reasoning
+// - Export to CSV/text for external analysis
+//
+// PRACTICAL APPLICATIONS:
+// - Reverse engineering: Find similar functions across malware families
+// - Version analysis: Track function evolution across software versions
+// - Code reuse detection: Identify shared code between different binaries
+// - Quality validation: Verify BSim analysis accuracy through spot checks
+//
+// WORKFLOW INTEGRATION:
+// - Use after Steps 1-4 completion for interactive exploration
+// - Complements automated analysis with manual investigation capabilities
+// - Validates similarity matrix results through targeted queries
+//
+// @author Ghidra Community (Enhanced for Unified Version System)
 //@category BSim
+//@menupath Tools.BSim.Utilities.Query Similar Functions
 import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.util.*;
@@ -35,7 +70,7 @@ import ghidra.program.model.listing.FunctionIterator;
 import ghidra.util.MessageType;
 import ghidra.util.Msg;
 
-public class QueryBSimForSimilarFunctionsScript extends GhidraScript {
+public class Utility_QueryBSimForSimilarFunctions extends GhidraScript {
 
 	private static final String HOST = "Host";
 	private static final String PORT = "Port";

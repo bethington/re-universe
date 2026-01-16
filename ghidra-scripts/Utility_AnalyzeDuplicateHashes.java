@@ -1,13 +1,40 @@
-//Analyze all programs in the project and find duplicates by MD5 hash
+// UTILITY: Analyze Duplicate Hashes (QUALITY ASSURANCE TOOL)
+//
+// Quality assurance utility that identifies duplicate binaries in the project by MD5 hash
+// analysis. Helps ensure data integrity and identifies potential issues with binary
+// collections before processing through the main BSim workflow.
+//
+// DUPLICATE DETECTION:
+// - Calculates MD5 hashes for all binaries in the current project
+// - Identifies exact duplicates that may cause analysis issues
+// - Reports duplicate groups with file paths and hash values
+// - Provides statistics on collection uniqueness
+//
+// QUALITY ASSURANCE VALUE:
+// - Prevents duplicate function signatures that skew similarity analysis
+// - Identifies collection organization issues (same binary in multiple locations)
+// - Helps validate binary ingestion processes
+// - Supports cleanup operations before main analysis
+//
+// USAGE RECOMMENDATIONS:
+// - Run before Step1 to validate binary collection quality
+// - Use periodically to maintain clean project organization
+// - Review results to remove unnecessary duplicates
+//
+// OUTPUT:
+// - Detailed duplicate groups report
+// - Summary statistics of collection uniqueness
+// - Recommendations for cleanup actions
+//
 //@category BSim
-//@menupath Tools.BSim.Analyze Duplicate Hashes
+//@menupath Tools.BSim.Utilities.Analyze Duplicate Hashes
 
 import java.util.*;
 import ghidra.app.script.GhidraScript;
 import ghidra.framework.model.*;
 import ghidra.program.model.listing.Program;
 
-public class AnalyzeDuplicateHashesScript extends GhidraScript {
+public class Utility_AnalyzeDuplicateHashes extends GhidraScript {
 
     // Map of MD5 -> list of program paths with that hash
     private Map<String, List<String>> hashToPrograms = new HashMap<>();

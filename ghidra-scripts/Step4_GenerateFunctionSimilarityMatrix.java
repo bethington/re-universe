@@ -1,9 +1,38 @@
-// Generate function similarity matrix for cross-version matching using instruction patterns
-// This creates similarity relationships based on function structure rather than names
+// STEP 4: Generate Function Similarity Matrix (REQUIRED ANALYSIS STEP)
+//
+// Creates comprehensive similarity matrix for cross-version function matching using
+// advanced mathematical analysis of function signatures and enrichment data from
+// previous steps. This is the core analysis step that produces actionable results.
+//
+// SIMILARITY ANALYSIS PROCESS:
+// - Compares LSH signatures from Step2 across all binary versions
+// - Incorporates enrichment data from Step3 scripts for enhanced accuracy
+// - Uses unified version system for structured cross-version analysis
+// - Calculates similarity scores using multiple algorithmic approaches
+//
+// ANALYSIS CAPABILITIES:
+// - Structure-based matching: Analyzes control flow and instruction patterns
+// - Context-aware matching: Uses comments, strings, and cross-references
+// - API-based matching: Leverages import/export and signature data
+// - Version-aware scoring: Optimized for unified version system analysis
+//
+// OUTPUT GENERATION:
+// - Function similarity matrix with confidence scores
+// - Cross-version mapping tables for version tracking
+// - Similarity reports with detailed match explanations
+// - Quality metrics and analysis statistics
+//
+// UNIFIED VERSION INTEGRATION:
+// - Processes functions across all versions in unified format
+// - Uses materialized views for optimized cross-version queries
+// - Maintains version metadata for accurate family grouping
+//
+// WORKFLOW POSITION: Requires Steps1-2, enhanced by Step3, enables practical results
+//
 // @author Claude Code Assistant
 // @category BSim
 // @keybinding ctrl shift M
-// @menupath Tools.BSim.Generate Similarity Matrix
+// @menupath Tools.BSim.Step4 - Generate Similarity Matrix
 
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.*;
@@ -14,7 +43,7 @@ import ghidra.framework.model.*;
 import java.sql.*;
 import java.util.*;
 
-public class GenerateFunctionSimilarityMatrix extends GhidraScript {
+public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
 
     private static final String DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
     private static final String DB_USER = "ben";

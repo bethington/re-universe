@@ -1,8 +1,33 @@
-// Populate string references into BSim database for enhanced similarity analysis
+// STEP 3b: Populate String References (OPTIONAL ENRICHMENT)
+//
+// Extracts string references from functions and stores them in the BSim database
+// for enhanced similarity analysis. String references provide strong indicators
+// for function identification, especially for library functions and error handling.
+//
+// STRING EXTRACTION TYPES:
+// - Direct string literals referenced by functions
+// - Imported string references from external libraries
+// - Debug/error message strings that identify function purpose
+// - Configuration and format strings that indicate functionality
+//
+// ANALYSIS ENHANCEMENT:
+// - Enables string-based function matching across versions
+// - Identifies functions by unique string patterns
+// - Improves accuracy for library function identification
+// - Supports malware analysis through string fingerprinting
+//
+// CROSS-VERSION ANALYSIS:
+// - Tracks string changes between software versions
+// - Identifies functions that maintain consistent string usage
+// - Detects version-specific modifications through string analysis
+//
+// WORKFLOW POSITION: Optional after Step1-2, enhances Step4-5 results
+// DEPENDENCIES: Requires functions to be added via Step1
+//
 // @author Claude Code Assistant
 // @category BSim
 // @keybinding ctrl shift T
-// @menupath Tools.BSim.Populate String References
+// @menupath Tools.BSim.Step3b - Populate String References (Optional)
 
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.*;
@@ -15,7 +40,7 @@ import ghidra.framework.model.*;
 import java.sql.*;
 import java.util.*;
 
-public class PopulateStringReferences extends GhidraScript {
+public class Step3b_PopulateStringReferences extends GhidraScript {
 
     private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
     private static final String DEFAULT_DB_USER = "ben";
