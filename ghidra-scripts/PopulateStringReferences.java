@@ -310,30 +310,34 @@ public class PopulateStringReferences extends GhidraScript {
         int processedCount = 0;
         int stringCount = 0;
         int referenceCount = 0;
+        int skippedCount = 0;
         int totalStrings = strings.size();
 
-        // Prepare statements
+        // Check if string already exists
+        String checkStringSql = "SELECT id FROM string_references WHERE executable_id = ? AND string_address = ?";
+        
+        // Insert without ON CONFLICT for compatibility
         String insertStringSql = """
             INSERT INTO string_references
             (executable_id, string_address, string_value, string_length, string_type)
             VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT (executable_id, string_address) DO UPDATE SET
-                string_value = EXCLUDED.string_value,
-                string_length = EXCLUDED.string_length,
-                string_type = EXCLUDED.string_type
             RETURNING id
             """;
 
+        // Check if reference already exists
+        String checkRefSql = "SELECT id FROM function_string_refs WHERE function_id = ? AND string_id = ? AND reference_address = ?";
+        
         String insertRefSql = """
             INSERT INTO function_string_refs
             (function_id, string_id, reference_type, reference_address)
             VALUES (?, ?, ?, ?)
-            ON CONFLICT (function_id, string_id, reference_address) DO NOTHING
             """;
 
         String getFunctionIdSql = "SELECT id FROM desctable WHERE id_exe = ? AND addr <= ? ORDER BY addr DESC LIMIT 1";
 
-        try (PreparedStatement stringStmt = conn.prepareStatement(insertStringSql);
+        try (PreparedStatement checkStringStmt = conn.prepareStatement(checkStringSql);
+             PreparedStatement stringStmt = conn.prepareStatement(insertStringSql);
+             PreparedStatement checkRefStmt = conn.prepareStatement(checkRefSql);
              PreparedStatement refStmt = conn.prepareStatement(insertRefSql);
              PreparedStatement funcIdStmt = conn.prepareStatement(getFunctionIdSql)) {
 
@@ -357,22 +361,41 @@ public class PopulateStringReferences extends GhidraScript {
                         continue; // Skip null, very short or very long strings
                     }
 
-                    stringStmt.setInt(1, executableId);
-                    stringStmt.setLong(2, stringAddr.getOffset());
-                    stringStmt.setString(3, stringValue);
-                    stringStmt.setInt(4, stringValue.length());
-                    stringStmt.setString(5, getStringType(foundString));
+                    // Check if string already exists
+                    checkStringStmt.setInt(1, executableId);
+                    checkStringStmt.setLong(2, stringAddr.getOffset());
+                    ResultSet checkRs = checkStringStmt.executeQuery();
+                    
+                    long stringId;
+                    if (checkRs.next()) {
+                        // String exists, use existing ID
+                        stringId = checkRs.getLong("id");
+                        skippedCount++;
+                        checkRs.close();
+                    } else {
+                        checkRs.close();
+                        
+                        // Insert new string
+                        stringStmt.setInt(1, executableId);
+                        stringStmt.setLong(2, stringAddr.getOffset());
+                        stringStmt.setString(3, stringValue);
+                        stringStmt.setInt(4, stringValue.length());
+                        stringStmt.setString(5, getStringType(foundString));
 
-                    ResultSet rs = stringStmt.executeQuery();
-                    if (rs.next()) {
-                        long stringId = rs.getLong("id");
-                        stringCount++;
-
-                        // Find functions that reference this string
-                        referenceCount += findFunctionReferences(conn, refStmt, funcIdStmt,
-                            stringAddr, stringId, executableId);
+                        ResultSet rs = stringStmt.executeQuery();
+                        if (rs.next()) {
+                            stringId = rs.getLong("id");
+                            stringCount++;
+                        } else {
+                            rs.close();
+                            continue;
+                        }
+                        rs.close();
                     }
-                    rs.close();
+
+                    // Find functions that reference this string
+                    referenceCount += findFunctionReferences(conn, checkRefStmt, refStmt, funcIdStmt,
+                        stringAddr, stringId, executableId);
 
                 } catch (SQLException e) {
                     printerr("Error processing string at " + foundString.getAddress() + ": " + e.getMessage());
@@ -404,9 +427,9 @@ public class PopulateStringReferences extends GhidraScript {
         return "unknown";
     }
 
-    private int findFunctionReferences(Connection conn, PreparedStatement refStmt,
-                                     PreparedStatement funcIdStmt, Address stringAddr,
-                                     long stringId, int executableId) throws SQLException {
+    private int findFunctionReferences(Connection conn, PreparedStatement checkRefStmt, 
+                                     PreparedStatement refStmt, PreparedStatement funcIdStmt, 
+                                     Address stringAddr, long stringId, int executableId) throws SQLException {
 
         int refCount = 0;
 
@@ -423,6 +446,19 @@ public class PopulateStringReferences extends GhidraScript {
             ResultSet rs = funcIdStmt.executeQuery();
             if (rs.next()) {
                 long functionId = rs.getLong("id");
+
+                // Check if reference already exists
+                checkRefStmt.setLong(1, functionId);
+                checkRefStmt.setLong(2, stringId);
+                checkRefStmt.setLong(3, refAddr.getOffset());
+                ResultSet checkRs = checkRefStmt.executeQuery();
+                if (checkRs.next()) {
+                    // Reference exists, skip
+                    checkRs.close();
+                    rs.close();
+                    continue;
+                }
+                checkRs.close();
 
                 // Insert function-string reference
                 refStmt.setLong(1, functionId);
