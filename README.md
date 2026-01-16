@@ -513,6 +513,130 @@ print(json.dumps(results, indent=2))
 
 ---
 
+## 🎯 Unified Version System
+
+This platform uses a **unified version system** that simplifies version management by eliminating family separation while maintaining full compatibility for cross-version analysis.
+
+### 📋 Naming Convention
+
+#### ✅ **Standard Unified Binaries** (Most files)
+```
+1.03_D2Game.dll       → Version: 1.03
+1.13c_D2Common.dll    → Version: 1.13c
+1.14d_Storm.dll       → Version: 1.14d
+```
+
+#### ✅ **Exception Binaries** (Game.exe, Diablo_II.exe only)
+```
+Classic_1.03_Game.exe     → Version: 1.03, Family: Classic
+LoD_1.13c_Game.exe        → Version: 1.13c, Family: LoD
+Classic_1.00_Diablo_II.exe → Version: 1.00, Family: Classic
+```
+
+### 🔧 Management Commands
+
+#### Quick Version Management
+```bash
+# Complete unified version management
+./manage-unified-versions.sh full
+
+# Individual operations
+./manage-unified-versions.sh populate   # Extract versions from filenames
+./manage-unified-versions.sh validate   # Check naming compliance
+./manage-unified-versions.sh refresh    # Update materialized views
+./manage-unified-versions.sh stats      # Show statistics
+```
+
+#### Clean Deployment
+```bash
+# Fresh deployment with unified system
+./clean-fresh-deployment.sh full
+
+# Individual phases
+./clean-fresh-deployment.sh infrastructure  # Containers only
+./clean-fresh-deployment.sh schema          # Schema only
+./clean-fresh-deployment.sh validate        # Validation only
+```
+
+### 🔍 Data Quality Validation
+```bash
+# Comprehensive validation
+./data-quality-validator.sh full
+
+# Specific validations
+./data-quality-validator.sh pre-ingestion   # Before data import
+./data-quality-validator.sh post-ingestion  # After data import
+./data-quality-validator.sh report          # Statistics only
+```
+
+### 🚀 Benefits
+
+#### **✨ Simplified Management**
+- **Single Version Display**: No more duplicate Classic/LoD versions
+- **Unified Analysis**: Cross-version analysis without family complexity
+- **Clear Naming**: Consistent `version_binary.ext` format
+
+#### **🎯 Smart Exception Handling**
+- **Automatic Detection**: System recognizes Game.exe exceptions
+- **Family Preservation**: Classic/LoD distinction maintained where needed
+- **API Compatibility**: Backward compatible with existing tools
+
+#### **⚡ Performance Optimized**
+- **Fast Queries**: Optimized materialized views for cross-version data
+- **Efficient Indexing**: Proper database indexes for version lookups
+- **Quick Management**: All operations complete in <1 second
+
+### 🔧 Database Schema
+
+#### Key Functions
+```sql
+-- Extract version from any naming format
+SELECT extract_version_from_name('1.03_D2Game.dll');        -- Returns: 1.03
+SELECT extract_version_from_name('Classic_1.03_Game.exe');  -- Returns: 1.03
+
+-- Check for exception binaries
+SELECT is_exception_binary('1.03_D2Game.dll');              -- Returns: false
+SELECT is_exception_binary('Classic_1.03_Game.exe');        -- Returns: true
+
+-- Get family type (Unified/Classic/LoD)
+SELECT get_family_for_exception('1.03_D2Game.dll');         -- Returns: Unified
+SELECT get_family_for_exception('Classic_1.03_Game.exe');   -- Returns: Classic
+```
+
+#### Key Views
+- **`cross_version_functions`** - Materialized view with unified cross-version analysis
+- **`api_cross_version_functions`** - API-friendly view for web interface
+- **`cross_version_statistics`** - Summary statistics for version analysis
+
+### 📊 API Integration
+
+#### Cross-Version Endpoints
+```bash
+# Test unified format
+curl "http://localhost:8081/api/functions/cross-version/1.03_D2Game.dll"
+
+# Test exception format
+curl "http://localhost:8081/api/functions/cross-version/Classic_1.03_Game.exe"
+
+# API health check
+curl "http://localhost:8081/api/health"
+```
+
+### 🔄 Migration Notes
+
+#### From Legacy System
+- **Automated Migration**: Version fields auto-populated from filenames
+- **Data Quality**: Strict validation prevents invalid naming
+- **Backward Compatibility**: Existing API endpoints continue working
+- **No Data Loss**: All historical data preserved with new version format
+
+#### For New Deployments
+- **Clean Installation**: Use `./clean-fresh-deployment.sh full`
+- **Naming Compliance**: Ensure all files follow unified convention
+- **Validation Required**: All data must pass naming validation before ingestion
+
+---
+
 ## 🙏 Acknowledgments
 
 - **[Ghidra Team](https://github.com/NationalSecurityAgency/ghidra)** - For the excellent BSim framework
