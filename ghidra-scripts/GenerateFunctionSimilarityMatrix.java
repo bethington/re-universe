@@ -10,6 +10,7 @@ import ghidra.program.model.listing.*;
 import ghidra.program.model.address.*;
 import ghidra.program.model.lang.*;
 import ghidra.util.exception.CancelledException;
+import ghidra.framework.model.*;
 import java.sql.*;
 import java.util.*;
 
@@ -23,16 +24,37 @@ public class GenerateFunctionSimilarityMatrix extends GhidraScript {
     private static final double MIN_SIMILARITY = 0.7;
     private static final double MIN_CONFIDENCE = 25.0;
 
+    // Mode selection constants
+    private static final String MODE_SINGLE = "Single Program (current)";
+    private static final String MODE_ALL = "All Programs in Project";
+    private static final String MODE_VERSION = "Programs by Version Filter";
+
     @Override
     public void run() throws Exception {
+        println("=== Function Similarity Matrix Generation ===");
 
+        // Ask user for processing mode
+        String[] modes = { MODE_SINGLE, MODE_ALL, MODE_VERSION };
+        String selectedMode = askChoice("Select Processing Mode",
+            "How would you like to generate similarity matrix?",
+            Arrays.asList(modes), MODE_SINGLE);
+
+        if (selectedMode.equals(MODE_SINGLE)) {
+            processSingleProgram();
+        } else if (selectedMode.equals(MODE_ALL)) {
+            processAllPrograms();
+        } else if (selectedMode.equals(MODE_VERSION)) {
+            processVersionFiltered();
+        }
+    }
+
+    private void processSingleProgram() throws Exception {
         if (currentProgram == null) {
             popup("No program is currently open. Please open a program first.");
             return;
         }
 
         String programName = currentProgram.getName();
-        println("=== Function Similarity Matrix Generation ===");
         println("Program: " + programName);
 
         FunctionManager funcManager = currentProgram.getFunctionManager();
@@ -52,7 +74,7 @@ public class GenerateFunctionSimilarityMatrix extends GhidraScript {
         }
 
         try {
-            generateSimilarityMatrix(programName);
+            generateSimilarityMatrix(currentProgram, programName);
             println("Successfully generated similarity matrix!");
 
         } catch (Exception e) {
@@ -62,7 +84,142 @@ public class GenerateFunctionSimilarityMatrix extends GhidraScript {
         }
     }
 
-    private void generateSimilarityMatrix(String programName) throws Exception {
+    private void processAllPrograms() throws Exception {
+        Project project = state.getProject();
+        if (project == null) {
+            popup("No project is currently open.");
+            return;
+        }
+
+        ProjectData projectData = project.getProjectData();
+        DomainFolder rootFolder = projectData.getRootFolder();
+
+        List<DomainFile> programFiles = new ArrayList<>();
+        collectProgramFiles(rootFolder, programFiles);
+
+        if (programFiles.isEmpty()) {
+            popup("No program files found in the project.");
+            return;
+        }
+
+        boolean proceed = askYesNo("Process All Programs",
+            String.format("Found %d programs in project.\n\nGenerate similarity matrix for all programs?",
+                programFiles.size()));
+
+        if (!proceed) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        println("Processing " + programFiles.size() + " programs...");
+        int successCount = 0;
+        int errorCount = 0;
+
+        for (DomainFile file : programFiles) {
+            if (monitor.isCancelled()) break;
+
+            try {
+                processProjectFile(file);
+                successCount++;
+            } catch (Exception e) {
+                printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                errorCount++;
+            }
+        }
+
+        println(String.format("\n=== Batch Processing Complete ===\nSuccess: %d\nErrors: %d",
+            successCount, errorCount));
+    }
+
+    private void processVersionFiltered() throws Exception {
+        String versionFilter = askString("Version Filter",
+            "Enter version pattern to match (e.g., '1.14' or 'D2R'):");
+
+        if (versionFilter == null || versionFilter.trim().isEmpty()) {
+            println("No version filter specified, operation cancelled.");
+            return;
+        }
+
+        Project project = state.getProject();
+        if (project == null) {
+            popup("No project is currently open.");
+            return;
+        }
+
+        ProjectData projectData = project.getProjectData();
+        DomainFolder rootFolder = projectData.getRootFolder();
+
+        List<DomainFile> allFiles = new ArrayList<>();
+        collectProgramFiles(rootFolder, allFiles);
+
+        // Filter by version
+        List<DomainFile> matchingFiles = new ArrayList<>();
+        for (DomainFile file : allFiles) {
+            String path = file.getPathname();
+            if (path.contains(versionFilter) || file.getName().contains(versionFilter)) {
+                matchingFiles.add(file);
+            }
+        }
+
+        if (matchingFiles.isEmpty()) {
+            popup("No programs matching version '" + versionFilter + "' found.");
+            return;
+        }
+
+        boolean proceed = askYesNo("Process Filtered Programs",
+            String.format("Found %d programs matching '%s'.\n\nGenerate similarity matrix for these programs?",
+                matchingFiles.size(), versionFilter));
+
+        if (!proceed) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        println("Processing " + matchingFiles.size() + " matching programs...");
+        int successCount = 0;
+        int errorCount = 0;
+
+        for (DomainFile file : matchingFiles) {
+            if (monitor.isCancelled()) break;
+
+            try {
+                processProjectFile(file);
+                successCount++;
+            } catch (Exception e) {
+                printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                errorCount++;
+            }
+        }
+
+        println(String.format("\n=== Version Filtered Processing Complete ===\nVersion: %s\nSuccess: %d\nErrors: %d",
+            versionFilter, successCount, errorCount));
+    }
+
+    private void collectProgramFiles(DomainFolder folder, List<DomainFile> files) throws Exception {
+        for (DomainFile file : folder.getFiles()) {
+            if (file.getContentType().equals("Program")) {
+                files.add(file);
+            }
+        }
+        for (DomainFolder subfolder : folder.getFolders()) {
+            collectProgramFiles(subfolder, files);
+        }
+    }
+
+    private void processProjectFile(DomainFile file) throws Exception {
+        println("\nProcessing: " + file.getPathname());
+        monitor.setMessage("Processing: " + file.getName());
+
+        Program program = (Program) file.getDomainObject(this, false, false, monitor);
+        try {
+            generateSimilarityMatrix(program, file.getName());
+            println("  Similarity matrix generated successfully");
+        } finally {
+            program.release(this);
+        }
+    }
+
+    private void generateSimilarityMatrix(Program program, String programName) throws Exception {
         println("Connecting to BSim database...");
 
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
@@ -79,7 +236,7 @@ public class GenerateFunctionSimilarityMatrix extends GhidraScript {
             println("Found " + otherExecutables.size() + " other executables for comparison");
 
             // Process similarity for current program's functions
-            processFunctionSimilarities(conn, currentExeId, otherExecutables);
+            processFunctionSimilarities(conn, program, currentExeId, otherExecutables);
 
         } catch (SQLException e) {
             printerr("Database error: " + e.getMessage());
@@ -130,13 +287,13 @@ public class GenerateFunctionSimilarityMatrix extends GhidraScript {
         return executables;
     }
 
-    private void processFunctionSimilarities(Connection conn, int currentExeId,
+    private void processFunctionSimilarities(Connection conn, Program program, int currentExeId,
                                            List<ExecutableInfo> otherExecutables) throws Exception {
 
         println("Processing function similarities...");
         monitor.setMessage("Generating similarity matrix");
 
-        FunctionManager funcManager = currentProgram.getFunctionManager();
+        FunctionManager funcManager = program.getFunctionManager();
         FunctionIterator functions = funcManager.getFunctions(true);
 
         int processedCount = 0;
