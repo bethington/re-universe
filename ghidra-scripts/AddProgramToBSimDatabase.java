@@ -407,6 +407,9 @@ public class AddProgramToBSimDatabase extends GhidraScript {
     private int getOrCreateExecutable(Connection conn, String programName, String programPath) throws SQLException {
         // Parse game info from path
         GameInfo gameInfo = new GameInfo(programPath);
+        
+        // Ensure game_version columns exist (they may not in older schemas)
+        ensureGameVersionColumns(conn);
 
         // Check if executable already exists
         String selectSql = "SELECT id FROM exetable WHERE name_exec = ?";
@@ -419,13 +422,18 @@ public class AddProgramToBSimDatabase extends GhidraScript {
                 println("Executable already exists in database with ID: " + existingId);
                 
                 // Update game_version and version_family if they were missing
-                String updateSql = "UPDATE exetable SET game_version = COALESCE(NULLIF(game_version, ''), ?), " +
-                    "version_family = COALESCE(NULLIF(version_family, ''), ?) WHERE id = ?";
-                try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
-                    updateStmt.setString(1, gameInfo.gameVersion);
-                    updateStmt.setString(2, gameInfo.versionFamily);
-                    updateStmt.setInt(3, existingId);
-                    updateStmt.executeUpdate();
+                try {
+                    String updateSql = "UPDATE exetable SET game_version = COALESCE(NULLIF(game_version, ''), ?), " +
+                        "version_family = COALESCE(NULLIF(version_family, ''), ?) WHERE id = ?";
+                    try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
+                        updateStmt.setString(1, gameInfo.gameVersion);
+                        updateStmt.setString(2, gameInfo.versionFamily);
+                        updateStmt.setInt(3, existingId);
+                        updateStmt.executeUpdate();
+                    }
+                } catch (SQLException e) {
+                    // Columns may not exist in older schema - just log and continue
+                    println("  Note: Could not update game version info (columns may not exist)");
                 }
 
                 // Check if auto-update is enabled, otherwise ask user
@@ -442,25 +450,57 @@ public class AddProgramToBSimDatabase extends GhidraScript {
             }
         }
 
-        // Create new executable record with game version info
-        String insertSql = "INSERT INTO exetable (name_exec, md5, architecture, ingest_date, repository, path, game_version, version_family) " +
-            "VALUES (?, ?, ?, NOW(), 1, 1, ?, ?) RETURNING id";
-        try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
-            stmt.setString(1, programName);
-            stmt.setString(2, generateMD5(programName)); // Simple MD5 placeholder
-            stmt.setInt(3, getArchitecture()); // Detect architecture
-            stmt.setString(4, gameInfo.gameVersion);
-            stmt.setString(5, gameInfo.versionFamily);
+        // Try to create new executable record with game version info
+        // First try with game_version columns, fall back to basic insert if columns don't exist
+        try {
+            String insertSql = "INSERT INTO exetable (name_exec, md5, architecture, ingest_date, repository, path, game_version, version_family) " +
+                "VALUES (?, ?, ?, NOW(), 1, 1, ?, ?) RETURNING id";
+            try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+                stmt.setString(1, programName);
+                stmt.setString(2, generateMD5(programName));
+                stmt.setInt(3, getArchitecture());
+                stmt.setString(4, gameInfo.gameVersion);
+                stmt.setString(5, gameInfo.versionFamily);
 
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                int newId = rs.getInt("id");
-                println("Created new executable record with ID: " + newId);
-                println("  Game Type: " + gameInfo.gameType + ", Version: " + gameInfo.gameVersion);
-                return newId;
-            } else {
-                throw new SQLException("Failed to create executable record");
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) {
+                    int newId = rs.getInt("id");
+                    println("Created new executable record with ID: " + newId);
+                    println("  Game Type: " + gameInfo.gameType + ", Version: " + gameInfo.gameVersion);
+                    return newId;
+                }
             }
+        } catch (SQLException e) {
+            // Fall back to basic insert without game version columns
+            println("  Note: Using basic insert (game version columns not available)");
+            String insertSql = "INSERT INTO exetable (name_exec, md5, architecture, ingest_date, repository, path) " +
+                "VALUES (?, ?, ?, NOW(), 1, 1) RETURNING id";
+            try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+                stmt.setString(1, programName);
+                stmt.setString(2, generateMD5(programName));
+                stmt.setInt(3, getArchitecture());
+
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) {
+                    int newId = rs.getInt("id");
+                    println("Created new executable record with ID: " + newId);
+                    return newId;
+                }
+            }
+        }
+        
+        throw new SQLException("Failed to create executable record");
+    }
+    
+    /**
+     * Ensure game_version and version_family columns exist in exetable
+     */
+    private void ensureGameVersionColumns(Connection conn) {
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("ALTER TABLE exetable ADD COLUMN IF NOT EXISTS game_version VARCHAR(16)");
+            stmt.execute("ALTER TABLE exetable ADD COLUMN IF NOT EXISTS version_family VARCHAR(16)");
+        } catch (SQLException e) {
+            // Columns may already exist or ALTER not supported - ignore
         }
     }
 
