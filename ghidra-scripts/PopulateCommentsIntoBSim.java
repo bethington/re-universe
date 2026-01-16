@@ -356,8 +356,22 @@ public class PopulateCommentsIntoBSim extends GhidraScript {
                 return userId;
             }
         }
-        println("No users found in auth_user table, using NULL for user_id");
-        return null;
+        
+        // No user exists, create a system user for Ghidra imports
+        println("No users found, creating 'ghidra_system' user...");
+        String createUserSql = "INSERT INTO auth_user (password, is_superuser, username, first_name, last_name, email, is_staff, is_active, date_joined) " +
+                               "VALUES ('!unusable', false, 'ghidra_system', 'Ghidra', 'System', 'ghidra@system.local', false, true, NOW()) " +
+                               "RETURNING id";
+        try (PreparedStatement stmt = conn.prepareStatement(createUserSql)) {
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                int userId = rs.getInt("id");
+                println("Created ghidra_system user with id: " + userId);
+                return userId;
+            }
+        }
+        
+        throw new SQLException("Failed to find or create a valid user for comments");
     }
 
     private int insertFunctionComments(PreparedStatement commentStmt, Program program, Function function, long functionId, Integer userId) throws SQLException {
@@ -384,11 +398,7 @@ public class PopulateCommentsIntoBSim extends GhidraScript {
                 commentStmt.setString(3, "function");
                 commentStmt.setLong(4, functionId);
                 commentStmt.setString(5, function.getName() + "_" + commentTypes[i]);
-                if (userId != null) {
-                    commentStmt.setInt(6, userId);
-                } else {
-                    commentStmt.setNull(6, java.sql.Types.INTEGER);
-                }
+                commentStmt.setInt(6, userId);  // user_id is required (NOT NULL)
 
                 try {
                     int rowsAffected = commentStmt.executeUpdate();
