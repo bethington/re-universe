@@ -155,7 +155,7 @@ public class AddProgramToBSimDatabase extends GhidraScript {
         
         // Get the project path (e.g., /PD2/D2Client.dll) instead of filesystem path
         String programPath = "";
-        DomainFile domainFile = state.getCurrentDomainFile();
+        DomainFile domainFile = currentProgram.getDomainFile();
         if (domainFile != null) {
             programPath = domainFile.getPathname();
         } else {
