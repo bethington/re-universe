@@ -10,6 +10,7 @@ import ghidra.program.model.listing.*;
 import ghidra.program.model.address.*;
 import ghidra.program.model.lang.*;
 import ghidra.util.exception.CancelledException;
+import ghidra.framework.model.*;
 import java.sql.*;
 import java.util.*;
 
@@ -19,16 +20,37 @@ public class GenerateBSimSignatures extends GhidraScript {
     private static final String DB_USER = "ben";
     private static final String DB_PASS = "goodyx12";
 
+    // Mode selection constants
+    private static final String MODE_SINGLE = "Single Program (current)";
+    private static final String MODE_ALL = "All Programs in Project";
+    private static final String MODE_VERSION = "Programs by Version Filter";
+
     @Override
     public void run() throws Exception {
+        println("=== Enhanced BSim Signature Generation ===");
 
+        // Ask user for processing mode
+        String[] modes = { MODE_SINGLE, MODE_ALL, MODE_VERSION };
+        String selectedMode = askChoice("Select Processing Mode",
+            "How would you like to generate signatures?",
+            Arrays.asList(modes), MODE_SINGLE);
+
+        if (selectedMode.equals(MODE_SINGLE)) {
+            processSingleProgram();
+        } else if (selectedMode.equals(MODE_ALL)) {
+            processAllPrograms();
+        } else if (selectedMode.equals(MODE_VERSION)) {
+            processVersionFiltered();
+        }
+    }
+
+    private void processSingleProgram() throws Exception {
         if (currentProgram == null) {
             popup("No program is currently open. Please open a program first.");
             return;
         }
 
         String programName = currentProgram.getName();
-        println("=== Enhanced BSim Signature Generation ===");
         println("Program: " + programName);
 
         FunctionManager funcManager = currentProgram.getFunctionManager();
@@ -48,7 +70,7 @@ public class GenerateBSimSignatures extends GhidraScript {
         }
 
         try {
-            generateSignatures(programName);
+            generateSignatures(currentProgram, programName);
             println("Successfully generated enhanced signatures!");
 
         } catch (Exception e) {
@@ -58,7 +80,142 @@ public class GenerateBSimSignatures extends GhidraScript {
         }
     }
 
-    private void generateSignatures(String programName) throws Exception {
+    private void processAllPrograms() throws Exception {
+        Project project = state.getProject();
+        if (project == null) {
+            popup("No project is currently open.");
+            return;
+        }
+
+        ProjectData projectData = project.getProjectData();
+        DomainFolder rootFolder = projectData.getRootFolder();
+
+        List<DomainFile> programFiles = new ArrayList<>();
+        collectProgramFiles(rootFolder, programFiles);
+
+        if (programFiles.isEmpty()) {
+            popup("No program files found in the project.");
+            return;
+        }
+
+        boolean proceed = askYesNo("Process All Programs",
+            String.format("Found %d programs in project.\n\nGenerate signatures for all programs?",
+                programFiles.size()));
+
+        if (!proceed) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        println("Processing " + programFiles.size() + " programs...");
+        int successCount = 0;
+        int errorCount = 0;
+
+        for (DomainFile file : programFiles) {
+            if (monitor.isCancelled()) break;
+
+            try {
+                processProjectFile(file);
+                successCount++;
+            } catch (Exception e) {
+                printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                errorCount++;
+            }
+        }
+
+        println(String.format("\n=== Batch Processing Complete ===\nSuccess: %d\nErrors: %d",
+            successCount, errorCount));
+    }
+
+    private void processVersionFiltered() throws Exception {
+        String versionFilter = askString("Version Filter",
+            "Enter version pattern to match (e.g., '1.14' or 'D2R'):");
+
+        if (versionFilter == null || versionFilter.trim().isEmpty()) {
+            println("No version filter specified, operation cancelled.");
+            return;
+        }
+
+        Project project = state.getProject();
+        if (project == null) {
+            popup("No project is currently open.");
+            return;
+        }
+
+        ProjectData projectData = project.getProjectData();
+        DomainFolder rootFolder = projectData.getRootFolder();
+
+        List<DomainFile> allFiles = new ArrayList<>();
+        collectProgramFiles(rootFolder, allFiles);
+
+        // Filter by version
+        List<DomainFile> matchingFiles = new ArrayList<>();
+        for (DomainFile file : allFiles) {
+            String path = file.getPathname();
+            if (path.contains(versionFilter) || file.getName().contains(versionFilter)) {
+                matchingFiles.add(file);
+            }
+        }
+
+        if (matchingFiles.isEmpty()) {
+            popup("No programs matching version '" + versionFilter + "' found.");
+            return;
+        }
+
+        boolean proceed = askYesNo("Process Filtered Programs",
+            String.format("Found %d programs matching '%s'.\n\nGenerate signatures for these programs?",
+                matchingFiles.size(), versionFilter));
+
+        if (!proceed) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        println("Processing " + matchingFiles.size() + " matching programs...");
+        int successCount = 0;
+        int errorCount = 0;
+
+        for (DomainFile file : matchingFiles) {
+            if (monitor.isCancelled()) break;
+
+            try {
+                processProjectFile(file);
+                successCount++;
+            } catch (Exception e) {
+                printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                errorCount++;
+            }
+        }
+
+        println(String.format("\n=== Version Filtered Processing Complete ===\nVersion: %s\nSuccess: %d\nErrors: %d",
+            versionFilter, successCount, errorCount));
+    }
+
+    private void collectProgramFiles(DomainFolder folder, List<DomainFile> files) throws Exception {
+        for (DomainFile file : folder.getFiles()) {
+            if (file.getContentType().equals("Program")) {
+                files.add(file);
+            }
+        }
+        for (DomainFolder subfolder : folder.getFolders()) {
+            collectProgramFiles(subfolder, files);
+        }
+    }
+
+    private void processProjectFile(DomainFile file) throws Exception {
+        println("\nProcessing: " + file.getPathname());
+        monitor.setMessage("Processing: " + file.getName());
+
+        Program program = (Program) file.getDomainObject(this, false, false, monitor);
+        try {
+            generateSignatures(program, file.getName());
+            println("  Signatures generated successfully");
+        } finally {
+            program.release(this);
+        }
+    }
+
+    private void generateSignatures(Program program, String programName) throws Exception {
         println("Connecting to database...");
 
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
@@ -71,7 +228,7 @@ public class GenerateBSimSignatures extends GhidraScript {
             }
 
             println("Processing functions for executable ID: " + executableId);
-            processFunctionSignatures(conn, executableId, programName);
+            processFunctionSignatures(conn, program, executableId, programName);
 
         } catch (SQLException e) {
             printerr("Database error: " + e.getMessage());
@@ -91,25 +248,78 @@ public class GenerateBSimSignatures extends GhidraScript {
         return -1;
     }
 
-    private void processFunctionSignatures(Connection conn, int executableId, String programName) throws Exception {
+    private void ensureEnhancedSignaturesTable(Connection conn) throws SQLException {
+        // Create table if it doesn't exist (using bytea for our custom signatures, not lshvector)
+        String createTableSql = """
+            CREATE TABLE IF NOT EXISTS enhanced_signatures (
+                id SERIAL PRIMARY KEY,
+                function_id BIGINT NOT NULL UNIQUE,
+                signature_vector BYTEA,
+                feature_count INTEGER,
+                signature_quality DOUBLE PRECISION,
+                instruction_count INTEGER,
+                parameter_count INTEGER,
+                branch_count INTEGER,
+                call_count INTEGER,
+                mnemonic_pattern TEXT,
+                control_flow_pattern TEXT,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+            """;
+        
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute(createTableSql);
+        }
+
+        // Add signature_vector column if it doesn't exist (for tables that had lsh_vector)
+        String addColumnSql = """
+            ALTER TABLE enhanced_signatures 
+            ADD COLUMN IF NOT EXISTS signature_vector BYTEA
+            """;
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute(addColumnSql);
+        } catch (SQLException e) {
+            // Column may already exist, ignore
+        }
+
+        // Drop the old lsh_vector column constraint and column if it exists
+        // First make it nullable (in case it has NOT NULL constraint)
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("ALTER TABLE enhanced_signatures ALTER COLUMN lsh_vector DROP NOT NULL");
+        } catch (SQLException e) {
+            // Column may not exist or constraint already dropped, ignore
+        }
+
+        // Drop the old lsh_vector column entirely since we use signature_vector now
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("ALTER TABLE enhanced_signatures DROP COLUMN IF EXISTS lsh_vector");
+        } catch (SQLException e) {
+            // Column may not exist, ignore
+        }
+    }
+
+    private void processFunctionSignatures(Connection conn, Program program, int executableId, String programName) throws Exception {
         println("Generating enhanced signatures...");
         monitor.setMessage("Generating function signatures");
 
-        FunctionManager funcManager = currentProgram.getFunctionManager();
+        FunctionManager funcManager = program.getFunctionManager();
         FunctionIterator functions = funcManager.getFunctions(true);
 
         int processedCount = 0;
         int signatureCount = 0;
 
+        // Ensure the table exists with correct schema (using bytea for our custom signatures)
+        ensureEnhancedSignaturesTable(conn);
+
         // SQL statements
         String checkSql = "SELECT id FROM enhanced_signatures WHERE function_id = ?";
         String insertSql = """
             INSERT INTO enhanced_signatures
-            (function_id, lsh_vector, feature_count, signature_quality, instruction_count,
+            (function_id, signature_vector, feature_count, signature_quality, instruction_count,
              parameter_count, branch_count, call_count, mnemonic_pattern, control_flow_pattern)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (function_id) DO UPDATE SET
-                lsh_vector = EXCLUDED.lsh_vector,
+                signature_vector = EXCLUDED.signature_vector,
                 feature_count = EXCLUDED.feature_count,
                 signature_quality = EXCLUDED.signature_quality,
                 instruction_count = EXCLUDED.instruction_count,

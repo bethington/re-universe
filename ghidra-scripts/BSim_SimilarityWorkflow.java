@@ -10,6 +10,7 @@ import ghidra.program.model.listing.*;
 import ghidra.program.model.address.*;
 import ghidra.program.model.lang.*;
 import ghidra.util.exception.CancelledException;
+import ghidra.framework.model.*;
 import java.sql.*;
 import java.util.*;
 
@@ -22,16 +23,40 @@ public class BSim_SimilarityWorkflow extends GhidraScript {
     private static final double MIN_CONFIDENCE = 30.0;
     private static final int MAX_COMPARISONS = 2000; // Limit for performance
 
+    // Scope selection constants
+    private static final String SCOPE_SINGLE = "Single Program (current)";
+    private static final String SCOPE_ALL = "All Programs in Project";
+    private static final String SCOPE_VERSION = "Programs by Version Filter";
+
+    // Current working program (set before processing each program)
+    private Program workingProgram;
+
     @Override
     public void run() throws Exception {
+        println("=== BSim Similarity-Based Cross-Version Matching ===");
 
+        // First ask for scope
+        String[] scopes = { SCOPE_SINGLE, SCOPE_ALL, SCOPE_VERSION };
+        String selectedScope = askChoice("Select Processing Scope",
+            "Which programs would you like to process?",
+            Arrays.asList(scopes), SCOPE_SINGLE);
+
+        if (selectedScope.equals(SCOPE_SINGLE)) {
+            processSingleProgram();
+        } else if (selectedScope.equals(SCOPE_ALL)) {
+            processAllPrograms();
+        } else if (selectedScope.equals(SCOPE_VERSION)) {
+            processVersionFiltered();
+        }
+    }
+
+    private void processSingleProgram() throws Exception {
         if (currentProgram == null) {
             popup("No program is currently open. Please open a program first.");
             return;
         }
 
         String programName = currentProgram.getName();
-        println("=== BSim Similarity-Based Cross-Version Matching ===");
         println("Program: " + programName);
 
         // Ask user for workflow mode
@@ -47,45 +72,170 @@ public class BSim_SimilarityWorkflow extends GhidraScript {
             Arrays.asList(modes), modes[3]);
 
         if (selectedMode.equals(modes[0])) {
-            generateSignatures();
+            generateSignatures(currentProgram);
         } else if (selectedMode.equals(modes[1])) {
-            generateSignatures();
-            findSimilarFunctions();
+            generateSignatures(currentProgram);
+            findSimilarFunctions(currentProgram);
         } else if (selectedMode.equals(modes[2])) {
-            queryExistingSimilarities();
+            queryExistingSimilarities(currentProgram);
         } else if (selectedMode.equals(modes[3])) {
-            runFullWorkflow();
+            runFullWorkflow(currentProgram);
         }
     }
 
-    private void runFullWorkflow() throws Exception {
-        println("\n=== Running Full BSim Similarity Workflow ===");
-
-        boolean proceed = askYesNo("Full BSim Workflow",
-            "This will:\n" +
-            "1. Generate enhanced signatures for all functions\n" +
-            "2. Compare against similar functions in other versions\n" +
-            "3. Populate similarity matrix in database\n" +
-            "4. Update cross-version relationships\n\n" +
-            "This may take significant time. Proceed?");
-
-        if (!proceed) {
-            println("Workflow cancelled by user");
+    private void processAllPrograms() throws Exception {
+        Project project = state.getProject();
+        if (project == null) {
+            popup("No project is currently open.");
             return;
         }
+
+        ProjectData projectData = project.getProjectData();
+        DomainFolder rootFolder = projectData.getRootFolder();
+
+        List<DomainFile> programFiles = new ArrayList<>();
+        collectProgramFiles(rootFolder, programFiles);
+
+        if (programFiles.isEmpty()) {
+            popup("No program files found in the project.");
+            return;
+        }
+
+        boolean proceed = askYesNo("Process All Programs",
+            String.format("Found %d programs in project.\n\nRun full workflow for all programs?",
+                programFiles.size()));
+
+        if (!proceed) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        println("Processing " + programFiles.size() + " programs...");
+        int successCount = 0;
+        int errorCount = 0;
+
+        for (DomainFile file : programFiles) {
+            if (monitor.isCancelled()) break;
+
+            try {
+                processProjectFile(file);
+                successCount++;
+            } catch (Exception e) {
+                printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                errorCount++;
+            }
+        }
+
+        println(String.format("\n=== Batch Processing Complete ===\nSuccess: %d\nErrors: %d",
+            successCount, errorCount));
+    }
+
+    private void processVersionFiltered() throws Exception {
+        String versionFilter = askString("Version Filter",
+            "Enter version pattern to match (e.g., '1.14' or 'D2R'):");
+
+        if (versionFilter == null || versionFilter.trim().isEmpty()) {
+            println("No version filter specified, operation cancelled.");
+            return;
+        }
+
+        Project project = state.getProject();
+        if (project == null) {
+            popup("No project is currently open.");
+            return;
+        }
+
+        ProjectData projectData = project.getProjectData();
+        DomainFolder rootFolder = projectData.getRootFolder();
+
+        List<DomainFile> allFiles = new ArrayList<>();
+        collectProgramFiles(rootFolder, allFiles);
+
+        // Filter by version
+        List<DomainFile> matchingFiles = new ArrayList<>();
+        for (DomainFile file : allFiles) {
+            String path = file.getPathname();
+            if (path.contains(versionFilter) || file.getName().contains(versionFilter)) {
+                matchingFiles.add(file);
+            }
+        }
+
+        if (matchingFiles.isEmpty()) {
+            popup("No programs matching version '" + versionFilter + "' found.");
+            return;
+        }
+
+        boolean proceed = askYesNo("Process Filtered Programs",
+            String.format("Found %d programs matching '%s'.\n\nRun full workflow for these programs?",
+                matchingFiles.size(), versionFilter));
+
+        if (!proceed) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        println("Processing " + matchingFiles.size() + " matching programs...");
+        int successCount = 0;
+        int errorCount = 0;
+
+        for (DomainFile file : matchingFiles) {
+            if (monitor.isCancelled()) break;
+
+            try {
+                processProjectFile(file);
+                successCount++;
+            } catch (Exception e) {
+                printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                errorCount++;
+            }
+        }
+
+        println(String.format("\n=== Version Filtered Processing Complete ===\nVersion: %s\nSuccess: %d\nErrors: %d",
+            versionFilter, successCount, errorCount));
+    }
+
+    private void collectProgramFiles(DomainFolder folder, List<DomainFile> files) throws Exception {
+        for (DomainFile file : folder.getFiles()) {
+            if (file.getContentType().equals("Program")) {
+                files.add(file);
+            }
+        }
+        for (DomainFolder subfolder : folder.getFolders()) {
+            collectProgramFiles(subfolder, files);
+        }
+    }
+
+    private void processProjectFile(DomainFile file) throws Exception {
+        println("\nProcessing: " + file.getPathname());
+        monitor.setMessage("Processing: " + file.getName());
+
+        Program program = (Program) file.getDomainObject(this, false, false, monitor);
+        try {
+            runFullWorkflow(program);
+            println("  Workflow completed successfully");
+        } finally {
+            program.release(this);
+        }
+    }
+
+    private void runFullWorkflow(Program program) throws Exception {
+        println("\n=== Running Full BSim Similarity Workflow ===");
+
+        // Set the working program for helper methods
+        this.workingProgram = program;
 
         try {
             // Step 1: Generate signatures
             println("\n--- Step 1: Generating Enhanced Signatures ---");
-            generateSignatures();
+            generateSignatures(program);
 
             // Step 2: Find similar functions
             println("\n--- Step 2: Finding Similar Functions ---");
-            findSimilarFunctions();
+            findSimilarFunctions(program);
 
             // Step 3: Update database relationships
             println("\n--- Step 3: Updating Database ---");
-            updateCrossVersionRelationships();
+            updateCrossVersionRelationships(program);
 
             println("\n✅ Full BSim workflow completed successfully!");
 
@@ -96,16 +246,16 @@ public class BSim_SimilarityWorkflow extends GhidraScript {
         }
     }
 
-    private void generateSignatures() throws Exception {
+    private void generateSignatures(Program program) throws Exception {
         println("Generating enhanced function signatures...");
 
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
-            int executableId = getExecutableId(conn, currentProgram.getName());
+            int executableId = getExecutableId(conn, program.getName());
             if (executableId == -1) {
                 throw new RuntimeException("Executable not found. Please run AddProgramToBSimDatabase.java first.");
             }
 
-            generateProgramSignatures(conn, executableId);
+            generateProgramSignatures(conn, program, executableId);
 
         } catch (SQLException e) {
             printerr("Database error: " + e.getMessage());
@@ -113,23 +263,26 @@ public class BSim_SimilarityWorkflow extends GhidraScript {
         }
     }
 
-    private void generateProgramSignatures(Connection conn, int executableId) throws Exception {
+    private void generateProgramSignatures(Connection conn, Program program, int executableId) throws Exception {
         println("Processing functions for signature generation...");
 
-        FunctionManager funcManager = currentProgram.getFunctionManager();
+        FunctionManager funcManager = program.getFunctionManager();
         FunctionIterator functions = funcManager.getFunctions(true);
 
         int totalFunctions = funcManager.getFunctionCount();
         int processedCount = 0;
         int signatureCount = 0;
 
+        // Ensure the table exists with correct schema
+        ensureEnhancedSignaturesTable(conn);
+
         String insertSql = """
             INSERT INTO enhanced_signatures
-            (function_id, lsh_vector, feature_count, signature_quality, instruction_count,
+            (function_id, signature_vector, feature_count, signature_quality, instruction_count,
              parameter_count, branch_count, call_count, mnemonic_pattern, control_flow_pattern)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (function_id) DO UPDATE SET
-                lsh_vector = EXCLUDED.lsh_vector,
+                signature_vector = EXCLUDED.signature_vector,
                 signature_quality = EXCLUDED.signature_quality,
                 created_at = NOW()
             """;
@@ -228,7 +381,7 @@ public class BSim_SimilarityWorkflow extends GhidraScript {
 
         try {
             AddressSetView body = function.getBody();
-            InstructionIterator instructions = currentProgram.getListing().getInstructions(body, true);
+            InstructionIterator instructions = workingProgram.getListing().getInstructions(body, true);
 
             while (instructions.hasNext()) {
                 Instruction instr = instructions.next();
@@ -278,7 +431,7 @@ public class BSim_SimilarityWorkflow extends GhidraScript {
     private String extractMnemonicPattern(Function function) {
         Map<String, Integer> mnemonics = new HashMap<>();
         AddressSetView body = function.getBody();
-        InstructionIterator instructions = currentProgram.getListing().getInstructions(body, true);
+        InstructionIterator instructions = workingProgram.getListing().getInstructions(body, true);
 
         while (instructions.hasNext()) {
             Instruction instr = instructions.next();
@@ -295,7 +448,7 @@ public class BSim_SimilarityWorkflow extends GhidraScript {
     private String extractControlFlowPattern(Function function) {
         Map<String, Integer> flows = new HashMap<>();
         AddressSetView body = function.getBody();
-        InstructionIterator instructions = currentProgram.getListing().getInstructions(body, true);
+        InstructionIterator instructions = workingProgram.getListing().getInstructions(body, true);
 
         while (instructions.hasNext()) {
             Instruction instr = instructions.next();
@@ -314,7 +467,7 @@ public class BSim_SimilarityWorkflow extends GhidraScript {
     private int countBranches(Function function) {
         int count = 0;
         AddressSetView body = function.getBody();
-        InstructionIterator instructions = currentProgram.getListing().getInstructions(body, true);
+        InstructionIterator instructions = workingProgram.getListing().getInstructions(body, true);
 
         while (instructions.hasNext()) {
             Instruction instr = instructions.next();
@@ -337,11 +490,11 @@ public class BSim_SimilarityWorkflow extends GhidraScript {
         return Math.min(quality, 1.0);
     }
 
-    private void findSimilarFunctions() throws Exception {
+    private void findSimilarFunctions(Program program) throws Exception {
         println("Finding similar functions across versions...");
 
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
-            int executableId = getExecutableId(conn, currentProgram.getName());
+            int executableId = getExecutableId(conn, program.getName());
             findAndStoreSimilarities(conn, executableId);
 
         } catch (SQLException e) {
@@ -358,8 +511,8 @@ public class BSim_SimilarityWorkflow extends GhidraScript {
                 d1.id as source_id, d1.name_func as source_name,
                 d2.id as target_id, d2.name_func as target_name,
                 e2.name_exec as target_exe,
-                es1.lsh_vector as source_vector,
-                es2.lsh_vector as target_vector,
+                es1.signature_vector as source_vector,
+                es2.signature_vector as target_vector,
                 es1.instruction_count as source_instr,
                 es2.instruction_count as target_instr
             FROM enhanced_signatures es1
@@ -470,19 +623,44 @@ public class BSim_SimilarityWorkflow extends GhidraScript {
         return Math.min(confidence, 100.0);
     }
 
-    private void updateCrossVersionRelationships() throws SQLException {
+    private void updateCrossVersionRelationships(Program program) throws SQLException {
         println("Refreshing cross-version relationships...");
 
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
-            String refreshSql = "SELECT refresh_cross_version_data()";
+            // First try to create the unique index if it doesn't exist (required for CONCURRENTLY refresh)
             try (Statement stmt = conn.createStatement()) {
-                stmt.execute(refreshSql);
+                stmt.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS cross_version_functions_unique_idx 
+                    ON cross_version_functions (source_function_id, target_function_id)
+                    """);
+            } catch (SQLException e) {
+                // Index may already exist or view doesn't exist, continue
+            }
+
+            // Try calling the refresh function
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("SELECT refresh_cross_version_data()");
                 println("Cross-version relationships updated successfully");
+            } catch (SQLException e) {
+                // If concurrent refresh fails, try non-concurrent refresh directly
+                if (e.getMessage().contains("concurrently")) {
+                    println("Concurrent refresh failed, trying direct refresh...");
+                    try (Statement stmt = conn.createStatement()) {
+                        stmt.execute("REFRESH MATERIALIZED VIEW cross_version_functions");
+                        println("Cross-version relationships updated successfully (non-concurrent)");
+                    } catch (SQLException e2) {
+                        // View may not exist yet, that's okay
+                        println("Note: cross_version_functions view not available: " + e2.getMessage());
+                    }
+                } else {
+                    // Function may not exist, that's okay for basic workflow
+                    println("Note: refresh_cross_version_data() not available: " + e.getMessage());
+                }
             }
         }
     }
 
-    private void queryExistingSimilarities() throws Exception {
+    private void queryExistingSimilarities(Program program) throws Exception {
         println("Querying existing similarities from database...");
 
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
@@ -533,6 +711,56 @@ public class BSim_SimilarityWorkflow extends GhidraScript {
             }
         }
         return -1;
+    }
+
+    private void ensureEnhancedSignaturesTable(Connection conn) throws SQLException {
+        // Create table if it doesn't exist (using bytea for our custom signatures, not lshvector)
+        String createTableSql = """
+            CREATE TABLE IF NOT EXISTS enhanced_signatures (
+                id SERIAL PRIMARY KEY,
+                function_id BIGINT NOT NULL UNIQUE,
+                signature_vector BYTEA,
+                feature_count INTEGER,
+                signature_quality DOUBLE PRECISION,
+                instruction_count INTEGER,
+                parameter_count INTEGER,
+                branch_count INTEGER,
+                call_count INTEGER,
+                mnemonic_pattern TEXT,
+                control_flow_pattern TEXT,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+            """;
+        
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute(createTableSql);
+        }
+
+        // Add signature_vector column if it doesn't exist (for tables that had lsh_vector)
+        String addColumnSql = """
+            ALTER TABLE enhanced_signatures 
+            ADD COLUMN IF NOT EXISTS signature_vector BYTEA
+            """;
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute(addColumnSql);
+        } catch (SQLException e) {
+            // Column may already exist, ignore
+        }
+
+        // Drop the old lsh_vector column constraint and column if it exists
+        // First make it nullable (in case it has NOT NULL constraint)
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("ALTER TABLE enhanced_signatures ALTER COLUMN lsh_vector DROP NOT NULL");
+        } catch (SQLException e) {
+            // Column may not exist or constraint already dropped, ignore
+        }
+
+        // Drop the old lsh_vector column entirely since we use signature_vector now
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("ALTER TABLE enhanced_signatures DROP COLUMN IF EXISTS lsh_vector");
+        } catch (SQLException e) {
+            // Column may not exist, ignore
+        }
     }
 
     // Helper class for function signatures
