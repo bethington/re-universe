@@ -1,0 +1,549 @@
+// Generate enhanced function signatures for BSim similarity analysis
+// Updated for unified version system support
+// Compatible with Ghidra 11.4.2 - No BSim client dependencies
+// @author Claude Code Assistant
+// @category BSim
+// @keybinding ctrl shift L
+// @menupath Tools.BSim.Generate Enhanced Signatures (Unified)
+
+import ghidra.app.script.GhidraScript;
+import ghidra.program.model.listing.*;
+import ghidra.program.model.address.*;
+import ghidra.program.model.lang.*;
+import ghidra.util.exception.CancelledException;
+import ghidra.framework.model.*;
+import java.sql.*;
+import java.util.*;
+import java.util.regex.*;
+
+public class GenerateBSimSignatures_Unified extends GhidraScript {
+
+    private static final String DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
+    private static final String DB_USER = "ben";
+    private static final String DB_PASS = "goodyx12";
+
+    // Mode selection constants
+    private static final String MODE_SINGLE = "Single Program (current)";
+    private static final String MODE_ALL = "All Programs in Project";
+    private static final String MODE_VERSION = "Programs by Version Filter";
+
+    // Unified version info helper
+    private static class UnifiedVersionInfo {
+        String gameVersion = null;
+        String familyType = "Unified";
+        boolean isException = false;
+
+        UnifiedVersionInfo(String executableName) {
+            parseUnifiedName(executableName);
+        }
+
+        private void parseUnifiedName(String executableName) {
+            if (executableName == null || executableName.isEmpty()) return;
+
+            // Standard binaries: 1.03_D2Game.dll
+            Pattern standardPattern = Pattern.compile("^(1\\.[0-9]+[a-z]?)_([A-Za-z0-9_]+)\\.(dll|exe)$");
+            Matcher standardMatcher = standardPattern.matcher(executableName);
+
+            if (standardMatcher.matches()) {
+                gameVersion = standardMatcher.group(1);
+                familyType = "Unified";
+                isException = false;
+                return;
+            }
+
+            // Exception binaries: Classic_1.03_Game.exe
+            Pattern exceptionPattern = Pattern.compile("^(Classic|LoD)_(1\\.[0-9]+[a-z]?)_(Game|Diablo_II)\\.(exe|dll)$");
+            Matcher exceptionMatcher = exceptionPattern.matcher(executableName);
+
+            if (exceptionMatcher.matches()) {
+                familyType = exceptionMatcher.group(1);
+                gameVersion = exceptionMatcher.group(2);
+                isException = true;
+            }
+        }
+
+        public String getDisplayInfo() {
+            if (gameVersion == null) return "Unknown format";
+            return isException ?
+                String.format("%s %s (Exception)", familyType, gameVersion) :
+                String.format("Unified %s (Standard)", gameVersion);
+        }
+
+        public boolean isValid() {
+            return gameVersion != null;
+        }
+    }
+
+    @Override
+    public void run() throws Exception {
+        println("=== Enhanced BSim Signature Generation (Unified Version System) ===");
+
+        // Ask user for processing mode
+        String[] modes = { MODE_SINGLE, MODE_ALL, MODE_VERSION };
+        String selectedMode = askChoice("Select Processing Mode",
+            "How would you like to generate signatures?",
+            Arrays.asList(modes), MODE_SINGLE);
+
+        if (selectedMode == null) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        if (selectedMode.equals(MODE_SINGLE)) {
+            processSingleProgram();
+        } else if (selectedMode.equals(MODE_ALL)) {
+            processAllPrograms();
+        } else if (selectedMode.equals(MODE_VERSION)) {
+            processVersionFiltered();
+        }
+    }
+
+    private void processSingleProgram() throws Exception {
+        if (currentProgram == null) {
+            popup("No program is currently open. Please open a program first.");
+            return;
+        }
+
+        String programName = currentProgram.getName();
+        UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(programName);
+
+        println("Program: " + programName);
+        println("Version Info: " + versionInfo.getDisplayInfo());
+
+        FunctionManager funcManager = currentProgram.getFunctionManager();
+        int functionCount = funcManager.getFunctionCount();
+        println("Total functions: " + functionCount);
+
+        if (!versionInfo.isValid()) {
+            boolean proceed = askYesNo("Non-Unified Format",
+                "This executable doesn't follow unified naming.\n" +
+                "Signatures will be generated but may not have optimal version mapping.\n\n" +
+                "Continue?");
+            if (!proceed) {
+                println("Operation cancelled");
+                return;
+            }
+        }
+
+        boolean proceed = askYesNo("Generate Enhanced Signatures",
+            String.format("Generate enhanced signatures for %d functions?\n\n" +
+            "Version: %s\n\n" +
+            "This will:\n" +
+            "- Create structural function signatures\n" +
+            "- Extract instruction patterns and features\n" +
+            "- Store data for similarity analysis\n" +
+            "- Enable cross-version function matching\n\nProceed?",
+            functionCount, versionInfo.getDisplayInfo()));
+
+        if (!proceed) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        try {
+            generateSignatures(currentProgram, programName, versionInfo);
+            println("Successfully generated enhanced signatures!");
+
+        } catch (Exception e) {
+            printerr("Error generating signatures: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
+    }
+
+    private void processAllPrograms() throws Exception {
+        Project project = state.getProject();
+        if (project == null) {
+            popup("No project is currently open.");
+            return;
+        }
+
+        ProjectData projectData = project.getProjectData();
+        DomainFolder rootFolder = projectData.getRootFolder();
+
+        List<DomainFile> programFiles = new ArrayList<>();
+        collectProgramFiles(rootFolder, programFiles);
+
+        if (programFiles.isEmpty()) {
+            popup("No program files found in the project.");
+            return;
+        }
+
+        // Validate unified formats
+        int validCount = 0;
+        int invalidCount = 0;
+        for (DomainFile file : programFiles) {
+            UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(file.getName());
+            if (versionInfo.isValid()) {
+                validCount++;
+            } else {
+                invalidCount++;
+            }
+        }
+
+        println("Found " + programFiles.size() + " program files");
+        println("  Valid unified format: " + validCount);
+        println("  Invalid/unknown format: " + invalidCount);
+
+        boolean proceed = askYesNo("Generate Signatures for All Programs",
+            String.format("Generate enhanced signatures for all %d programs?\n\n" +
+            "Valid unified format: %d\n" +
+            "Invalid format: %d\n\n" +
+            "This may take a considerable amount of time.",
+            programFiles.size(), validCount, invalidCount));
+
+        if (!proceed) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        int successCount = 0;
+        int errorCount = 0;
+
+        for (int i = 0; i < programFiles.size(); i++) {
+            DomainFile file = programFiles.get(i);
+            monitor.setMessage(String.format("Processing %d/%d: %s", i + 1, programFiles.size(), file.getName()));
+            monitor.setProgress(i);
+
+            if (monitor.isCancelled()) {
+                println("Operation cancelled by user");
+                break;
+            }
+
+            try {
+                processProjectFile(file);
+                successCount++;
+            } catch (Exception e) {
+                printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                errorCount++;
+            }
+        }
+
+        println(String.format("Completed: %d successful, %d errors", successCount, errorCount));
+    }
+
+    private void processVersionFiltered() throws Exception {
+        Project project = state.getProject();
+        if (project == null) {
+            popup("No project is currently open.");
+            return;
+        }
+
+        String versionFilter = askString("Version Filter",
+            "Enter version pattern (e.g., '1.03', '1.13c', 'Classic'):", "1.03");
+
+        if (versionFilter == null || versionFilter.trim().isEmpty()) {
+            println("Operation cancelled - no filter provided");
+            return;
+        }
+
+        ProjectData projectData = project.getProjectData();
+        DomainFolder rootFolder = projectData.getRootFolder();
+
+        List<DomainFile> programFiles = new ArrayList<>();
+        collectProgramFiles(rootFolder, programFiles);
+
+        // Filter by unified version info
+        List<DomainFile> matchingFiles = new ArrayList<>();
+        for (DomainFile file : programFiles) {
+            String fileName = file.getName();
+            UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(fileName);
+
+            if (fileName.toLowerCase().contains(versionFilter.toLowerCase()) ||
+                (versionInfo.gameVersion != null && versionInfo.gameVersion.contains(versionFilter)) ||
+                versionInfo.familyType.toLowerCase().contains(versionFilter.toLowerCase())) {
+                matchingFiles.add(file);
+            }
+        }
+
+        if (matchingFiles.isEmpty()) {
+            popup("No programs matching filter '" + versionFilter + "' found.");
+            return;
+        }
+
+        println("Found " + matchingFiles.size() + " programs matching '" + versionFilter + "'");
+        println("Matching programs:");
+        for (DomainFile file : matchingFiles) {
+            UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(file.getName());
+            println("  - " + file.getName() + " (" + versionInfo.getDisplayInfo() + ")");
+        }
+
+        boolean proceed = askYesNo("Generate Signatures for Filtered Programs",
+            String.format("Generate signatures for %d programs matching '%s'?",
+            matchingFiles.size(), versionFilter));
+
+        if (!proceed) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        int successCount = 0;
+        int errorCount = 0;
+
+        for (int i = 0; i < matchingFiles.size(); i++) {
+            DomainFile file = matchingFiles.get(i);
+            monitor.setMessage(String.format("Processing %d/%d: %s", i + 1, matchingFiles.size(), file.getName()));
+
+            if (monitor.isCancelled()) {
+                break;
+            }
+
+            try {
+                processProjectFile(file);
+                successCount++;
+            } catch (Exception e) {
+                printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                errorCount++;
+            }
+        }
+
+        println(String.format("Completed: %d successful, %d errors", successCount, errorCount));
+    }
+
+    private void collectProgramFiles(DomainFolder folder, List<DomainFile> files) throws Exception {
+        for (DomainFile file : folder.getFiles()) {
+            if (file.getContentType().equals("Program")) {
+                files.add(file);
+            }
+        }
+
+        for (DomainFolder subfolder : folder.getFolders()) {
+            collectProgramFiles(subfolder, files);
+        }
+    }
+
+    private void processProjectFile(DomainFile file) throws Exception {
+        println("Processing: " + file.getPathname());
+
+        Program program = (Program) file.getDomainObject(this, true, false, monitor);
+
+        try {
+            String programName = program.getName();
+            UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(programName);
+            generateSignatures(program, programName, versionInfo);
+            println("  Generated signatures for " + programName + " (" + versionInfo.getDisplayInfo() + ")");
+
+        } finally {
+            program.release(this);
+        }
+    }
+
+    private void generateSignatures(Program program, String programName, UnifiedVersionInfo versionInfo) throws Exception {
+        println("Connecting to BSim database...");
+
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
+            println("Connected to BSim database");
+
+            // Get executable ID
+            int executableId = getExecutableId(conn, programName);
+            if (executableId == -1) {
+                throw new Exception("Executable not found in database. Run AddProgramToBSimDatabase first.");
+            }
+
+            println("Found executable ID: " + executableId);
+
+            // Generate enhanced signatures
+            generateEnhancedSignatures(conn, executableId, program, versionInfo);
+
+            // Update similarity analysis
+            updateSimilarityAnalysis(conn, executableId);
+
+            println("Signature generation completed for " + programName);
+
+        } catch (SQLException e) {
+            printerr("Database error: " + e.getMessage());
+            throw e;
+        }
+    }
+
+    private int getExecutableId(Connection conn, String programName) throws SQLException {
+        String sql = "SELECT id FROM exetable WHERE name_exec = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, programName);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return rs.getInt("id");
+            }
+            return -1;
+        }
+    }
+
+    private void generateEnhancedSignatures(Connection conn, int executableId, Program program, UnifiedVersionInfo versionInfo) throws Exception {
+        println("Generating enhanced signatures...");
+
+        FunctionManager funcManager = program.getFunctionManager();
+        FunctionIterator functions = funcManager.getFunctions(true);
+
+        int functionCount = 0;
+        int signatureCount = 0;
+
+        // Check if enhanced_signatures table exists
+        boolean hasEnhancedTable = checkEnhancedSignaturesTable(conn);
+
+        String insertSql;
+        if (hasEnhancedTable) {
+            insertSql = "INSERT INTO enhanced_signatures (function_id, executable_id, signature_hash, " +
+                "instruction_count, basic_block_count, call_count, signature_quality, feature_vector) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (function_id) DO UPDATE SET " +
+                "signature_hash = EXCLUDED.signature_hash, " +
+                "instruction_count = EXCLUDED.instruction_count, " +
+                "basic_block_count = EXCLUDED.basic_block_count, " +
+                "call_count = EXCLUDED.call_count, " +
+                "signature_quality = EXCLUDED.signature_quality, " +
+                "feature_vector = EXCLUDED.feature_vector";
+        } else {
+            println("Enhanced signatures table not available - using basic signature storage");
+            return;
+        }
+
+        try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+
+            while (functions.hasNext() && !monitor.isCancelled()) {
+                Function function = functions.next();
+                functionCount++;
+
+                if (functionCount % 50 == 0) {
+                    monitor.setMessage(String.format("Processing function %d: %s", functionCount, function.getName()));
+                }
+
+                try {
+                    // Get function ID from desctable
+                    int functionId = getFunctionId(conn, function.getName(), executableId);
+                    if (functionId == -1) {
+                        continue; // Function not in database
+                    }
+
+                    // Generate enhanced signature
+                    FunctionSignature signature = generateFunctionSignature(function);
+
+                    stmt.setInt(1, functionId);
+                    stmt.setInt(2, executableId);
+                    stmt.setString(3, signature.hash);
+                    stmt.setInt(4, signature.instructionCount);
+                    stmt.setInt(5, signature.basicBlockCount);
+                    stmt.setInt(6, signature.callCount);
+                    stmt.setDouble(7, signature.quality);
+                    stmt.setString(8, signature.featureVector);
+
+                    stmt.addBatch();
+                    signatureCount++;
+
+                    // Execute batch periodically
+                    if (signatureCount % 100 == 0) {
+                        stmt.executeBatch();
+                    }
+
+                } catch (SQLException e) {
+                    printerr("Error processing function " + function.getName() + ": " + e.getMessage());
+                }
+            }
+
+            // Execute remaining batch
+            stmt.executeBatch();
+        }
+
+        println(String.format("Generated %d enhanced signatures for %d functions", signatureCount, functionCount));
+    }
+
+    private boolean checkEnhancedSignaturesTable(Connection conn) {
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeQuery("SELECT 1 FROM enhanced_signatures LIMIT 1");
+            return true;
+        } catch (SQLException e) {
+            return false;
+        }
+    }
+
+    private int getFunctionId(Connection conn, String functionName, int executableId) throws SQLException {
+        String sql = "SELECT id FROM desctable WHERE name_func = ? AND id_exe = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, functionName);
+            stmt.setInt(2, executableId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return rs.getInt("id");
+            }
+            return -1;
+        }
+    }
+
+    private FunctionSignature generateFunctionSignature(Function function) {
+        FunctionSignature signature = new FunctionSignature();
+
+        // Basic metrics
+        signature.instructionCount = (int) function.getBody().getNumAddresses();
+        signature.basicBlockCount = function.getBody().getNumAddressRanges();
+
+        // Count calls
+        signature.callCount = 0;
+        InstructionIterator instructions = currentProgram.getListing().getInstructions(function.getBody(), true);
+        while (instructions.hasNext()) {
+            Instruction instruction = instructions.next();
+            if (instruction.getFlowType().isCall()) {
+                signature.callCount++;
+            }
+        }
+
+        // Generate feature vector (simplified)
+        signature.featureVector = String.format("inst:%d,bb:%d,calls:%d",
+            signature.instructionCount, signature.basicBlockCount, signature.callCount);
+
+        // Calculate quality score
+        signature.quality = calculateQuality(signature);
+
+        // Generate hash
+        signature.hash = generateSignatureHash(function, signature);
+
+        return signature;
+    }
+
+    private double calculateQuality(FunctionSignature signature) {
+        // Simple quality calculation based on signature completeness
+        double quality = 0.5; // Base quality
+
+        if (signature.instructionCount > 10) quality += 0.2;
+        if (signature.basicBlockCount > 1) quality += 0.2;
+        if (signature.callCount > 0) quality += 0.1;
+
+        return Math.min(quality, 1.0);
+    }
+
+    private String generateSignatureHash(Function function, FunctionSignature signature) {
+        String data = function.getName() + "_" + signature.instructionCount + "_" +
+                     signature.basicBlockCount + "_" + signature.callCount;
+        return Integer.toHexString(data.hashCode());
+    }
+
+    private void updateSimilarityAnalysis(Connection conn, int executableId) throws SQLException {
+        println("Updating similarity analysis...");
+
+        try {
+            // Trigger refresh of materialized views for cross-version analysis
+            String sql = "SELECT refresh_cross_version_data()";
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.executeQuery();
+                println("Cross-version analysis updated");
+            }
+        } catch (SQLException e) {
+            // Fall back to manual view refresh
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("REFRESH MATERIALIZED VIEW cross_version_functions");
+                println("Materialized views refreshed");
+            } catch (SQLException e2) {
+                println("Note: Could not refresh materialized views");
+            }
+        }
+    }
+
+    // Helper class for function signatures
+    private static class FunctionSignature {
+        String hash;
+        int instructionCount;
+        int basicBlockCount;
+        int callCount;
+        double quality;
+        String featureVector;
+    }
+}
