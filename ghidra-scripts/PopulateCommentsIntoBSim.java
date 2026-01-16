@@ -9,29 +9,51 @@ import ghidra.program.model.listing.*;
 import ghidra.program.model.address.*;
 import ghidra.program.model.symbol.*;
 import ghidra.util.exception.CancelledException;
+import ghidra.framework.model.*;
 import java.sql.*;
 import java.util.*;
 
 public class PopulateCommentsIntoBSim extends GhidraScript {
 
-    private static final String DEFAULT_DB_URL = "jdbc:postgresql://localhost:5432/bsim";
+    private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
     private static final String DEFAULT_DB_USER = "ben";
     private static final String DEFAULT_DB_PASS = "goodyx12";
 
+    // Mode selection constants
+    private static final String MODE_SINGLE = "Single Program (current)";
+    private static final String MODE_ALL = "All Programs in Project";
+    private static final String MODE_VERSION = "Programs by Version Filter";
+
     @Override
     public void run() throws Exception {
+        println("=== BSim Comment Population Script ===");
 
+        // Ask user for processing mode
+        String[] modes = { MODE_SINGLE, MODE_ALL, MODE_VERSION };
+        String selectedMode = askChoice("Select Processing Mode",
+            "How would you like to populate comments?",
+            Arrays.asList(modes), MODE_SINGLE);
+
+        if (selectedMode.equals(MODE_SINGLE)) {
+            processSingleProgram();
+        } else if (selectedMode.equals(MODE_ALL)) {
+            processAllPrograms();
+        } else if (selectedMode.equals(MODE_VERSION)) {
+            processVersionFiltered();
+        }
+    }
+
+    private void processSingleProgram() throws Exception {
         if (currentProgram == null) {
             popup("No program is currently open. Please open a program first.");
             return;
         }
 
         String programName = currentProgram.getName();
-        println("=== BSim Comment Population Script ===");
         println("Program: " + programName);
 
         // Count functions with comments
-        int functionsWithComments = countFunctionsWithComments();
+        int functionsWithComments = countFunctionsWithComments(currentProgram);
         println("Functions with comments: " + functionsWithComments);
 
         if (functionsWithComments == 0) {
@@ -51,7 +73,7 @@ public class PopulateCommentsIntoBSim extends GhidraScript {
         }
 
         try {
-            populateComments(programName);
+            populateComments(currentProgram, programName);
             println("Successfully populated comments into BSim database!");
 
         } catch (Exception e) {
@@ -61,22 +83,162 @@ public class PopulateCommentsIntoBSim extends GhidraScript {
         }
     }
 
-    private int countFunctionsWithComments() {
-        FunctionManager funcManager = currentProgram.getFunctionManager();
+    private void processAllPrograms() throws Exception {
+        Project project = state.getProject();
+        if (project == null) {
+            popup("No project is currently open.");
+            return;
+        }
+
+        ProjectData projectData = project.getProjectData();
+        DomainFolder rootFolder = projectData.getRootFolder();
+
+        List<DomainFile> programFiles = new ArrayList<>();
+        collectProgramFiles(rootFolder, programFiles);
+
+        if (programFiles.isEmpty()) {
+            popup("No program files found in the project.");
+            return;
+        }
+
+        boolean proceed = askYesNo("Process All Programs",
+            String.format("Found %d programs in project.\n\nPopulate comments for all programs?",
+                programFiles.size()));
+
+        if (!proceed) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        println("Processing " + programFiles.size() + " programs...");
+        int successCount = 0;
+        int errorCount = 0;
+
+        for (DomainFile file : programFiles) {
+            if (monitor.isCancelled()) break;
+
+            try {
+                processProjectFile(file);
+                successCount++;
+            } catch (Exception e) {
+                printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                errorCount++;
+            }
+        }
+
+        println(String.format("\n=== Batch Processing Complete ===\nSuccess: %d\nErrors: %d",
+            successCount, errorCount));
+    }
+
+    private void processVersionFiltered() throws Exception {
+        String versionFilter = askString("Version Filter",
+            "Enter version pattern to match (e.g., '1.14' or 'D2R'):");
+
+        if (versionFilter == null || versionFilter.trim().isEmpty()) {
+            println("No version filter specified, operation cancelled.");
+            return;
+        }
+
+        Project project = state.getProject();
+        if (project == null) {
+            popup("No project is currently open.");
+            return;
+        }
+
+        ProjectData projectData = project.getProjectData();
+        DomainFolder rootFolder = projectData.getRootFolder();
+
+        List<DomainFile> allFiles = new ArrayList<>();
+        collectProgramFiles(rootFolder, allFiles);
+
+        // Filter by version
+        List<DomainFile> matchingFiles = new ArrayList<>();
+        for (DomainFile file : allFiles) {
+            String path = file.getPathname();
+            if (path.contains(versionFilter) || file.getName().contains(versionFilter)) {
+                matchingFiles.add(file);
+            }
+        }
+
+        if (matchingFiles.isEmpty()) {
+            popup("No programs matching version '" + versionFilter + "' found.");
+            return;
+        }
+
+        boolean proceed = askYesNo("Process Filtered Programs",
+            String.format("Found %d programs matching '%s'.\n\nPopulate comments for these programs?",
+                matchingFiles.size(), versionFilter));
+
+        if (!proceed) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        println("Processing " + matchingFiles.size() + " matching programs...");
+        int successCount = 0;
+        int errorCount = 0;
+
+        for (DomainFile file : matchingFiles) {
+            if (monitor.isCancelled()) break;
+
+            try {
+                processProjectFile(file);
+                successCount++;
+            } catch (Exception e) {
+                printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                errorCount++;
+            }
+        }
+
+        println(String.format("\n=== Version Filtered Processing Complete ===\nVersion: %s\nSuccess: %d\nErrors: %d",
+            versionFilter, successCount, errorCount));
+    }
+
+    private void collectProgramFiles(DomainFolder folder, List<DomainFile> files) throws Exception {
+        for (DomainFile file : folder.getFiles()) {
+            if (file.getContentType().equals("Program")) {
+                files.add(file);
+            }
+        }
+        for (DomainFolder subfolder : folder.getFolders()) {
+            collectProgramFiles(subfolder, files);
+        }
+    }
+
+    private void processProjectFile(DomainFile file) throws Exception {
+        println("\nProcessing: " + file.getPathname());
+        monitor.setMessage("Processing: " + file.getName());
+
+        Program program = (Program) file.getDomainObject(this, false, false, monitor);
+        try {
+            int commentCount = countFunctionsWithComments(program);
+            if (commentCount > 0) {
+                populateComments(program, file.getName());
+                println("  Added " + commentCount + " function comments");
+            } else {
+                println("  No comments to add");
+            }
+        } finally {
+            program.release(this);
+        }
+    }
+
+    private int countFunctionsWithComments(Program program) {
+        FunctionManager funcManager = program.getFunctionManager();
         FunctionIterator functions = funcManager.getFunctions(true);
         int count = 0;
 
         while (functions.hasNext()) {
             Function func = functions.next();
-            if (hasComments(func)) {
+            if (hasComments(program, func)) {
                 count++;
             }
         }
         return count;
     }
 
-    private boolean hasComments(Function func) {
-        CodeUnit cu = currentProgram.getListing().getCodeUnitAt(func.getEntryPoint());
+    private boolean hasComments(Program program, Function func) {
+        CodeUnit cu = program.getListing().getCodeUnitAt(func.getEntryPoint());
         if (cu == null) return false;
 
         String plateComment = cu.getComment(CodeUnit.PLATE_COMMENT);
@@ -90,7 +252,7 @@ public class PopulateCommentsIntoBSim extends GhidraScript {
                (eolComment != null && !eolComment.trim().isEmpty());
     }
 
-    private void populateComments(String programName) throws Exception {
+    private void populateComments(Program program, String programName) throws Exception {
         println("Connecting to BSim database...");
 
         try (Connection conn = DriverManager.getConnection(DEFAULT_DB_URL, DEFAULT_DB_USER, DEFAULT_DB_PASS)) {
@@ -105,7 +267,7 @@ public class PopulateCommentsIntoBSim extends GhidraScript {
             println("Executable ID: " + executableId);
 
             // Process function comments
-            processComments(conn, executableId, programName);
+            processComments(conn, program, executableId, programName);
 
         } catch (SQLException e) {
             printerr("Database error: " + e.getMessage());
@@ -126,18 +288,21 @@ public class PopulateCommentsIntoBSim extends GhidraScript {
         }
     }
 
-    private void processComments(Connection conn, int executableId, String programName) throws Exception {
+    private void processComments(Connection conn, Program program, int executableId, String programName) throws Exception {
         println("Processing function comments...");
         monitor.setMessage("Processing function comments for BSim");
 
-        FunctionManager funcManager = currentProgram.getFunctionManager();
+        FunctionManager funcManager = program.getFunctionManager();
         FunctionIterator functions = funcManager.getFunctions(true);
 
         int processedCount = 0;
         int commentCount = 0;
 
-        // Prepare statements for comment insertion
-        String insertCommentSql = "INSERT INTO core_comment (content, content_html, entity_type, entity_id, entity_name, created_at, updated_at, is_deleted, parent_id, user_id) VALUES (?, ?, ?, ?, ?, NOW(), NOW(), false, NULL, 1) ON CONFLICT DO NOTHING";
+        // Get or create a valid user_id (find first user or use NULL)
+        Integer userId = getValidUserId(conn);
+
+        // Prepare statements for comment insertion (user_id can be NULL)
+        String insertCommentSql = "INSERT INTO core_comment (content, content_html, entity_type, entity_id, entity_name, created_at, updated_at, is_deleted, parent_id, user_id) VALUES (?, ?, ?, ?, ?, NOW(), NOW(), false, NULL, ?) ON CONFLICT DO NOTHING";
 
         // Get function ID from BSim database
         String getFunctionIdSql = "SELECT id FROM desctable WHERE name_func = ? AND id_exe = ?";
@@ -154,7 +319,7 @@ public class PopulateCommentsIntoBSim extends GhidraScript {
                         processedCount, function.getName()));
                 }
 
-                if (hasComments(function)) {
+                if (hasComments(program, function)) {
                     // Get BSim function ID
                     funcIdStmt.setString(1, function.getName());
                     funcIdStmt.setInt(2, executableId);
@@ -164,7 +329,7 @@ public class PopulateCommentsIntoBSim extends GhidraScript {
                         long functionId = rs.getLong("id");
 
                         // Extract and insert all comment types
-                        commentCount += insertFunctionComments(commentStmt, function, functionId);
+                        commentCount += insertFunctionComments(commentStmt, program, function, functionId, userId);
                     }
                     rs.close();
                 }
@@ -180,8 +345,23 @@ public class PopulateCommentsIntoBSim extends GhidraScript {
             processedCount, commentCount));
     }
 
-    private int insertFunctionComments(PreparedStatement commentStmt, Function function, long functionId) throws SQLException {
-        CodeUnit cu = currentProgram.getListing().getCodeUnitAt(function.getEntryPoint());
+    private Integer getValidUserId(Connection conn) throws SQLException {
+        // Try to find an existing user in auth_user table
+        String findUserSql = "SELECT id FROM auth_user ORDER BY id LIMIT 1";
+        try (PreparedStatement stmt = conn.prepareStatement(findUserSql)) {
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                int userId = rs.getInt("id");
+                println("Using existing user_id: " + userId);
+                return userId;
+            }
+        }
+        println("No users found in auth_user table, using NULL for user_id");
+        return null;
+    }
+
+    private int insertFunctionComments(PreparedStatement commentStmt, Program program, Function function, long functionId, Integer userId) throws SQLException {
+        CodeUnit cu = program.getListing().getCodeUnitAt(function.getEntryPoint());
         if (cu == null) return 0;
 
         int insertedCount = 0;
@@ -204,6 +384,11 @@ public class PopulateCommentsIntoBSim extends GhidraScript {
                 commentStmt.setString(3, "function");
                 commentStmt.setLong(4, functionId);
                 commentStmt.setString(5, function.getName() + "_" + commentTypes[i]);
+                if (userId != null) {
+                    commentStmt.setInt(6, userId);
+                } else {
+                    commentStmt.setNull(6, java.sql.Types.INTEGER);
+                }
 
                 try {
                     int rowsAffected = commentStmt.executeUpdate();

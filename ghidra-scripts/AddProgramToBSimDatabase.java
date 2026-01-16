@@ -1,4 +1,5 @@
-// Add current program to PostgreSQL BSim database for cross-version analysis
+// Add programs to PostgreSQL BSim database for cross-version analysis
+// Supports: Single program, All programs in project, or Version-filtered programs
 // @author Claude Code Assistant
 // @category BSim
 // @keybinding ctrl shift B
@@ -9,64 +10,269 @@ import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.*;
 import ghidra.program.model.address.*;
 import ghidra.util.exception.CancelledException;
+import ghidra.framework.model.*;
+import ghidra.program.database.ProgramDB;
+import ghidra.base.project.GhidraProject;
 import java.util.*;
 import java.sql.*;
 
 public class AddProgramToBSimDatabase extends GhidraScript {
 
     // Default BSim database configuration
-    private static final String DEFAULT_DB_URL = "jdbc:postgresql://localhost:5432/bsim";
+    private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
     private static final String DEFAULT_DB_USER = "ben";
     private static final String DEFAULT_DB_PASS = "goodyx12";
+
+    // Processing mode
+    private static final String MODE_SINGLE = "Single Program (current)";
+    private static final String MODE_ALL = "All Programs in Project";
+    private static final String MODE_VERSION = "Programs by Version Filter";
 
     @Override
     public void run() throws Exception {
 
-        // Check if we have a program loaded
-        if (currentProgram == null) {
-            popup("No program is currently open. Please open a program first.");
-            return;
-        }
-
-        // Get program details
-        String programName = currentProgram.getName();
-        String programPath = currentProgram.getExecutablePath();
-
         println("=== BSim Database Population Script ===");
-        println("Program: " + programName);
-        println("Path: " + programPath);
-        println("Functions in program: " + currentProgram.getFunctionManager().getFunctionCount());
 
-        // Check if user wants to proceed
-        boolean proceed = askYesNo("Confirm BSim Addition",
-            String.format("Add program '%s' to BSim database?\n\nThis will:\n" +
-            "- Generate function signatures\n" +
-            "- Add to cross-version analysis database\n" +
-            "- Enable similarity matching\n\nProceed?", programName));
+        // Ask user which mode to use
+        String[] modes = { MODE_SINGLE, MODE_ALL, MODE_VERSION };
+        String selectedMode = askChoice("Select Processing Mode",
+            "How would you like to populate the BSim database?", Arrays.asList(modes), MODE_SINGLE);
 
-        if (!proceed) {
+        if (selectedMode == null) {
             println("Operation cancelled by user");
             return;
         }
 
-        try {
-            // Process functions and add to database
-            addProgramToBSim(programName, programPath);
+        println("Selected mode: " + selectedMode);
 
-            println("Successfully added program to BSim database!");
-            println("Cross-version analysis data has been updated.");
+        try {
+            if (MODE_SINGLE.equals(selectedMode)) {
+                processSingleProgram();
+            } else if (MODE_ALL.equals(selectedMode)) {
+                processAllPrograms();
+            } else if (MODE_VERSION.equals(selectedMode)) {
+                processVersionFiltered();
+            }
+
+            println("BSim database population completed!");
 
         } catch (Exception e) {
-            printerr("Error adding program to BSim database: " + e.getMessage());
+            printerr("Error during BSim population: " + e.getMessage());
             e.printStackTrace();
             throw e;
         }
     }
 
     /**
-     * Add the current program to the BSim database
+     * Process only the currently open program
      */
-    private void addProgramToBSim(String programName, String programPath) throws Exception {
+    private void processSingleProgram() throws Exception {
+        if (currentProgram == null) {
+            popup("No program is currently open. Please open a program first.");
+            return;
+        }
+
+        String programName = currentProgram.getName();
+        String programPath = currentProgram.getExecutablePath();
+
+        println("Program: " + programName);
+        println("Path: " + programPath);
+        println("Functions: " + currentProgram.getFunctionManager().getFunctionCount());
+
+        boolean proceed = askYesNo("Confirm BSim Addition",
+            String.format("Add program '%s' to BSim database?", programName));
+
+        if (!proceed) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        addProgramToBSim(currentProgram, programName, programPath);
+        println("Successfully added " + programName + " to BSim database!");
+    }
+
+    /**
+     * Process all programs in the Ghidra project
+     */
+    private void processAllPrograms() throws Exception {
+        Project project = state.getProject();
+        if (project == null) {
+            popup("No project is open. Please open a Ghidra project first.");
+            return;
+        }
+
+        ProjectData projectData = project.getProjectData();
+        DomainFolder rootFolder = projectData.getRootFolder();
+
+        // Collect all program files
+        List<DomainFile> programFiles = new ArrayList<>();
+        collectProgramFiles(rootFolder, programFiles);
+
+        if (programFiles.isEmpty()) {
+            popup("No programs found in the project.");
+            return;
+        }
+
+        println("Found " + programFiles.size() + " programs in project");
+
+        boolean proceed = askYesNo("Process All Programs",
+            String.format("Add all %d programs to BSim database?\n\nThis may take a while.", programFiles.size()));
+
+        if (!proceed) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        int successCount = 0;
+        int errorCount = 0;
+
+        for (int i = 0; i < programFiles.size(); i++) {
+            DomainFile file = programFiles.get(i);
+            monitor.setMessage(String.format("Processing %d/%d: %s", i + 1, programFiles.size(), file.getName()));
+            monitor.setProgress(i);
+
+            if (monitor.isCancelled()) {
+                println("Operation cancelled by user");
+                break;
+            }
+
+            try {
+                processProjectFile(file);
+                successCount++;
+            } catch (Exception e) {
+                printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                errorCount++;
+            }
+        }
+
+        println(String.format("Completed: %d successful, %d errors", successCount, errorCount));
+    }
+
+    /**
+     * Process programs matching a version filter
+     */
+    private void processVersionFiltered() throws Exception {
+        Project project = state.getProject();
+        if (project == null) {
+            popup("No project is open. Please open a Ghidra project first.");
+            return;
+        }
+
+        // Ask for version filter
+        String versionFilter = askString("Version Filter",
+            "Enter version pattern to match (e.g., '1.14', 'LoD', 'Classic'):", "1.14");
+
+        if (versionFilter == null || versionFilter.trim().isEmpty()) {
+            println("Operation cancelled - no filter provided");
+            return;
+        }
+
+        ProjectData projectData = project.getProjectData();
+        DomainFolder rootFolder = projectData.getRootFolder();
+
+        // Collect matching program files
+        List<DomainFile> programFiles = new ArrayList<>();
+        collectProgramFiles(rootFolder, programFiles);
+
+        // Filter by version
+        List<DomainFile> matchingFiles = new ArrayList<>();
+        for (DomainFile file : programFiles) {
+            String path = file.getPathname().toLowerCase();
+            String name = file.getName().toLowerCase();
+            if (path.contains(versionFilter.toLowerCase()) || name.contains(versionFilter.toLowerCase())) {
+                matchingFiles.add(file);
+            }
+        }
+
+        if (matchingFiles.isEmpty()) {
+            popup("No programs matching filter '" + versionFilter + "' found.");
+            return;
+        }
+
+        println("Found " + matchingFiles.size() + " programs matching '" + versionFilter + "'");
+
+        // Show matching files
+        println("Matching programs:");
+        for (DomainFile file : matchingFiles) {
+            println("  - " + file.getPathname());
+        }
+
+        boolean proceed = askYesNo("Process Filtered Programs",
+            String.format("Add %d programs matching '%s' to BSim database?", matchingFiles.size(), versionFilter));
+
+        if (!proceed) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        int successCount = 0;
+        int errorCount = 0;
+
+        for (int i = 0; i < matchingFiles.size(); i++) {
+            DomainFile file = matchingFiles.get(i);
+            monitor.setMessage(String.format("Processing %d/%d: %s", i + 1, matchingFiles.size(), file.getName()));
+            monitor.setProgress(i);
+
+            if (monitor.isCancelled()) {
+                println("Operation cancelled by user");
+                break;
+            }
+
+            try {
+                processProjectFile(file);
+                successCount++;
+            } catch (Exception e) {
+                printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                errorCount++;
+            }
+        }
+
+        println(String.format("Completed: %d successful, %d errors", successCount, errorCount));
+    }
+
+    /**
+     * Recursively collect all program files from a folder
+     */
+    private void collectProgramFiles(DomainFolder folder, List<DomainFile> files) throws Exception {
+        // Add files from this folder
+        for (DomainFile file : folder.getFiles()) {
+            if (file.getContentType().equals("Program")) {
+                files.add(file);
+            }
+        }
+
+        // Recurse into subfolders
+        for (DomainFolder subfolder : folder.getFolders()) {
+            collectProgramFiles(subfolder, files);
+        }
+    }
+
+    /**
+     * Process a single project file
+     */
+    private void processProjectFile(DomainFile file) throws Exception {
+        println("Processing: " + file.getPathname());
+
+        // Open the program
+        Program program = (Program) file.getDomainObject(this, true, false, monitor);
+
+        try {
+            String programName = program.getName();
+            String programPath = file.getPathname();
+
+            addProgramToBSim(program, programName, programPath);
+            println("  Added " + programName + " to BSim database");
+
+        } finally {
+            // Always release the program
+            program.release(this);
+        }
+    }
+
+    /**
+     * Add a program to the BSim database
+     */
+    private void addProgramToBSim(Program program, String programName, String programPath) throws Exception {
 
         println("Connecting to BSim database...");
 
@@ -80,7 +286,7 @@ public class AddProgramToBSimDatabase extends GhidraScript {
             println("Executable ID: " + executableId);
 
             // Process functions
-            processFunctions(conn, executableId, programName);
+            processFunctions(conn, executableId, programName, program);
 
             // Update materialized views for cross-version analysis
             refreshMaterializedViews(conn);
@@ -137,22 +343,26 @@ public class AddProgramToBSimDatabase extends GhidraScript {
     /**
      * Process all functions in the program and add to database
      */
-    private void processFunctions(Connection conn, int executableId, String programName) throws Exception {
+    private void processFunctions(Connection conn, int executableId, String programName, Program program) throws Exception {
 
         println("Processing functions...");
         monitor.setMessage("Processing functions for BSim");
 
         // Get all functions in the program
-        FunctionManager funcManager = currentProgram.getFunctionManager();
+        FunctionManager funcManager = program.getFunctionManager();
         FunctionIterator functions = funcManager.getFunctions(true);
 
         int functionCount = 0;
         int addedCount = 0;
+        int skippedCount = 0;
 
-        // Prepare insert statement
-        String insertSql = "INSERT INTO desctable (name_func, id_exe, id_signature, flags, addr) VALUES (?, ?, ?, ?, ?) ON CONFLICT (name_func, id_exe, addr) DO NOTHING";
+        // Check if function already exists
+        String checkSql = "SELECT id FROM desctable WHERE name_func = ? AND id_exe = ? AND addr = ?";
+        // Prepare insert statement (without ON CONFLICT for compatibility)
+        String insertSql = "INSERT INTO desctable (name_func, id_exe, id_signature, flags, addr) VALUES (?, ?, ?, ?, ?)";
 
-        try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+        try (PreparedStatement checkStmt = conn.prepareStatement(checkSql);
+             PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
 
             // Process each function
             while (functions.hasNext() && !monitor.isCancelled()) {
@@ -167,20 +377,39 @@ public class AddProgramToBSimDatabase extends GhidraScript {
                 }
 
                 try {
-                    // Add function to database
-                    stmt.setString(1, function.getName());
-                    stmt.setInt(2, executableId);
-                    stmt.setLong(3, generateSignatureId(function)); // Generate signature ID
-                    stmt.setInt(4, 0); // Default flags
-                    stmt.setLong(5, function.getEntryPoint().getOffset());
+                    // Check if function already exists
+                    checkStmt.setString(1, function.getName());
+                    checkStmt.setInt(2, executableId);
+                    checkStmt.setLong(3, function.getEntryPoint().getOffset());
+                    ResultSet rs = checkStmt.executeQuery();
+                    
+                    if (rs.next()) {
+                        // Function already exists, skip
+                        skippedCount++;
+                        rs.close();
+                        continue;
+                    }
+                    rs.close();
 
-                    int rowsAffected = stmt.executeUpdate();
+                    // Add function to database
+                    insertStmt.setString(1, function.getName());
+                    insertStmt.setInt(2, executableId);
+                    insertStmt.setLong(3, generateSignatureId(function)); // Generate signature ID
+                    insertStmt.setInt(4, 0); // Default flags
+                    insertStmt.setLong(5, function.getEntryPoint().getOffset());
+
+                    int rowsAffected = insertStmt.executeUpdate();
                     if (rowsAffected > 0) {
                         addedCount++;
                     }
 
                 } catch (SQLException e) {
-                    printerr("Error processing function " + function.getName() + ": " + e.getMessage());
+                    // Only log if it's not a duplicate key error
+                    if (!e.getMessage().contains("duplicate key")) {
+                        printerr("Error processing function " + function.getName() + ": " + e.getMessage());
+                    } else {
+                        skippedCount++;
+                    }
                 }
             }
         }
@@ -190,8 +419,8 @@ public class AddProgramToBSimDatabase extends GhidraScript {
             return;
         }
 
-        println(String.format("Processed %d functions, added %d new functions to database",
-            functionCount, addedCount));
+        println(String.format("Processed %d functions, added %d new, skipped %d existing",
+            functionCount, addedCount, skippedCount));
 
         // Log program metadata
         logProgramMetadata(programName, functionCount, addedCount);

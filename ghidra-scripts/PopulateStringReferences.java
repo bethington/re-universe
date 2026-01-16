@@ -10,29 +10,51 @@ import ghidra.program.model.address.*;
 import ghidra.program.model.symbol.*;
 import ghidra.program.model.data.*;
 import ghidra.util.exception.CancelledException;
+import ghidra.framework.model.*;
 import java.sql.*;
 import java.util.*;
 
 public class PopulateStringReferences extends GhidraScript {
 
-    private static final String DEFAULT_DB_URL = "jdbc:postgresql://localhost:5432/bsim";
+    private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
     private static final String DEFAULT_DB_USER = "ben";
     private static final String DEFAULT_DB_PASS = "goodyx12";
 
+    // Mode selection constants
+    private static final String MODE_SINGLE = "Single Program (current)";
+    private static final String MODE_ALL = "All Programs in Project";
+    private static final String MODE_VERSION = "Programs by Version Filter";
+
     @Override
     public void run() throws Exception {
+        println("=== BSim String References Population Script ===");
 
+        // Ask user for processing mode
+        String[] modes = { MODE_SINGLE, MODE_ALL, MODE_VERSION };
+        String selectedMode = askChoice("Select Processing Mode",
+            "How would you like to populate string references?",
+            Arrays.asList(modes), MODE_SINGLE);
+
+        if (selectedMode.equals(MODE_SINGLE)) {
+            processSingleProgram();
+        } else if (selectedMode.equals(MODE_ALL)) {
+            processAllPrograms();
+        } else if (selectedMode.equals(MODE_VERSION)) {
+            processVersionFiltered();
+        }
+    }
+
+    private void processSingleProgram() throws Exception {
         if (currentProgram == null) {
             popup("No program is currently open. Please open a program first.");
             return;
         }
 
         String programName = currentProgram.getName();
-        println("=== BSim String References Population Script ===");
         println("Program: " + programName);
 
         // Count strings in program
-        int stringCount = countStringReferences();
+        int stringCount = countStringReferences(currentProgram);
         println("String references found: " + stringCount);
 
         if (stringCount == 0) {
@@ -52,7 +74,7 @@ public class PopulateStringReferences extends GhidraScript {
         }
 
         try {
-            populateStringReferences(programName);
+            populateStringReferences(currentProgram, programName);
             println("Successfully populated string references into BSim database!");
 
         } catch (Exception e) {
@@ -62,12 +84,147 @@ public class PopulateStringReferences extends GhidraScript {
         }
     }
 
-    private int countStringReferences() {
-        Data[] strings = findStrings(currentProgram.getMemory(), 4, 1, true, true);
+    private void processAllPrograms() throws Exception {
+        Project project = state.getProject();
+        if (project == null) {
+            popup("No project is currently open.");
+            return;
+        }
+
+        ProjectData projectData = project.getProjectData();
+        DomainFolder rootFolder = projectData.getRootFolder();
+
+        List<DomainFile> programFiles = new ArrayList<>();
+        collectProgramFiles(rootFolder, programFiles);
+
+        if (programFiles.isEmpty()) {
+            popup("No program files found in the project.");
+            return;
+        }
+
+        boolean proceed = askYesNo("Process All Programs",
+            String.format("Found %d programs in project.\n\nPopulate string references for all programs?",
+                programFiles.size()));
+
+        if (!proceed) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        println("Processing " + programFiles.size() + " programs...");
+        int successCount = 0;
+        int errorCount = 0;
+
+        for (DomainFile file : programFiles) {
+            if (monitor.isCancelled()) break;
+
+            try {
+                processProjectFile(file);
+                successCount++;
+            } catch (Exception e) {
+                printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                errorCount++;
+            }
+        }
+
+        println(String.format("\n=== Batch Processing Complete ===\nSuccess: %d\nErrors: %d",
+            successCount, errorCount));
+    }
+
+    private void processVersionFiltered() throws Exception {
+        String versionFilter = askString("Version Filter",
+            "Enter version pattern to match (e.g., '1.14' or 'D2R'):");
+
+        if (versionFilter == null || versionFilter.trim().isEmpty()) {
+            println("No version filter specified, operation cancelled.");
+            return;
+        }
+
+        Project project = state.getProject();
+        if (project == null) {
+            popup("No project is currently open.");
+            return;
+        }
+
+        ProjectData projectData = project.getProjectData();
+        DomainFolder rootFolder = projectData.getRootFolder();
+
+        List<DomainFile> allFiles = new ArrayList<>();
+        collectProgramFiles(rootFolder, allFiles);
+
+        // Filter by version
+        List<DomainFile> matchingFiles = new ArrayList<>();
+        for (DomainFile file : allFiles) {
+            String path = file.getPathname();
+            if (path.contains(versionFilter) || file.getName().contains(versionFilter)) {
+                matchingFiles.add(file);
+            }
+        }
+
+        if (matchingFiles.isEmpty()) {
+            popup("No programs matching version '" + versionFilter + "' found.");
+            return;
+        }
+
+        boolean proceed = askYesNo("Process Filtered Programs",
+            String.format("Found %d programs matching '%s'.\n\nPopulate string references for these programs?",
+                matchingFiles.size(), versionFilter));
+
+        if (!proceed) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        println("Processing " + matchingFiles.size() + " matching programs...");
+        int successCount = 0;
+        int errorCount = 0;
+
+        for (DomainFile file : matchingFiles) {
+            if (monitor.isCancelled()) break;
+
+            try {
+                processProjectFile(file);
+                successCount++;
+            } catch (Exception e) {
+                printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                errorCount++;
+            }
+        }
+
+        println(String.format("\n=== Version Filtered Processing Complete ===\nVersion: %s\nSuccess: %d\nErrors: %d",
+            versionFilter, successCount, errorCount));
+    }
+
+    private void collectProgramFiles(DomainFolder folder, List<DomainFile> files) throws Exception {
+        for (DomainFile file : folder.getFiles()) {
+            if (file.getContentType().equals("Program")) {
+                files.add(file);
+            }
+        }
+        for (DomainFolder subfolder : folder.getFolders()) {
+            collectProgramFiles(subfolder, files);
+        }
+    }
+
+    private void processProjectFile(DomainFile file) throws Exception {
+        println("\nProcessing: " + file.getPathname());
+        monitor.setMessage("Processing: " + file.getName());
+
+        Program program = (Program) file.getDomainObject(this, false, false, monitor);
+        try {
+            populateStringReferences(program, file.getName());
+            println("  String references populated successfully");
+        } finally {
+            program.release(this);
+        }
+    }
+
+    private int countStringReferences(Program program) {
+        Data[] strings = findStrings(program.getMemory(), 4, 1, true, true);
         return strings.length;
     }
 
-    private void populateStringReferences(String programName) throws Exception {
+    private void populateStringReferences(Program program, String programName) throws Exception {
         println("Connecting to BSim database...");
 
         try (Connection conn = DriverManager.getConnection(DEFAULT_DB_URL, DEFAULT_DB_USER, DEFAULT_DB_PASS)) {
@@ -85,7 +242,7 @@ public class PopulateStringReferences extends GhidraScript {
             println("Executable ID: " + executableId);
 
             // Process string references
-            processStringReferences(conn, executableId, programName);
+            processStringReferences(conn, program, executableId, programName);
 
         } catch (SQLException e) {
             printerr("Database error: " + e.getMessage());
@@ -142,12 +299,12 @@ public class PopulateStringReferences extends GhidraScript {
         }
     }
 
-    private void processStringReferences(Connection conn, int executableId, String programName) throws Exception {
+    private void processStringReferences(Connection conn, Program program, int executableId, String programName) throws Exception {
         println("Processing string references...");
         monitor.setMessage("Processing string references for BSim");
 
         // Find all strings in the program
-        Data[] strings = findStrings(currentProgram.getMemory(), 4, 1, true, true);
+        Data[] strings = findStrings(program.getMemory(), 4, 1, true, true);
 
         int processedCount = 0;
         int stringCount = 0;

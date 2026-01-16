@@ -9,25 +9,47 @@ import ghidra.program.model.listing.*;
 import ghidra.program.model.address.*;
 import ghidra.program.model.symbol.*;
 import ghidra.util.exception.CancelledException;
+import ghidra.framework.model.*;
 import java.sql.*;
 import java.util.*;
 
 public class PopulateCrossReferences extends GhidraScript {
 
-    private static final String DEFAULT_DB_URL = "jdbc:postgresql://localhost:5432/bsim";
+    private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
     private static final String DEFAULT_DB_USER = "ben";
     private static final String DEFAULT_DB_PASS = "goodyx12";
 
+    // Mode selection constants
+    private static final String MODE_SINGLE = "Single Program (current)";
+    private static final String MODE_ALL = "All Programs in Project";
+    private static final String MODE_VERSION = "Programs by Version Filter";
+
     @Override
     public void run() throws Exception {
+        println("=== BSim Cross-References Population Script ===");
 
+        // Ask user for processing mode
+        String[] modes = { MODE_SINGLE, MODE_ALL, MODE_VERSION };
+        String selectedMode = askChoice("Select Processing Mode",
+            "How would you like to populate cross-references?",
+            Arrays.asList(modes), MODE_SINGLE);
+
+        if (selectedMode.equals(MODE_SINGLE)) {
+            processSingleProgram();
+        } else if (selectedMode.equals(MODE_ALL)) {
+            processAllPrograms();
+        } else if (selectedMode.equals(MODE_VERSION)) {
+            processVersionFiltered();
+        }
+    }
+
+    private void processSingleProgram() throws Exception {
         if (currentProgram == null) {
             popup("No program is currently open. Please open a program first.");
             return;
         }
 
         String programName = currentProgram.getName();
-        println("=== BSim Cross-References Population Script ===");
         println("Program: " + programName);
 
         // Count functions for reference estimation
@@ -48,7 +70,7 @@ public class PopulateCrossReferences extends GhidraScript {
         }
 
         try {
-            populateCrossReferences(programName);
+            populateCrossReferences(currentProgram, programName);
             println("Successfully populated cross-references into BSim database!");
 
         } catch (Exception e) {
@@ -58,7 +80,142 @@ public class PopulateCrossReferences extends GhidraScript {
         }
     }
 
-    private void populateCrossReferences(String programName) throws Exception {
+    private void processAllPrograms() throws Exception {
+        Project project = state.getProject();
+        if (project == null) {
+            popup("No project is currently open.");
+            return;
+        }
+
+        ProjectData projectData = project.getProjectData();
+        DomainFolder rootFolder = projectData.getRootFolder();
+
+        List<DomainFile> programFiles = new ArrayList<>();
+        collectProgramFiles(rootFolder, programFiles);
+
+        if (programFiles.isEmpty()) {
+            popup("No program files found in the project.");
+            return;
+        }
+
+        boolean proceed = askYesNo("Process All Programs",
+            String.format("Found %d programs in project.\n\nPopulate cross-references for all programs?",
+                programFiles.size()));
+
+        if (!proceed) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        println("Processing " + programFiles.size() + " programs...");
+        int successCount = 0;
+        int errorCount = 0;
+
+        for (DomainFile file : programFiles) {
+            if (monitor.isCancelled()) break;
+
+            try {
+                processProjectFile(file);
+                successCount++;
+            } catch (Exception e) {
+                printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                errorCount++;
+            }
+        }
+
+        println(String.format("\n=== Batch Processing Complete ===\nSuccess: %d\nErrors: %d",
+            successCount, errorCount));
+    }
+
+    private void processVersionFiltered() throws Exception {
+        String versionFilter = askString("Version Filter",
+            "Enter version pattern to match (e.g., '1.14' or 'D2R'):");
+
+        if (versionFilter == null || versionFilter.trim().isEmpty()) {
+            println("No version filter specified, operation cancelled.");
+            return;
+        }
+
+        Project project = state.getProject();
+        if (project == null) {
+            popup("No project is currently open.");
+            return;
+        }
+
+        ProjectData projectData = project.getProjectData();
+        DomainFolder rootFolder = projectData.getRootFolder();
+
+        List<DomainFile> allFiles = new ArrayList<>();
+        collectProgramFiles(rootFolder, allFiles);
+
+        // Filter by version
+        List<DomainFile> matchingFiles = new ArrayList<>();
+        for (DomainFile file : allFiles) {
+            String path = file.getPathname();
+            if (path.contains(versionFilter) || file.getName().contains(versionFilter)) {
+                matchingFiles.add(file);
+            }
+        }
+
+        if (matchingFiles.isEmpty()) {
+            popup("No programs matching version '" + versionFilter + "' found.");
+            return;
+        }
+
+        boolean proceed = askYesNo("Process Filtered Programs",
+            String.format("Found %d programs matching '%s'.\n\nPopulate cross-references for these programs?",
+                matchingFiles.size(), versionFilter));
+
+        if (!proceed) {
+            println("Operation cancelled by user");
+            return;
+        }
+
+        println("Processing " + matchingFiles.size() + " matching programs...");
+        int successCount = 0;
+        int errorCount = 0;
+
+        for (DomainFile file : matchingFiles) {
+            if (monitor.isCancelled()) break;
+
+            try {
+                processProjectFile(file);
+                successCount++;
+            } catch (Exception e) {
+                printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                errorCount++;
+            }
+        }
+
+        println(String.format("\n=== Version Filtered Processing Complete ===\nVersion: %s\nSuccess: %d\nErrors: %d",
+            versionFilter, successCount, errorCount));
+    }
+
+    private void collectProgramFiles(DomainFolder folder, List<DomainFile> files) throws Exception {
+        for (DomainFile file : folder.getFiles()) {
+            if (file.getContentType().equals("Program")) {
+                files.add(file);
+            }
+        }
+        for (DomainFolder subfolder : folder.getFolders()) {
+            collectProgramFiles(subfolder, files);
+        }
+    }
+
+    private void processProjectFile(DomainFile file) throws Exception {
+        println("\nProcessing: " + file.getPathname());
+        monitor.setMessage("Processing: " + file.getName());
+
+        Program program = (Program) file.getDomainObject(this, false, false, monitor);
+        try {
+            populateCrossReferences(program, file.getName());
+            println("  Cross-references populated successfully");
+        } finally {
+            program.release(this);
+        }
+    }
+
+    private void populateCrossReferences(Program program, String programName) throws Exception {
         println("Connecting to BSim database...");
 
         try (Connection conn = DriverManager.getConnection(DEFAULT_DB_URL, DEFAULT_DB_USER, DEFAULT_DB_PASS)) {
@@ -76,7 +233,7 @@ public class PopulateCrossReferences extends GhidraScript {
             println("Executable ID: " + executableId);
 
             // Process cross-references
-            processCrossReferences(conn, executableId, programName);
+            processCrossReferences(conn, program, executableId, programName);
 
         } catch (SQLException e) {
             printerr("Database error: " + e.getMessage());
@@ -150,11 +307,11 @@ public class PopulateCrossReferences extends GhidraScript {
         }
     }
 
-    private void processCrossReferences(Connection conn, int executableId, String programName) throws Exception {
+    private void processCrossReferences(Connection conn, Program program, int executableId, String programName) throws Exception {
         println("Processing cross-references...");
         monitor.setMessage("Processing cross-references for BSim");
 
-        FunctionManager funcManager = currentProgram.getFunctionManager();
+        FunctionManager funcManager = program.getFunctionManager();
         FunctionIterator functions = funcManager.getFunctions(true);
 
         int processedCount = 0;
@@ -212,12 +369,12 @@ public class PopulateCrossReferences extends GhidraScript {
                     if (functionId == null) continue;
 
                     // Process function calls
-                    int outgoingCalls = processFunctionCalls(callStmt, function, functionId,
+                    int outgoingCalls = processFunctionCalls(callStmt, program, function, functionId,
                         functionIdMap, executableId);
                     callCount += outgoingCalls;
 
                     // Process data references
-                    int dataRefs = processDataReferences(dataRefStmt, function, functionId, executableId);
+                    int dataRefs = processDataReferences(dataRefStmt, program, function, functionId, executableId);
                     dataRefCount += dataRefs;
 
                     // Calculate and insert metrics
@@ -257,7 +414,7 @@ public class PopulateCrossReferences extends GhidraScript {
         return functionIdMap;
     }
 
-    private int processFunctionCalls(PreparedStatement callStmt, Function function,
+    private int processFunctionCalls(PreparedStatement callStmt, Program program, Function function,
                                    long functionId, Map<String, Long> functionIdMap,
                                    int executableId) throws SQLException {
 
@@ -301,14 +458,14 @@ public class PopulateCrossReferences extends GhidraScript {
         return callCount;
     }
 
-    private int processDataReferences(PreparedStatement dataRefStmt, Function function,
+    private int processDataReferences(PreparedStatement dataRefStmt, Program program, Function function,
                                     long functionId, int executableId) throws SQLException {
 
         int dataRefCount = 0;
 
         // Iterate through function body to find data references
         AddressSetView body = function.getBody();
-        InstructionIterator instructions = currentProgram.getListing().getInstructions(body, true);
+        InstructionIterator instructions = program.getListing().getInstructions(body, true);
 
         while (instructions.hasNext() && !monitor.isCancelled()) {
             Instruction instr = instructions.next();
@@ -321,7 +478,7 @@ public class PopulateCrossReferences extends GhidraScript {
                     dataRefStmt.setLong(3, ref.getToAddress().getOffset());
                     dataRefStmt.setLong(4, ref.getFromAddress().getOffset());
                     dataRefStmt.setString(5, getDataReferenceType(ref));
-                    dataRefStmt.setString(6, getDataType(ref.getToAddress()));
+                    dataRefStmt.setString(6, getDataType(program, ref.getToAddress()));
 
                     try {
                         dataRefStmt.executeUpdate();
@@ -401,10 +558,10 @@ public class PopulateCrossReferences extends GhidraScript {
         return "read_write";
     }
 
-    private String getDataType(Address addr) {
+    private String getDataType(Program program, Address addr) {
         // Simplified data type detection based on address characteristics
-        if (currentProgram.getMemory().getBlock(addr) != null) {
-            String blockName = currentProgram.getMemory().getBlock(addr).getName().toLowerCase();
+        if (program.getMemory().getBlock(addr) != null) {
+            String blockName = program.getMemory().getBlock(addr).getName().toLowerCase();
             if (blockName.contains("data") || blockName.contains("bss")) {
                 return "global";
             } else if (blockName.contains("stack")) {
