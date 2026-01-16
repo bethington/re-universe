@@ -1,9 +1,9 @@
-// Add programs to PostgreSQL BSim database for cross-version analysis
-// Supports: Single program, All programs in project, or Version-filtered programs
+// Add programs to PostgreSQL BSim database with unified version system support
+// Updated for unified naming convention: 1.03_D2Game.dll, Classic_1.03_Game.exe
 // @author Claude Code Assistant
 // @category BSim
 // @keybinding ctrl shift B
-// @menupath Tools.BSim.Add Program to Database
+// @menupath Tools.BSim.Add Program to Database (Unified)
 // @toolbar
 
 import ghidra.app.script.GhidraScript;
@@ -15,8 +15,9 @@ import ghidra.program.database.ProgramDB;
 import ghidra.base.project.GhidraProject;
 import java.util.*;
 import java.sql.*;
+import java.util.regex.*;
 
-public class AddProgramToBSimDatabase extends GhidraScript {
+public class AddProgramToBSimDatabase_Unified extends GhidraScript {
 
     // Default BSim database configuration
     private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
@@ -32,112 +33,79 @@ public class AddProgramToBSimDatabase extends GhidraScript {
     private boolean autoUpdateExisting = false;
 
     // Helper class for unified version parsing
-    private static class GameInfo {
-        String gameType = "Unknown";
-        String gameVersion = "Unknown";
-        String versionFamily = "Unified";  // Default to Unified for new system
+    private static class UnifiedVersionInfo {
+        String gameVersion = null;
+        String familyType = "Unified";
+        boolean isException = false;
 
-        GameInfo(String path) {
-            parsePath(path);
-        }
-
-        // New constructor for unified executable name parsing
-        GameInfo(String path, String executableName) {
-            parsePath(path);
+        UnifiedVersionInfo(String executableName) {
             parseUnifiedName(executableName);
         }
 
-        // Parse unified naming convention from executable name
         private void parseUnifiedName(String executableName) {
             if (executableName == null || executableName.isEmpty()) return;
 
+            // Extract version from unified naming convention
             // Standard binaries: 1.03_D2Game.dll -> version: 1.03, family: Unified
-            java.util.regex.Pattern standardPattern = java.util.regex.Pattern.compile(
-                "^(1\\.[0-9]+[a-z]?)_([A-Za-z0-9_]+)\\.(dll|exe)$");
-            java.util.regex.Matcher standardMatcher = standardPattern.matcher(executableName);
+            Pattern standardPattern = Pattern.compile("^(1\\.[0-9]+[a-z]?)_([A-Za-z0-9_]+)\\.(dll|exe)$");
+            Matcher standardMatcher = standardPattern.matcher(executableName);
 
             if (standardMatcher.matches()) {
                 gameVersion = standardMatcher.group(1);
-                versionFamily = "Unified";
-                gameType = "Unified";
+                familyType = "Unified";
+                isException = false;
                 return;
             }
 
             // Exception binaries: Classic_1.03_Game.exe -> version: 1.03, family: Classic
-            java.util.regex.Pattern exceptionPattern = java.util.regex.Pattern.compile(
-                "^(Classic|LoD)_(1\\.[0-9]+[a-z]?)_(Game|Diablo_II)\\.(exe|dll)$");
-            java.util.regex.Matcher exceptionMatcher = exceptionPattern.matcher(executableName);
+            Pattern exceptionPattern = Pattern.compile("^(Classic|LoD)_(1\\.[0-9]+[a-z]?)_(Game|Diablo_II)\\.(exe|dll)$");
+            Matcher exceptionMatcher = exceptionPattern.matcher(executableName);
 
             if (exceptionMatcher.matches()) {
-                versionFamily = exceptionMatcher.group(1);
+                familyType = exceptionMatcher.group(1);
                 gameVersion = exceptionMatcher.group(2);
-                gameType = versionFamily;
+                isException = true;
                 return;
             }
-        }
-        
-        private void parsePath(String path) {
-            if (path == null || path.isEmpty()) return;
-            
-            String lowerPath = path.toLowerCase();
-            String[] parts = path.split("/");
-            
-            // Detect game type from path folders
-            for (String part : parts) {
-                String lowerPart = part.toLowerCase();
-                
-                // Project Diablo 2
-                if (lowerPart.equals("pd2") || lowerPart.contains("projectdiablo")) {
-                    gameType = "PD2";
-                    versionFamily = "PD2";
-                }
-                // Diablo 2 Resurrected
-                else if (lowerPart.equals("d2r") || lowerPart.contains("resurrected")) {
-                    gameType = "D2R";
-                    versionFamily = "D2R";
-                }
-                // Classic Diablo 2
-                else if (lowerPart.equals("classic") || lowerPart.equals("d2classic")) {
-                    gameType = "Classic";
-                    versionFamily = "Classic";
-                }
-                // Lord of Destruction
-                else if (lowerPart.equals("lod") || lowerPart.equals("d2lod")) {
-                    gameType = "LoD";
-                    versionFamily = "LoD";
-                }
-                // Median XL
-                else if (lowerPart.equals("medianxl") || lowerPart.equals("median")) {
-                    gameType = "MedianXL";
-                    versionFamily = "MedianXL";
-                }
-                // Path of Diablo
-                else if (lowerPart.equals("pod") || lowerPart.contains("pathofdiablo")) {
-                    gameType = "PoD";
-                    versionFamily = "PoD";
-                }
-                
-                // Extract version patterns (e.g., 1.14d, 1.09, S9, etc.)
-                java.util.regex.Pattern versionPattern = java.util.regex.Pattern.compile(
-                    "(1\\.\\d{2}[a-z]?|[sS]\\d+|v?\\d+\\.\\d+\\.\\d+)"
-                );
-                java.util.regex.Matcher matcher = versionPattern.matcher(part);
-                if (matcher.find() && gameVersion.equals("Unknown")) {
-                    gameVersion = matcher.group(1);
+
+            // Fallback: try to extract version from filename
+            Pattern versionPattern = Pattern.compile("(1\\.[0-9]+[a-z]?)");
+            Matcher versionMatcher = versionPattern.matcher(executableName);
+            if (versionMatcher.find()) {
+                gameVersion = versionMatcher.group(1);
+                // Determine family based on version (older versions = Classic, newer = LoD)
+                if (isClassicVersion(gameVersion)) {
+                    familyType = "Classic";
+                } else {
+                    familyType = "LoD";
                 }
             }
-            
-            // If still unknown, try to detect from program name
-            if (gameType.equals("Unknown")) {
-                String lastPart = parts[parts.length - 1].toLowerCase();
-                if (lastPart.contains("d2client") || lastPart.contains("d2game") || 
-                    lastPart.contains("d2common") || lastPart.contains("d2win")) {
-                    // Likely vanilla D2 - check for version in path
-                    if (lowerPath.contains("1.14") || lowerPath.contains("1.13")) {
-                        gameType = "LoD";
-                        versionFamily = "LoD";
-                    }
+        }
+
+        private boolean isClassicVersion(String version) {
+            // Versions 1.00-1.06b are Classic era
+            String[] classicVersions = {"1.00", "1.01", "1.02", "1.03", "1.04", "1.04b", "1.04c", "1.05", "1.05b", "1.06", "1.06b"};
+            for (String classicVer : classicVersions) {
+                if (version.equals(classicVer)) {
+                    return true;
                 }
+            }
+            return false;
+        }
+
+        public boolean isValidUnifiedFormat() {
+            return gameVersion != null && !gameVersion.equals("Unknown");
+        }
+
+        public String getDisplayInfo() {
+            if (!isValidUnifiedFormat()) {
+                return "Invalid/Unknown format";
+            }
+
+            if (isException) {
+                return String.format("%s %s (Exception Binary)", familyType, gameVersion);
+            } else {
+                return String.format("Unified %s (Standard Binary)", gameVersion);
             }
         }
     }
@@ -145,7 +113,8 @@ public class AddProgramToBSimDatabase extends GhidraScript {
     @Override
     public void run() throws Exception {
 
-        println("=== BSim Database Population Script ===");
+        println("=== BSim Database Population Script (Unified Version System) ===");
+        println("Supports unified naming: 1.03_D2Game.dll, Classic_1.03_Game.exe");
 
         // Ask user which mode to use
         String[] modes = { MODE_SINGLE, MODE_ALL, MODE_VERSION };
@@ -187,30 +156,48 @@ public class AddProgramToBSimDatabase extends GhidraScript {
         }
 
         String programName = currentProgram.getName();
-        
-        // Get the project path (e.g., /PD2/D2Client.dll) instead of filesystem path
+
+        // Parse unified version information
+        UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(programName);
+
+        // Get the project path
         String programPath = "";
         DomainFile domainFile = currentProgram.getDomainFile();
         if (domainFile != null) {
             programPath = domainFile.getPathname();
         } else {
-            // Fallback to executable path if domain file not available
             programPath = currentProgram.getExecutablePath();
         }
 
         println("Program: " + programName);
         println("Project Path: " + programPath);
+        println("Version Info: " + versionInfo.getDisplayInfo());
         println("Functions: " + currentProgram.getFunctionManager().getFunctionCount());
 
+        if (!versionInfo.isValidUnifiedFormat()) {
+            boolean proceed = askYesNo("Non-Unified Format Detected",
+                "This executable doesn't follow the unified naming convention.\n" +
+                "Expected formats:\n" +
+                "  Standard: 1.03_D2Game.dll\n" +
+                "  Exception: Classic_1.03_Game.exe\n\n" +
+                "Proceed anyway?");
+
+            if (!proceed) {
+                println("Operation cancelled - invalid naming format");
+                return;
+            }
+        }
+
         boolean proceed = askYesNo("Confirm BSim Addition",
-            String.format("Add program '%s' to BSim database?", programName));
+            String.format("Add program '%s' to BSim database?\n\nVersion Info: %s",
+                programName, versionInfo.getDisplayInfo()));
 
         if (!proceed) {
             println("Operation cancelled by user");
             return;
         }
 
-        addProgramToBSim(currentProgram, programName, programPath);
+        addProgramToBSim(currentProgram, programName, programPath, versionInfo);
         println("Successfully added " + programName + " to BSim database!");
     }
 
@@ -236,7 +223,33 @@ public class AddProgramToBSimDatabase extends GhidraScript {
             return;
         }
 
+        // Validate unified naming convention
+        int validCount = 0;
+        int invalidCount = 0;
+        for (DomainFile file : programFiles) {
+            UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(file.getName());
+            if (versionInfo.isValidUnifiedFormat()) {
+                validCount++;
+            } else {
+                invalidCount++;
+            }
+        }
+
         println("Found " + programFiles.size() + " programs in project");
+        println("  Valid unified format: " + validCount);
+        println("  Invalid/unknown format: " + invalidCount);
+
+        if (invalidCount > 0) {
+            boolean proceed = askYesNo("Invalid Formats Detected",
+                String.format("%d files don't follow unified naming convention.\n" +
+                "These will be processed with limited version info.\n\n" +
+                "Continue?", invalidCount));
+
+            if (!proceed) {
+                println("Operation cancelled due to naming format issues");
+                return;
+            }
+        }
 
         boolean proceed = askYesNo("Process All Programs",
             String.format("Add all %d programs to BSim database?\n\nThis may take a while.", programFiles.size()));
@@ -249,10 +262,6 @@ public class AddProgramToBSimDatabase extends GhidraScript {
         // Ask if user wants to auto-update existing executables
         autoUpdateExisting = askYesNo("Auto-Update Existing",
             "Automatically update existing executables without prompting for each one?");
-        
-        if (autoUpdateExisting) {
-            println("Auto-update mode enabled - existing executables will be updated automatically");
-        }
 
         int successCount = 0;
         int errorCount = 0;
@@ -291,7 +300,7 @@ public class AddProgramToBSimDatabase extends GhidraScript {
 
         // Ask for version filter
         String versionFilter = askString("Version Filter",
-            "Enter version pattern to match (e.g., '1.14', 'LoD', 'Classic'):", "1.14");
+            "Enter version pattern to match (e.g., '1.03', '1.13c', 'Classic'):", "1.03");
 
         if (versionFilter == null || versionFilter.trim().isEmpty()) {
             println("Operation cancelled - no filter provided");
@@ -305,12 +314,16 @@ public class AddProgramToBSimDatabase extends GhidraScript {
         List<DomainFile> programFiles = new ArrayList<>();
         collectProgramFiles(rootFolder, programFiles);
 
-        // Filter by version
+        // Filter by version using unified format
         List<DomainFile> matchingFiles = new ArrayList<>();
         for (DomainFile file : programFiles) {
-            String path = file.getPathname().toLowerCase();
-            String name = file.getName().toLowerCase();
-            if (path.contains(versionFilter.toLowerCase()) || name.contains(versionFilter.toLowerCase())) {
+            String fileName = file.getName();
+            UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(fileName);
+
+            // Match against version, family type, or filename
+            if (fileName.toLowerCase().contains(versionFilter.toLowerCase()) ||
+                (versionInfo.gameVersion != null && versionInfo.gameVersion.contains(versionFilter)) ||
+                versionInfo.familyType.toLowerCase().contains(versionFilter.toLowerCase())) {
                 matchingFiles.add(file);
             }
         }
@@ -322,10 +335,11 @@ public class AddProgramToBSimDatabase extends GhidraScript {
 
         println("Found " + matchingFiles.size() + " programs matching '" + versionFilter + "'");
 
-        // Show matching files
+        // Show matching files with version info
         println("Matching programs:");
         for (DomainFile file : matchingFiles) {
-            println("  - " + file.getPathname());
+            UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(file.getName());
+            println("  - " + file.getName() + " (" + versionInfo.getDisplayInfo() + ")");
         }
 
         boolean proceed = askYesNo("Process Filtered Programs",
@@ -336,13 +350,8 @@ public class AddProgramToBSimDatabase extends GhidraScript {
             return;
         }
 
-        // Ask if user wants to auto-update existing executables
         autoUpdateExisting = askYesNo("Auto-Update Existing",
             "Automatically update existing executables without prompting for each one?");
-        
-        if (autoUpdateExisting) {
-            println("Auto-update mode enabled - existing executables will be updated automatically");
-        }
 
         int successCount = 0;
         int errorCount = 0;
@@ -373,14 +382,12 @@ public class AddProgramToBSimDatabase extends GhidraScript {
      * Recursively collect all program files from a folder
      */
     private void collectProgramFiles(DomainFolder folder, List<DomainFile> files) throws Exception {
-        // Add files from this folder
         for (DomainFile file : folder.getFiles()) {
             if (file.getContentType().equals("Program")) {
                 files.add(file);
             }
         }
 
-        // Recurse into subfolders
         for (DomainFolder subfolder : folder.getFolders()) {
             collectProgramFiles(subfolder, files);
         }
@@ -398,34 +405,33 @@ public class AddProgramToBSimDatabase extends GhidraScript {
         try {
             String programName = program.getName();
             String programPath = file.getPathname();
+            UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(programName);
 
-            addProgramToBSim(program, programName, programPath);
-            println("  Added " + programName + " to BSim database");
+            addProgramToBSim(program, programName, programPath, versionInfo);
+            println("  Added " + programName + " (" + versionInfo.getDisplayInfo() + ") to BSim database");
 
         } finally {
-            // Always release the program
             program.release(this);
         }
     }
 
     /**
-     * Add a program to the BSim database
+     * Add a program to the BSim database with unified version support
      */
-    private void addProgramToBSim(Program program, String programName, String programPath) throws Exception {
+    private void addProgramToBSim(Program program, String programName, String programPath, UnifiedVersionInfo versionInfo) throws Exception {
 
         println("Connecting to BSim database...");
 
-        // Connect to PostgreSQL BSim database
         try (Connection conn = DriverManager.getConnection(DEFAULT_DB_URL, DEFAULT_DB_USER, DEFAULT_DB_PASS)) {
 
             println("Connected to BSim database successfully");
 
-            // First, check if executable already exists
-            int executableId = getOrCreateExecutable(conn, programName, programPath);
+            // Get or create executable with unified version info
+            int executableId = getOrCreateExecutableUnified(conn, programName, programPath, versionInfo);
             println("Executable ID: " + executableId);
 
             // Process functions
-            processFunctions(conn, executableId, programName, programPath, program);
+            processFunctions(conn, executableId, programName, program);
 
             // Update materialized views for cross-version analysis
             refreshMaterializedViews(conn);
@@ -437,14 +443,9 @@ public class AddProgramToBSimDatabase extends GhidraScript {
     }
 
     /**
-     * Get or create executable record in database
+     * Get or create executable record with unified version support
      */
-    private int getOrCreateExecutable(Connection conn, String programName, String programPath) throws SQLException {
-        // Parse game info from path and executable name (unified system)
-        GameInfo gameInfo = new GameInfo(programPath, programName);
-        
-        // Ensure game_version columns exist (they may not in older schemas)
-        ensureGameVersionColumns(conn);
+    private int getOrCreateExecutableUnified(Connection conn, String programName, String programPath, UnifiedVersionInfo versionInfo) throws SQLException {
 
         // Check if executable already exists
         String selectSql = "SELECT id FROM exetable WHERE name_exec = ?";
@@ -455,23 +456,19 @@ public class AddProgramToBSimDatabase extends GhidraScript {
             if (rs.next()) {
                 int existingId = rs.getInt("id");
                 println("Executable already exists in database with ID: " + existingId);
-                
-                // Update game_version and version_family if they were missing
+
+                // Update version info using unified schema function
                 try {
-                    String updateSql = "UPDATE exetable SET game_version = COALESCE(NULLIF(game_version, ''), ?), " +
-                        "version_family = COALESCE(NULLIF(version_family, ''), ?) WHERE id = ?";
+                    String updateSql = "SELECT populate_version_fields_from_filename()";
                     try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
-                        updateStmt.setString(1, gameInfo.gameVersion);
-                        updateStmt.setString(2, gameInfo.versionFamily);
-                        updateStmt.setInt(3, existingId);
-                        updateStmt.executeUpdate();
+                        updateStmt.executeQuery();
+                        println("  Updated version fields using unified system");
                     }
                 } catch (SQLException e) {
-                    // Columns may not exist in older schema - just log and continue
-                    println("  Note: Could not update game version info (columns may not exist)");
+                    println("  Note: Could not update version fields (function may not exist)");
                 }
 
-                // Check if auto-update is enabled, otherwise ask user
+                // Check if auto-update is enabled
                 if (!autoUpdateExisting) {
                     boolean update = askYesNo("Executable Exists",
                         "Executable already exists in database. Update function data?");
@@ -485,35 +482,44 @@ public class AddProgramToBSimDatabase extends GhidraScript {
             }
         }
 
-        // Try to create new executable record with game version info
-        // First try with game_version columns, fall back to basic insert if columns don't exist
-        try {
-            String insertSql = "INSERT INTO exetable (name_exec, md5, architecture, ingest_date, repository, path, game_version, version_family) " +
-                "VALUES (?, ?, ?, NOW(), 1, 1, ?, ?) RETURNING id";
-            try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
-                stmt.setString(1, programName);
-                stmt.setString(2, generateMD5(programName));
-                stmt.setInt(3, getArchitecture());
-                stmt.setString(4, gameInfo.gameVersion);
-                stmt.setString(5, gameInfo.versionFamily);
+        // Create new executable record with unified version system
+        String insertSql = "INSERT INTO exetable (name_exec, md5, architecture, ingest_date, game_version) " +
+            "VALUES (?, ?, ?, NOW(), ?) RETURNING id";
 
-                ResultSet rs = stmt.executeQuery();
-                if (rs.next()) {
-                    int newId = rs.getInt("id");
-                    println("Created new executable record with ID: " + newId);
-                    println("  Game Type: " + gameInfo.gameType + ", Version: " + gameInfo.gameVersion);
-                    return newId;
+        try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+            stmt.setString(1, programName);
+            stmt.setString(2, generateMD5(programName));
+            stmt.setString(3, getArchitectureString());
+            stmt.setString(4, versionInfo.gameVersion);
+
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                int newId = rs.getInt("id");
+                println("Created new executable record with ID: " + newId);
+                println("  " + versionInfo.getDisplayInfo());
+
+                // Trigger version field population
+                try {
+                    String populateSql = "SELECT populate_version_fields_from_filename()";
+                    try (PreparedStatement populateStmt = conn.prepareStatement(populateSql)) {
+                        populateStmt.executeQuery();
+                        println("  Version fields populated using unified schema");
+                    }
+                } catch (SQLException e) {
+                    println("  Note: Version field population function not available");
                 }
+
+                return newId;
             }
         } catch (SQLException e) {
-            // Fall back to basic insert without game version columns
-            println("  Note: Using basic insert (game version columns not available)");
-            String insertSql = "INSERT INTO exetable (name_exec, md5, architecture, ingest_date, repository, path) " +
-                "VALUES (?, ?, ?, NOW(), 1, 1) RETURNING id";
-            try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+            // Fall back to basic insert without version field
+            println("  Note: Using basic insert (unified version schema not available)");
+            String basicInsertSql = "INSERT INTO exetable (name_exec, md5, architecture, ingest_date) " +
+                "VALUES (?, ?, ?, NOW()) RETURNING id";
+            try (PreparedStatement stmt = conn.prepareStatement(basicInsertSql)) {
                 stmt.setString(1, programName);
                 stmt.setString(2, generateMD5(programName));
-                stmt.setInt(3, getArchitecture());
+                stmt.setString(3, getArchitectureString());
 
                 ResultSet rs = stmt.executeQuery();
                 if (rs.next()) {
@@ -523,31 +529,18 @@ public class AddProgramToBSimDatabase extends GhidraScript {
                 }
             }
         }
-        
+
         throw new SQLException("Failed to create executable record");
-    }
-    
-    /**
-     * Ensure game_version and version_family columns exist in exetable
-     */
-    private void ensureGameVersionColumns(Connection conn) {
-        try (Statement stmt = conn.createStatement()) {
-            stmt.execute("ALTER TABLE exetable ADD COLUMN IF NOT EXISTS game_version VARCHAR(16)");
-            stmt.execute("ALTER TABLE exetable ADD COLUMN IF NOT EXISTS version_family VARCHAR(16)");
-        } catch (SQLException e) {
-            // Columns may already exist or ALTER not supported - ignore
-        }
     }
 
     /**
      * Process all functions in the program and add to database
      */
-    private void processFunctions(Connection conn, int executableId, String programName, String programPath, Program program) throws Exception {
+    private void processFunctions(Connection conn, int executableId, String programName, Program program) throws Exception {
 
         println("Processing functions...");
         monitor.setMessage("Processing functions for BSim");
 
-        // Get all functions in the program
         FunctionManager funcManager = program.getFunctionManager();
         FunctionIterator functions = funcManager.getFunctions(true);
 
@@ -555,24 +548,19 @@ public class AddProgramToBSimDatabase extends GhidraScript {
         int addedCount = 0;
         int skippedCount = 0;
 
-        // Check if function already exists
         String checkSql = "SELECT id FROM desctable WHERE name_func = ? AND id_exe = ? AND addr = ?";
-        // Prepare insert statement (without ON CONFLICT for compatibility)
         String insertSql = "INSERT INTO desctable (name_func, id_exe, id_signature, flags, addr) VALUES (?, ?, ?, ?, ?)";
 
         try (PreparedStatement checkStmt = conn.prepareStatement(checkSql);
              PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
 
-            // Process each function
             while (functions.hasNext() && !monitor.isCancelled()) {
                 Function function = functions.next();
                 functionCount++;
 
-                // Update progress
                 if (functionCount % 100 == 0) {
                     monitor.setMessage(String.format("Processing function %d: %s",
                         functionCount, function.getName()));
-                    println(String.format("Processed %d functions...", functionCount));
                 }
 
                 try {
@@ -581,9 +569,8 @@ public class AddProgramToBSimDatabase extends GhidraScript {
                     checkStmt.setInt(2, executableId);
                     checkStmt.setLong(3, function.getEntryPoint().getOffset());
                     ResultSet rs = checkStmt.executeQuery();
-                    
+
                     if (rs.next()) {
-                        // Function already exists, skip
                         skippedCount++;
                         rs.close();
                         continue;
@@ -593,8 +580,8 @@ public class AddProgramToBSimDatabase extends GhidraScript {
                     // Add function to database
                     insertStmt.setString(1, function.getName());
                     insertStmt.setInt(2, executableId);
-                    insertStmt.setLong(3, generateSignatureId(function)); // Generate signature ID
-                    insertStmt.setInt(4, 0); // Default flags
+                    insertStmt.setLong(3, generateSignatureId(function));
+                    insertStmt.setInt(4, 0);
                     insertStmt.setLong(5, function.getEntryPoint().getOffset());
 
                     int rowsAffected = insertStmt.executeUpdate();
@@ -603,7 +590,6 @@ public class AddProgramToBSimDatabase extends GhidraScript {
                     }
 
                 } catch (SQLException e) {
-                    // Only log if it's not a duplicate key error
                     if (!e.getMessage().contains("duplicate key")) {
                         printerr("Error processing function " + function.getName() + ": " + e.getMessage());
                     } else {
@@ -620,9 +606,6 @@ public class AddProgramToBSimDatabase extends GhidraScript {
 
         println(String.format("Processed %d functions, added %d new, skipped %d existing",
             functionCount, addedCount, skippedCount));
-
-        // Log program metadata
-        logProgramMetadata(programName, programPath, functionCount, addedCount);
     }
 
     /**
@@ -632,26 +615,22 @@ public class AddProgramToBSimDatabase extends GhidraScript {
         println("Refreshing materialized views for cross-version analysis...");
 
         try (Statement stmt = conn.createStatement()) {
-            // Refresh cross-version functions view
-            stmt.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY cross_version_functions");
-            println("Refreshed cross_version_functions view");
-
-            // Refresh function evolution view
-            stmt.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY function_evolution");
-            println("Refreshed function_evolution view");
-
+            // Use the unified system refresh function
+            stmt.execute("SELECT refresh_cross_version_data()");
+            println("Refreshed cross-version materialized views");
         } catch (SQLException e) {
-            // If concurrent refresh fails, try regular refresh
+            // Fall back to manual refresh
             try (Statement stmt = conn.createStatement()) {
                 stmt.execute("REFRESH MATERIALIZED VIEW cross_version_functions");
-                stmt.execute("REFRESH MATERIALIZED VIEW function_evolution");
-                println("Refreshed views (non-concurrent mode)");
+                println("Refreshed cross_version_functions view");
+            } catch (SQLException e2) {
+                println("Note: Could not refresh materialized views");
             }
         }
     }
 
     /**
-     * Generate a simple MD5 placeholder
+     * Generate MD5 hash for executable
      */
     private String generateMD5(String input) {
         try {
@@ -670,44 +649,24 @@ public class AddProgramToBSimDatabase extends GhidraScript {
     }
 
     /**
-     * Detect program architecture
+     * Get architecture as string for unified schema
      */
-    private int getArchitecture() {
+    private String getArchitectureString() {
         String arch = currentProgram.getLanguage().getProcessor().toString().toLowerCase();
         if (arch.contains("x86") && arch.contains("64")) {
-            return 64; // x86-64
+            return "x64";
         } else if (arch.contains("x86")) {
-            return 32; // x86-32
+            return "x86";
         } else {
-            return 32; // Default to 32-bit
+            return "unknown";
         }
     }
 
     /**
-     * Generate signature ID for function (simplified)
+     * Generate signature ID for function
      */
     private long generateSignatureId(Function function) {
-        // Simple signature generation based on function properties
         String signature = function.getName() + "_" + function.getBody().getNumAddresses();
         return Math.abs(signature.hashCode());
-    }
-
-    /**
-     * Log program metadata for analysis
-     */
-    private void logProgramMetadata(String programName, String programPath, int functionCount, int addedCount) {
-        // Parse version information from path
-        GameInfo gameInfo = new GameInfo(programPath);
-
-        println("=== Program Analysis Summary ===");
-        println("Program: " + programName);
-        println("Path: " + programPath);
-        println("Game Type: " + gameInfo.gameType);
-        println("Version: " + gameInfo.gameVersion);
-        println("Version Family: " + gameInfo.versionFamily);
-        println("Total Functions: " + functionCount);
-        println("Added to Database: " + addedCount);
-        println("Architecture: " + getArchitecture() + "-bit");
-        println("================================");
     }
 }
