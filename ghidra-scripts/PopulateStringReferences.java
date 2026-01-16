@@ -9,6 +9,7 @@ import ghidra.program.model.listing.*;
 import ghidra.program.model.address.*;
 import ghidra.program.model.symbol.*;
 import ghidra.program.model.data.*;
+import ghidra.program.util.string.FoundString;
 import ghidra.util.exception.CancelledException;
 import ghidra.framework.model.*;
 import java.sql.*;
@@ -220,8 +221,8 @@ public class PopulateStringReferences extends GhidraScript {
     }
 
     private int countStringReferences(Program program) {
-        Data[] strings = findStrings(program.getMemory(), 4, 1, true, true);
-        return strings.length;
+        List<FoundString> strings = findStrings(program.getMemory(), 4, 1, true, true);
+        return strings.size();
     }
 
     private void populateStringReferences(Program program, String programName) throws Exception {
@@ -304,11 +305,12 @@ public class PopulateStringReferences extends GhidraScript {
         monitor.setMessage("Processing string references for BSim");
 
         // Find all strings in the program
-        Data[] strings = findStrings(program.getMemory(), 4, 1, true, true);
+        List<FoundString> strings = findStrings(program.getMemory(), 4, 1, true, true);
 
         int processedCount = 0;
         int stringCount = 0;
         int referenceCount = 0;
+        int totalStrings = strings.size();
 
         // Prepare statements
         String insertStringSql = """
@@ -335,32 +337,31 @@ public class PopulateStringReferences extends GhidraScript {
              PreparedStatement refStmt = conn.prepareStatement(insertRefSql);
              PreparedStatement funcIdStmt = conn.prepareStatement(getFunctionIdSql)) {
 
-            for (Data stringData : strings) {
+            for (FoundString foundString : strings) {
                 if (monitor.isCancelled()) break;
 
                 processedCount++;
 
                 if (processedCount % 100 == 0) {
                     monitor.setMessage(String.format("Processing string %d of %d",
-                        processedCount, strings.length));
+                        processedCount, totalStrings));
                     println(String.format("Processed %d strings...", processedCount));
                 }
 
                 try {
                     // Insert string
-                    Address stringAddr = stringData.getAddress();
-                    Object value = stringData.getValue();
-                    String stringValue = value != null ? value.toString() : "";
+                    Address stringAddr = foundString.getAddress();
+                    String stringValue = foundString.getString(program.getMemory());
 
-                    if (stringValue.length() < 4 || stringValue.length() > 1000) {
-                        continue; // Skip very short or very long strings
+                    if (stringValue == null || stringValue.length() < 4 || stringValue.length() > 1000) {
+                        continue; // Skip null, very short or very long strings
                     }
 
                     stringStmt.setInt(1, executableId);
                     stringStmt.setLong(2, stringAddr.getOffset());
                     stringStmt.setString(3, stringValue);
                     stringStmt.setInt(4, stringValue.length());
-                    stringStmt.setString(5, getStringType(stringData));
+                    stringStmt.setString(5, getStringType(foundString));
 
                     ResultSet rs = stringStmt.executeQuery();
                     if (rs.next()) {
@@ -374,7 +375,7 @@ public class PopulateStringReferences extends GhidraScript {
                     rs.close();
 
                 } catch (SQLException e) {
-                    printerr("Error processing string at " + stringData.getAddress() + ": " + e.getMessage());
+                    printerr("Error processing string at " + foundString.getAddress() + ": " + e.getMessage());
                 }
             }
         }
@@ -388,14 +389,17 @@ public class PopulateStringReferences extends GhidraScript {
             processedCount, stringCount, referenceCount));
     }
 
-    private String getStringType(Data stringData) {
-        DataType dt = stringData.getDataType();
-        if (dt instanceof StringDataType) {
-            return "string";
-        } else if (dt instanceof UnicodeDataType) {
-            return "unicode";
-        } else if (dt instanceof StringUTF8DataType) {
-            return "utf8";
+    private String getStringType(FoundString foundString) {
+        // Determine string type based on FoundString properties
+        if (foundString.getDataType() != null) {
+            DataType dt = foundString.getDataType();
+            if (dt instanceof StringDataType) {
+                return "string";
+            } else if (dt instanceof UnicodeDataType) {
+                return "unicode";
+            } else if (dt instanceof StringUTF8DataType) {
+                return "utf8";
+            }
         }
         return "unknown";
     }

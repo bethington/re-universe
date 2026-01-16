@@ -466,9 +466,10 @@ public class PopulateImportExports extends GhidraScript {
     }
 
     private String getLibraryName(Symbol symbol) {
-        ExternalLocation extLoc = symbol.getExternalLocation();
-        if (extLoc != null) {
-            String libraryName = extLoc.getLibraryName();
+        // Get the parent namespace which represents the library for external symbols
+        ghidra.program.model.symbol.Namespace namespace = symbol.getParentNamespace();
+        if (namespace != null && !namespace.isGlobal()) {
+            String libraryName = namespace.getName();
             if (libraryName != null && !libraryName.isEmpty()) {
                 return libraryName;
             }

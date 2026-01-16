@@ -15,6 +15,8 @@ import ghidra.framework.model.*;
 import java.sql.*;
 import java.util.*;
 
+// Note: Using ParameterDefinition for signature arguments
+
 public class PopulateFunctionSignatures extends GhidraScript {
 
     private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
@@ -305,34 +307,35 @@ public class PopulateFunctionSignatures extends GhidraScript {
 
         int processedCount = 0;
         int signatureCount = 0;
+        int skippedCount = 0;
 
-        // Prepare statements
+        // Check if signature already exists
+        String checkSignatureSql = "SELECT id FROM function_signatures WHERE function_id = ?";
+        
+        // Insert without ON CONFLICT for compatibility
         String insertSignatureSql = """
             INSERT INTO function_signatures
             (function_id, executable_id, function_name, return_type, return_type_size,
              parameter_count, calling_convention, has_varargs, signature_hash)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (function_id) DO UPDATE SET
-                return_type = EXCLUDED.return_type,
-                parameter_count = EXCLUDED.parameter_count,
-                calling_convention = EXCLUDED.calling_convention,
-                has_varargs = EXCLUDED.has_varargs,
-                signature_hash = EXCLUDED.signature_hash,
-                updated_at = NOW()
             RETURNING id
             """;
 
+        // Check if parameter already exists
+        String checkParameterSql = "SELECT id FROM function_parameters WHERE signature_id = ? AND parameter_index = ?";
+        
         String insertParameterSql = """
             INSERT INTO function_parameters
             (signature_id, parameter_index, parameter_name, parameter_type,
              parameter_size, is_pointer, is_array)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT DO NOTHING
             """;
 
         String getFunctionIdSql = "SELECT id FROM desctable WHERE name_func = ? AND id_exe = ?";
 
-        try (PreparedStatement signatureStmt = conn.prepareStatement(insertSignatureSql);
+        try (PreparedStatement checkSigStmt = conn.prepareStatement(checkSignatureSql);
+             PreparedStatement signatureStmt = conn.prepareStatement(insertSignatureSql);
+             PreparedStatement checkParamStmt = conn.prepareStatement(checkParameterSql);
              PreparedStatement parameterStmt = conn.prepareStatement(insertParameterSql);
              PreparedStatement funcIdStmt = conn.prepareStatement(getFunctionIdSql)) {
 
@@ -354,9 +357,21 @@ public class PopulateFunctionSignatures extends GhidraScript {
 
                     if (rs.next()) {
                         long functionId = rs.getLong("id");
+                        
+                        // Check if signature already exists
+                        checkSigStmt.setLong(1, functionId);
+                        ResultSet checkRs = checkSigStmt.executeQuery();
+                        if (checkRs.next()) {
+                            // Signature exists, skip
+                            skippedCount++;
+                            checkRs.close();
+                            rs.close();
+                            continue;
+                        }
+                        checkRs.close();
 
                         // Insert function signature
-                        if (insertFunctionSignature(signatureStmt, parameterStmt, function, functionId, executableId)) {
+                        if (insertFunctionSignature(signatureStmt, parameterStmt, checkParamStmt, function, functionId, executableId)) {
                             signatureCount++;
                         }
                     }
@@ -378,6 +393,7 @@ public class PopulateFunctionSignatures extends GhidraScript {
     }
 
     private boolean insertFunctionSignature(PreparedStatement signatureStmt, PreparedStatement parameterStmt,
+                                          PreparedStatement checkParamStmt,
                                           Function function, long functionId, int executableId) throws SQLException {
 
         // Extract function signature information
@@ -390,8 +406,8 @@ public class PopulateFunctionSignatures extends GhidraScript {
             returnTypeSize = signature.getReturnType().getLength();
         }
 
-        Parameter[] parameters = signature.getArguments();
-        int parameterCount = parameters.length;
+        ParameterDefinition[] paramDefs = signature.getArguments();
+        int parameterCount = paramDefs.length;
         boolean hasVarargs = signature.hasVarArgs();
         String callingConvention = function.getCallingConventionName();
 
@@ -414,9 +430,9 @@ public class PopulateFunctionSignatures extends GhidraScript {
             long signatureId = rs.getLong("id");
 
             // Insert parameters
-            for (int i = 0; i < parameters.length; i++) {
-                Parameter param = parameters[i];
-                insertParameter(parameterStmt, signatureId, i, param);
+            for (int i = 0; i < paramDefs.length; i++) {
+                ParameterDefinition paramDef = paramDefs[i];
+                insertParameter(checkParamStmt, parameterStmt, signatureId, i, paramDef);
             }
 
             rs.close();
@@ -426,19 +442,30 @@ public class PopulateFunctionSignatures extends GhidraScript {
         return false;
     }
 
-    private void insertParameter(PreparedStatement parameterStmt, long signatureId,
-                               int index, Parameter param) throws SQLException {
+    private void insertParameter(PreparedStatement checkParamStmt, PreparedStatement parameterStmt, 
+                               long signatureId, int index, ParameterDefinition paramDef) throws SQLException {
 
-        String paramName = param.getName();
+        // Check if parameter already exists
+        checkParamStmt.setLong(1, signatureId);
+        checkParamStmt.setInt(2, index);
+        ResultSet checkRs = checkParamStmt.executeQuery();
+        if (checkRs.next()) {
+            // Parameter exists, skip
+            checkRs.close();
+            return;
+        }
+        checkRs.close();
+
+        String paramName = paramDef.getName();
         if (paramName == null || paramName.trim().isEmpty()) {
             paramName = "param" + index;
         }
 
-        DataType paramType = param.getDataType();
+        DataType paramType = paramDef.getDataType();
         String typeName = paramType.getDisplayName();
         int typeSize = paramType.getLength();
         boolean isPointer = paramType instanceof Pointer;
-        boolean isArray = paramType instanceof Array;
+        boolean isArray = paramType instanceof ghidra.program.model.data.Array;
 
         parameterStmt.setLong(1, signatureId);
         parameterStmt.setInt(2, index);
@@ -461,8 +488,8 @@ public class PopulateFunctionSignatures extends GhidraScript {
         }
 
         // Add parameter types
-        Parameter[] params = signature.getArguments();
-        for (Parameter param : params) {
+        ParameterDefinition[] params = signature.getArguments();
+        for (ParameterDefinition param : params) {
             sigBuilder.append(param.getDataType().getDisplayName()).append(",");
         }
 
