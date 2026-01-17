@@ -17,10 +17,12 @@ public class WebDataService {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Cacheable(value = "versions", key = "'count'")
     public int getExecutableCount() {
         return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM exetable", Integer.class);
     }
 
+    @Cacheable(value = "versions", key = "'all'")
     public List<VersionData> getVersions() {
         // Use a SQL query that groups executables by parsed version info
         String sql = """
@@ -82,6 +84,7 @@ public class WebDataService {
         return versions;
     }
 
+    @Cacheable(value = "binaries", key = "#gameType + '_' + #version")
     public List<BinaryData> getBinariesForVersion(String gameType, String version) {
         String sql = """
             SELECT
@@ -180,6 +183,7 @@ public class WebDataService {
         }
     }
 
+    @Cacheable(value = "categories", key = "'all'")
     public Map<String, Object> getCategories() {
         // Return basic file categories structure
         Map<String, Object> categories = new HashMap<>();
@@ -194,95 +198,31 @@ public class WebDataService {
         return categories;
     }
 
-    public Map<String, Object> getFolders() {
-        // Build folders structure from exetable data
-        // Format: { "Classic/1.00": { "files": { "D2Game.dll": { ... }, ... } }, ... }
-        String sql = """
-            SELECT
-                name_exec,
-                md5,
-                architecture,
-                ingest_date
-            FROM exetable
-            WHERE name_exec IS NOT NULL
-            ORDER BY name_exec
-        """;
-
-        List<Map<String, Object>> results = jdbcTemplate.queryForList(sql);
-        Map<String, Object> folders = new LinkedHashMap<>();
-
-        for (Map<String, Object> row : results) {
-            String nameExec = (String) row.get("name_exec");
-            if (nameExec == null || nameExec.isEmpty()) continue;
-
-            // Parse gameType, version, and fileName from name_exec
-            // Format: "Classic_1.00_D2Game.dll" or "LoD_1.07_D2Game.dll"
-            String[] parts = nameExec.split("_", 3);
-            if (parts.length < 3) continue;
-
-            String gameType = parts[0];
-            String version = parts[1];
-            String fileName = parts[2];
-            String folderName = gameType + "/" + version;
-
-            // Get or create folder entry
-            @SuppressWarnings("unchecked")
-            Map<String, Object> folder = (Map<String, Object>) folders.computeIfAbsent(folderName, k -> {
-                Map<String, Object> newFolder = new LinkedHashMap<>();
-                newFolder.put("files", new LinkedHashMap<String, Object>());
-                return newFolder;
-            });
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> files = (Map<String, Object>) folder.get("files");
-
-            // Build file entry
-            String md5 = (String) row.get("md5");
-            Object archObj = row.get("architecture");
-            String arch = "x86";
-            if (archObj instanceof Integer && (Integer) archObj == 64) {
-                arch = "x64";
-            } else if (archObj instanceof String) {
-                arch = (String) archObj;
-            }
-
-            String fileType = extractFileExtension(fileName);
-            String category = categorizeFile(fileName);
-
-            Map<String, Object> fileData = new LinkedHashMap<>();
-            fileData.put("name", fileName);
-            fileData.put("full_name", nameExec);
-            fileData.put("md5", md5);
-            fileData.put("arch", arch);
-            fileData.put("type", fileType);
-            fileData.put("category", category);
-
-            files.put(fileName, fileData);
-        }
-
-        return folders;
-    }
-
+    @Cacheable(value = "fileHistory", key = "'all'")
     public Map<String, Object> getFileHistory() {
         // Placeholder - would need to implement based on file tracking
         return new HashMap<>();
     }
 
+    @Cacheable(value = "diffs", key = "'all'")
     public Map<String, Object> getDiffs() {
         // Placeholder - would need version comparison logic
         return new HashMap<>();
     }
 
+    @Cacheable(value = "exports", key = "'all'")
     public Map<String, Object> getExports() {
         // Placeholder - would need PE export analysis
         return new HashMap<>();
     }
 
+    @Cacheable(value = "textContent", key = "'all'")
     public Map<String, Object> getTextContent() {
         // Placeholder - would need text file content storage
         return new HashMap<>();
     }
 
+    @Cacheable(value = "functionIndex", key = "'all'")
     public Map<String, Object> getFunctionIndex() {
         // Get list of available executables for function data
         String sql = "SELECT DISTINCT name_exec FROM exetable ORDER BY name_exec";
@@ -301,6 +241,7 @@ public class WebDataService {
         return index;
     }
 
+    @Cacheable(value = "functions", key = "#filename")
     public Map<String, Object> getFunctions(String filename) {
         // Get function data for specific executable
         String sql = """

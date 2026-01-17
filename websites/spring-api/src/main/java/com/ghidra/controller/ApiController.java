@@ -4,6 +4,7 @@ import com.ghidra.model.VersionData;
 import com.ghidra.model.BinaryData;
 import com.ghidra.service.WebDataService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,6 +18,9 @@ public class ApiController {
 
     @Autowired
     private WebDataService webDataService;
+
+    @Autowired
+    private CacheManager cacheManager;
 
     @GetMapping("/versions")
     public ResponseEntity<List<VersionData>> getVersions() {
@@ -50,17 +54,6 @@ public class ApiController {
                 "executableCount", executableCount,
                 "status", "ok"
             ));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.internalServerError().build();
-        }
-    }
-
-    @GetMapping("/folders")
-    public ResponseEntity<Map<String, Object>> getFolders() {
-        try {
-            Map<String, Object> folders = webDataService.getFolders();
-            return ResponseEntity.ok(folders);
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError().build();
@@ -131,5 +124,41 @@ public class ApiController {
             e.printStackTrace();
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    /**
+     * Clears all caches. Call this after ingesting new binaries to refresh data.
+     * Example: POST /api/cache/clear
+     */
+    @PostMapping("/cache/clear")
+    public ResponseEntity<Map<String, Object>> clearCache() {
+        try {
+            cacheManager.getCacheNames().forEach(cacheName -> {
+                var cache = cacheManager.getCache(cacheName);
+                if (cache != null) {
+                    cache.clear();
+                }
+            });
+            return ResponseEntity.ok(Map.of(
+                "status", "ok",
+                "message", "All caches cleared",
+                "caches", cacheManager.getCacheNames()
+            ));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Returns cache status and statistics.
+     */
+    @GetMapping("/cache/status")
+    public ResponseEntity<Map<String, Object>> getCacheStatus() {
+        return ResponseEntity.ok(Map.of(
+            "status", "ok",
+            "caches", cacheManager.getCacheNames(),
+            "cacheType", "ConcurrentMapCache (in-memory)"
+        ));
     }
 }
