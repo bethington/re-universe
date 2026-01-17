@@ -94,8 +94,8 @@ public class WebDataService {
             ORDER BY name_exec
         """;
 
-        // Match actual naming convention: "1.01_D2Game.dll"
-        String pattern = version + "_%";
+        // Match actual naming convention: "Classic_1.00_D2Game.dll" or "LoD_1.07_D2Game.dll"
+        String pattern = gameType + "_" + version + "_%";
         List<Map<String, Object>> results = jdbcTemplate.queryForList(sql, pattern);
         List<BinaryData> binaries = new ArrayList<>();
 
