@@ -365,6 +365,9 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
             println("Connected to BSim database successfully");
 
+            // Optimize connection for bulk operations
+            conn.setAutoCommit(true); // Will be set to false in batch operations
+
             // Get current executable info
             int currentExeId = getExecutableId(conn, programName, versionInfo);
             if (currentExeId == -1) {
@@ -511,10 +514,13 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
         FunctionManager funcManager = program.getFunctionManager();
         FunctionIterator functions = funcManager.getFunctions(true);
 
+        // Cache function IDs to avoid repeated database lookups
+        Map<String, Long> functionIdCache = new HashMap<>();
+
         int processedCount = 0;
         int similarityCount = 0;
 
-        // Prepare statements
+        // Prepare batch insert statement for better performance
         String insertSimilaritySql = """
             INSERT INTO function_similarity_matrix
             (source_function_id, target_function_id, similarity_score, confidence_score, match_type)
@@ -525,7 +531,11 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
                 updated_at = now()
             """;
 
+        // Set connection for better performance
+        conn.setAutoCommit(false); // Enable batch processing
+
         try (PreparedStatement similarityStmt = conn.prepareStatement(insertSimilaritySql)) {
+            int batchCount = 0;
 
             while (functions.hasNext() && !monitor.isCancelled()) {
                 Function currentFunction = functions.next();
@@ -539,8 +549,16 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
                 }
 
                 try {
-                    // Get current function's ID from database
-                    long currentFuncId = getFunctionId(conn, currentFunction.getName(), currentExeId);
+                    // Get current function's ID from database (with caching)
+                    String cacheKey = currentExeId + ":" + currentFunction.getName();
+                    long currentFuncId = functionIdCache.computeIfAbsent(cacheKey,
+                        k -> {
+                            try {
+                                return getFunctionId(conn, currentFunction.getName(), currentExeId);
+                            } catch (SQLException e) {
+                                return -1L;
+                            }
+                        });
                     if (currentFuncId == -1) continue;
 
                     // Get enhanced signature for current function from database
@@ -556,37 +574,27 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
                         List<FunctionCandidate> candidates = getSimilarFunctionCandidates(
                             conn, currentFunction, otherExe.id);
 
-                        // Debug: Show candidate count for first few functions
-                        if (processedCount <= 3) {
-                            println(String.format("  Function '%s' has %d candidates in %s",
-                                currentFunction.getName(), candidates.size(), otherExe.name));
-                        }
-
                         for (FunctionCandidate candidate : candidates) {
                             double similarity = calculateSimilarity(currentSig, candidate.signature);
                             double confidence = calculateConfidence(currentSig, candidate.signature);
 
-                            // Debug output for first few functions to understand scoring
-                            if (processedCount <= 3) {
-                                String candidatePreview = candidate.name.substring(0, Math.min(candidate.name.length(), 20));
-                                println(String.format("    Candidate '%s': sim=%.3f, conf=%.1f | Source: inst=%d, Target: inst=%d",
-                                    candidatePreview, similarity, confidence,
-                                    currentSig.instructionCount, candidate.signature.instructionCount));
-
-                                if (similarity >= MIN_SIMILARITY && confidence >= MIN_CONFIDENCE) {
-                                    println("      ✅ MATCH FOUND!");
-                                }
-                            }
-
                             if (similarity >= MIN_SIMILARITY && confidence >= MIN_CONFIDENCE) {
-                                // Store similarity relationship
+                                // Add to batch instead of immediate execution
                                 similarityStmt.setLong(1, currentFuncId);
                                 similarityStmt.setLong(2, candidate.functionId);
                                 similarityStmt.setDouble(3, similarity);
                                 similarityStmt.setDouble(4, confidence);
 
-                                similarityStmt.executeUpdate();
+                                similarityStmt.addBatch();
+                                batchCount++;
                                 similarityCount++;
+
+                                // Execute batch every 500 similarities for better performance
+                                if (batchCount >= 500) {
+                                    similarityStmt.executeBatch();
+                                    conn.commit();
+                                    batchCount = 0;
+                                }
                             }
                         }
                     }
@@ -595,7 +603,16 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
                     printerr("Error processing function " + currentFunction.getName() + ": " + e.getMessage());
                 }
             }
+
+            // Execute any remaining batch items
+            if (batchCount > 0) {
+                similarityStmt.executeBatch();
+                conn.commit();
+            }
         }
+
+        // Restore autoCommit
+        conn.setAutoCommit(true);
 
         if (monitor.isCancelled()) {
             println("Operation cancelled by user");
