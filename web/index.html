@@ -181,29 +181,10 @@
 
         .panel-details .panel-content {
             overflow: hidden;
-            display: flex;
-            flex-direction: column;
         }
 
-        /* Ensure exports-container has zero padding in file details panel */
-        .panel-details .exports-container {
-            padding: 0;
-            margin: 0;
-            height: 100%;
-            flex: 1;
-        }
-
-        /* Remove padding from cross-version-loading when it contains the table */
-        #cross-version-loading {
-            padding: 0 !important;
-            height: 100%;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* Panel 1: Binaries Navigator */
-        .panel-binaries {
+        /* Panel 1: Version Navigator */
+        .panel-versions {
             width: 140px;
             flex-shrink: 0;
         }
@@ -245,8 +226,8 @@
             color: #ff6666;
         }
 
-        /* All Versions - unified display */
-        .filter-btn.all-versions {
+        /* LoD - all LoD versions */
+        .filter-btn.lod {
             background: linear-gradient(180deg, #2a2a1a 0%, #1a1a0a 100%);
             color: var(--accent-gold);
         }
@@ -297,7 +278,7 @@
             color: #ff6666;
         }
 
-        .version-badge.unified {
+        .version-badge.lod {
             color: var(--accent-gold);
         }
 
@@ -313,7 +294,7 @@
             color: #ff6666;
         }
 
-        .version-type.unified {
+        .version-type.lod {
             color: var(--accent-gold);
         }
 
@@ -581,7 +562,7 @@
             color: var(--color-magic);
         }
 
-        /* Panel 3: Cross-Version Matrix */
+        /* Panel 3: File Details */
         .panel-details {
             flex: 1;
             min-width: 300px;
@@ -1257,16 +1238,13 @@
         .exports-table tbody tr.compare-active-row {
             background-color: rgba(0, 200, 83, 0.15) !important;
         }
-
         .exports-table tbody tr.compare-active-row .fn-name-cell {
             background-color: rgba(0, 200, 83, 0.15) !important;
         }
-
         .exports-table td.compare-active-cell {
             background-color: rgba(0, 200, 83, 0.3) !important;
             box-shadow: inset 0 0 0 2px var(--color-set);
         }
-
         .exports-table thead th.compare-active-column {
             background-color: rgba(0, 200, 83, 0.2) !important;
             box-shadow: inset 0 -2px 0 var(--color-set);
@@ -1534,17 +1512,9 @@
             font-weight: 700;
         }
 
-        .compare-score-value.high {
-            color: var(--color-set);
-        }
-
-        .compare-score-value.medium {
-            color: var(--color-rare);
-        }
-
-        .compare-score-value.low {
-            color: var(--color-crafted);
-        }
+        .compare-score-value.high { color: var(--color-set); }
+        .compare-score-value.medium { color: var(--color-rare); }
+        .compare-score-value.low { color: var(--color-crafted); }
 
         .compare-score-tier {
             font-size: 0.55rem;
@@ -1618,23 +1588,10 @@
             letter-spacing: 0.5px;
         }
 
-        .compare-col-label.source {
-            text-align: right;
-            color: var(--color-magic);
-        }
-
-        .compare-col-label.metric {
-            text-align: center;
-        }
-
-        .compare-col-label.target {
-            text-align: left;
-            color: var(--color-rare);
-        }
-
-        .compare-col-label.match {
-            text-align: center;
-        }
+        .compare-col-label.source { text-align: right; color: var(--color-magic); }
+        .compare-col-label.metric { text-align: center; }
+        .compare-col-label.target { text-align: left; color: var(--color-rare); }
+        .compare-col-label.match { text-align: center; }
 
         /* Compare Row */
         .compare-row {
@@ -1684,21 +1641,10 @@
             font-size: 0.8rem;
         }
 
-        .compare-row .match-icon.exact {
-            color: var(--color-set);
-        }
-
-        .compare-row .match-icon.close {
-            color: var(--color-rare);
-        }
-
-        .compare-row .match-icon.diff {
-            color: var(--color-crafted);
-        }
-
-        .compare-row .match-icon.missing {
-            color: var(--text-muted);
-        }
+        .compare-row .match-icon.exact { color: var(--color-set); }
+        .compare-row .match-icon.close { color: var(--color-rare); }
+        .compare-row .match-icon.diff { color: var(--color-crafted); }
+        .compare-row .match-icon.missing { color: var(--text-muted); }
 
         /* List Comparison (for callees, strings, etc.) */
         .compare-list {
@@ -1797,28 +1743,23 @@
             padding: 1px 3px;
             margin: -1px -3px;
         }
-
         .copyable:hover {
             background: rgba(255, 255, 255, 0.1);
         }
-
         .copyable.copied {
             background: rgba(0, 200, 83, 0.3) !important;
         }
-
         .copyable::after {
             content: '';
             opacity: 0;
             transition: opacity 0.15s ease;
         }
-
         .copyable:hover::after {
             content: ' [click to copy]';
             opacity: 0.5;
             font-size: 0.65rem;
             color: var(--text-muted);
         }
-
         .copyable.copied::after {
             content: ' copied!';
             opacity: 1;
@@ -1834,11 +1775,9 @@
         .compare-paired-row.match-exact {
             background: rgba(0, 200, 83, 0.08);
         }
-
         .compare-paired-row.match-exact .paired-col-match {
             color: var(--color-set);
         }
-
         .compare-paired-row.match-exact .paired-col-source,
         .compare-paired-row.match-exact .paired-col-target {
             color: var(--color-set);
@@ -1847,11 +1786,9 @@
         .compare-paired-row.match-normalized {
             background: rgba(255, 199, 0, 0.08);
         }
-
         .compare-paired-row.match-normalized .paired-col-match {
             color: var(--color-rare);
         }
-
         .compare-paired-row.match-normalized .paired-col-source,
         .compare-paired-row.match-normalized .paired-col-target {
             color: var(--color-rare);
@@ -1860,15 +1797,12 @@
         .compare-paired-row.match-source-only {
             opacity: 0.75;
         }
-
         .compare-paired-row.match-source-only .paired-col-match {
             color: var(--color-magic);
         }
-
         .compare-paired-row.match-source-only .paired-col-source {
             color: var(--color-magic);
         }
-
         .compare-paired-row.match-source-only .paired-col-target {
             color: var(--text-muted);
         }
@@ -1876,15 +1810,12 @@
         .compare-paired-row.match-target-only {
             opacity: 0.75;
         }
-
         .compare-paired-row.match-target-only .paired-col-match {
             color: var(--color-crafted);
         }
-
         .compare-paired-row.match-target-only .paired-col-source {
             color: var(--text-muted);
         }
-
         .compare-paired-row.match-target-only .paired-col-target {
             color: var(--color-crafted);
         }
@@ -2140,17 +2071,9 @@
             transition: width 0.2s;
         }
 
-        .contrib-bar-fill.high {
-            background: var(--color-set);
-        }
-
-        .contrib-bar-fill.medium {
-            background: var(--color-rare);
-        }
-
-        .contrib-bar-fill.low {
-            background: var(--color-crafted);
-        }
+        .contrib-bar-fill.high { background: var(--color-set); }
+        .contrib-bar-fill.medium { background: var(--color-rare); }
+        .contrib-bar-fill.low { background: var(--color-crafted); }
 
         .contrib-value {
             font-size: 0.55rem;
@@ -2242,17 +2165,9 @@
             font-weight: 700;
         }
 
-        .score-final.high {
-            color: var(--color-set);
-        }
-
-        .score-final.medium {
-            color: var(--color-rare);
-        }
-
-        .score-final.low {
-            color: var(--color-crafted);
-        }
+        .score-final.high { color: var(--color-set); }
+        .score-final.medium { color: var(--color-rare); }
+        .score-final.low { color: var(--color-crafted); }
 
         /* Validation warnings */
         .score-warnings {
@@ -2329,17 +2244,9 @@
             font-weight: 700;
         }
 
-        .alternate-match-btn .alt-score.high {
-            color: var(--color-set);
-        }
-
-        .alternate-match-btn .alt-score.medium {
-            color: var(--color-rare);
-        }
-
-        .alternate-match-btn .alt-score.low {
-            color: var(--color-crafted);
-        }
+        .alternate-match-btn .alt-score.high { color: var(--color-set); }
+        .alternate-match-btn .alt-score.medium { color: var(--color-rare); }
+        .alternate-match-btn .alt-score.low { color: var(--color-crafted); }
 
         .alternate-match-btn .alt-addr {
             font-size: 0.55rem;
@@ -2613,556 +2520,6 @@
             color: var(--accent-gold);
             font-weight: 600;
         }
-
-        /* Cross-Version Matrix Panel Styles */
-        .file-details-container {
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .file-details-header {
-            padding: 1rem;
-            border-bottom: 1px solid var(--border-dark);
-            background: linear-gradient(180deg, var(--bg-light) 0%, var(--bg-medium) 100%);
-        }
-
-        .file-details-title {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .file-details-filename {
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .file-details-badge {
-            padding: 0.2rem 0.5rem;
-            border-radius: 3px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .file-details-meta {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .file-details-separator {
-            color: var(--border-light);
-        }
-
-        .file-details-tabs {
-            display: flex;
-            background-color: var(--bg-dark);
-            border-bottom: 1px solid var(--border-dark);
-        }
-
-        .file-details-tab {
-            background: none;
-            border: none;
-            padding: 0.8rem 1.2rem;
-            color: var(--text-muted);
-            font-size: 0.8rem;
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-            transition: all 0.2s ease;
-        }
-
-        .file-details-tab:hover {
-            background-color: var(--bg-medium);
-            color: var(--text-primary);
-        }
-
-        .file-details-tab.active {
-            color: var(--accent-gold);
-            border-bottom-color: var(--accent-gold);
-            background-color: var(--bg-medium);
-        }
-
-        .file-details-content {
-            flex: 1;
-            overflow-y: auto;
-            overflow-x: hidden;
-        }
-
-        .file-details-tab-content {
-            display: none;
-            height: 100%;
-        }
-
-        .file-details-tab-content.active {
-            display: block;
-        }
-
-        /* Overview Tab Styles */
-        .file-overview {
-            padding: 1rem;
-        }
-
-        .file-overview-section {
-            margin-bottom: 2rem;
-        }
-
-        .file-overview-section h3 {
-            color: var(--accent-gold);
-            font-size: 0.9rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--border-dark);
-        }
-
-        .file-overview-grid {
-            display: grid;
-            gap: 0.8rem;
-        }
-
-        .file-overview-item {
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-            padding: 0.5rem 0;
-        }
-
-        .file-overview-item label {
-            font-weight: 600;
-            color: var(--text-primary);
-            min-width: 120px;
-            font-size: 0.85rem;
-        }
-
-        .file-overview-item span {
-            color: var(--text-muted);
-            font-size: 0.85rem;
-        }
-
-        .file-hash {
-            background-color: var(--bg-darkest);
-            padding: 0.3rem 0.5rem;
-            border-radius: 3px;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 0.75rem;
-            border: 1px solid var(--border-dark);
-        }
-
-        /* Functions Tab Styles */
-        .file-functions {
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .file-functions-header {
-            padding: 1rem;
-            border-bottom: 1px solid var(--border-dark);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background-color: var(--bg-medium);
-        }
-
-        .file-functions-stats {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-
-        .file-functions-search input {
-            padding: 0.4rem 0.6rem;
-            background-color: var(--bg-dark);
-            border: 1px solid var(--border-dark);
-            border-radius: 3px;
-            color: var(--text-primary);
-            font-size: 0.8rem;
-            width: 200px;
-        }
-
-        .file-functions-search input:focus {
-            outline: none;
-            border-color: var(--accent-gold);
-        }
-
-        .file-functions-table-container {
-            flex: 1;
-            overflow: auto;
-        }
-
-        .file-functions-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.8rem;
-        }
-
-        .file-functions-table th {
-            background-color: var(--bg-medium);
-            padding: 0.6rem 0.8rem;
-            text-align: left;
-            font-weight: 600;
-            color: var(--text-primary);
-            border-bottom: 2px solid var(--border-dark);
-            position: sticky;
-            top: 0;
-            z-index: 1;
-        }
-
-        .file-functions-table td {
-            padding: 0.5rem 0.8rem;
-            border-bottom: 1px solid var(--border-dark);
-            vertical-align: middle;
-        }
-
-        .function-row:hover {
-            background-color: var(--bg-hover);
-        }
-
-        .function-index {
-            color: var(--text-muted);
-            text-align: right;
-            width: 60px;
-        }
-
-        .function-address {
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 0.75rem;
-            color: var(--color-set);
-            width: 100px;
-        }
-
-        .function-name {
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-
-        .function-flags {
-            color: var(--text-muted);
-            text-align: center;
-            width: 60px;
-        }
-
-        .file-functions-empty {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 200px;
-            color: var(--text-muted);
-        }
-
-        .file-functions-empty .details-empty-icon {
-            font-size: 2rem;
-            margin-bottom: 1rem;
-        }
-
-        /* Cross-Version Function Analysis */
-        .cross-version-controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.6rem;
-            background-color: var(--bg-medium);
-            border-bottom: 1px solid var(--border-dark);
-            gap: 1rem;
-        }
-
-        .cross-version-search {
-            flex: 1;
-        }
-
-        .cross-version-search input {
-            width: 100%;
-            padding: 0.4rem;
-            background-color: var(--bg-dark);
-            border: 1px solid var(--border-dark);
-            border-radius: 4px;
-            color: var(--text-primary);
-            font-family: var(--font-mono);
-            font-size: 0.8rem;
-        }
-
-        .category-filter {
-            padding: 0.4rem;
-            background-color: var(--bg-dark);
-            border: 1px solid var(--border-dark);
-            border-radius: 4px;
-            color: var(--text-primary);
-            font-size: 0.8rem;
-        }
-
-        .exports-table-wrapper {
-            flex: 1;
-            overflow: auto;
-            overflow-x: auto;
-            overflow-y: auto;
-            position: relative;
-            min-height: 0;
-        }
-
-        .exports-table {
-            border-collapse: separate;
-            border-spacing: 0;
-            width: auto;
-            min-width: fit-content;
-        }
-
-        .exports-table th,
-        .exports-table td {
-            padding: 0.3rem 0.5rem;
-            border-bottom: 1px solid var(--border-dark);
-            border-right: 1px solid var(--border-dark);
-            font-size: 0.7rem;
-            white-space: nowrap;
-        }
-
-        .exports-table thead th {
-            background-color: var(--bg-medium);
-            color: var(--text-muted);
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            position: sticky;
-            top: 0;
-            z-index: 20;
-        }
-
-        .exports-table thead th.selected-version {
-            background-color: var(--accent-gold);
-            color: var(--bg-darkest);
-        }
-
-        .exports-table thead th.sortable {
-            cursor: pointer;
-            user-select: none;
-            transition: background-color 0.15s;
-        }
-
-        .exports-table thead th.sortable:hover {
-            background-color: var(--bg-light);
-        }
-
-        .exports-table tbody tr:hover {
-            background-color: var(--bg-hover);
-        }
-
-        .exports-table .fn-name-cell {
-            position: sticky;
-            left: 0;
-            background-color: var(--bg-dark);
-            z-index: 10;
-            font-family: var(--font-mono);
-            color: var(--text-primary);
-            min-width: 150px;
-            max-width: 200px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .exports-table thead th.fn-name-cell {
-            z-index: 30;
-            background-color: var(--bg-medium);
-        }
-
-        .exports-table tbody tr:hover .fn-name-cell {
-            background-color: var(--bg-hover);
-        }
-
-        .exports-table .addr-cell {
-            font-family: var(--font-mono);
-            color: var(--color-magic);
-            text-align: center;
-            min-width: 80px;
-        }
-
-        .exports-table .addr-cell.missing {
-            color: var(--text-muted);
-            font-style: italic;
-        }
-
-        .exports-table .fn-name-cell.category-game {
-            color: var(--color-set);
-        }
-
-        .exports-table .fn-name-cell.category-crt {
-            color: var(--color-magic);
-        }
-
-        .exports-table .fn-name-cell.category-imp {
-            color: var(--color-crafted);
-        }
-
-        .exports-table .fn-name-cell.category-eh {
-            color: var(--color-rare);
-        }
-
-        /* Additional styles for d2_report_viewer.html matching interface */
-        .exports-controls {
-            background-color: var(--bg-medium);
-            border-bottom: 1px solid var(--border-dark);
-        }
-
-        .exports-toolbar {
-            display: flex;
-            align-items: center;
-            padding: 0.6rem;
-            gap: 0.6rem;
-            flex-wrap: wrap;
-        }
-
-        .exports-filter {
-            padding: 0.4rem;
-            background-color: var(--bg-dark);
-            border: 1px solid var(--border-dark);
-            border-radius: 4px;
-            color: var(--text-primary);
-            font-family: var(--font-mono);
-            font-size: 0.8rem;
-            min-width: 200px;
-        }
-
-        .exports-toolbar-separator {
-            width: 1px;
-            height: 20px;
-            background-color: var(--border-dark);
-            margin: 0 0.3rem;
-        }
-
-        .exports-toggle {
-            display: flex;
-            align-items: center;
-            gap: 0.3rem;
-            background-color: var(--bg-dark);
-            border: 1px solid var(--border-dark);
-            color: var(--text-secondary);
-            padding: 0.4rem 0.6rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.75rem;
-            transition: all 0.2s ease;
-        }
-
-        .exports-toggle:hover {
-            background-color: var(--bg-light);
-            color: var(--text-primary);
-        }
-
-        .exports-toggle.active {
-            background-color: var(--accent-gold);
-            color: var(--bg-darkest);
-            border-color: var(--accent-gold);
-        }
-
-        .exports-toggle-indicator {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: var(--text-muted);
-            transition: background-color 0.2s ease;
-        }
-
-        .exports-toggle.active .exports-toggle-indicator {
-            background-color: var(--bg-darkest);
-        }
-
-        .exports-stats {
-            color: var(--text-secondary);
-            font-size: 0.75rem;
-            font-family: var(--font-mono);
-            margin-left: auto;
-        }
-
-        .exports-stats .named-count {
-            color: var(--color-set);
-            font-weight: 600;
-        }
-
-        .category-legend {
-            display: flex;
-            gap: 0.6rem;
-            margin-left: 1rem;
-        }
-
-        .category-legend-item {
-            display: flex;
-            align-items: center;
-            gap: 0.3rem;
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-        }
-
-        .category-legend-bar {
-            width: 12px;
-            height: 3px;
-            border-radius: 1px;
-        }
-
-        .category-legend-bar.cat-game {
-            background-color: var(--color-set);
-        }
-
-        .category-legend-bar.cat-crt {
-            background-color: var(--color-magic);
-        }
-
-        .category-legend-bar.cat-imp {
-            background-color: var(--color-crafted);
-        }
-
-        .category-legend-bar.cat-eh {
-            background-color: var(--color-rare);
-        }
-
-        /* Address cell interactions */
-        .exports-table .addr-cell {
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-        }
-
-        .exports-table .addr-cell:not(.missing):hover {
-            background-color: var(--bg-hover);
-        }
-
-        /* Gap row styling when gaps-only filter is active */
-        .exports-table tr.gap-row {
-            /* Will be styled when gap analysis is enhanced */
-        }
-
-        /* Responsive adjustments for toolbar */
-        @media (max-width: 768px) {
-            .category-legend {
-                display: none;
-            }
-
-            .exports-toolbar {
-                flex-wrap: wrap;
-                gap: 0.4rem;
-            }
-
-            .exports-filter {
-                min-width: 150px;
-            }
-
-            .exports-toggle span:not(.exports-toggle-indicator) {
-                display: none;
-            }
-
-            .exports-toggle {
-                padding: 0.4rem;
-                min-width: 32px;
-                justify-content: center;
-            }
-        }
     </style>
 </head>
 
@@ -3177,16 +2534,16 @@
 
     <div class="main-container">
         <div class="panels-wrapper">
-            <!-- Panel 1: Binaries Navigator -->
-            <div class="panel panel-binaries">
+            <!-- Panel 1: Version Navigator -->
+            <div class="panel panel-versions">
                 <div class="panel-header">
-                    <h2>Binaries</h2>
+                    <h2>Versions</h2>
                 </div>
                 <div class="version-filters">
                     <div class="filter-buttons">
-                        <button class="filter-btn pre-refactor" onclick="toggleVersionFilter('preRefactor')" title="Versions 1.00-1.03 (Pre-refactor codebase)">Pre</button>
-                        <button class="filter-btn post-refactor" onclick="toggleVersionFilter('postRefactor')" title="Versions 1.04+ (Post-refactor codebase)">Post</button>
-                        <button class="filter-btn all-versions active" onclick="toggleVersionFilter('allVersions')" title="All versions (Unified display)">All</button>
+                        <button class="filter-btn pre-refactor" onclick="toggleVersionFilter('preRefactor')" title="Classic 1.00-1.03 (Pre-refactor codebase)">Pre</button>
+                        <button class="filter-btn post-refactor" onclick="toggleVersionFilter('postRefactor')" title="Classic 1.04+ (Post-refactor codebase)">Post</button>
+                        <button class="filter-btn lod active" onclick="toggleVersionFilter('lod')" title="Lord of Destruction (All versions)">LoD</button>
                     </div>
                 </div>
                 <div class="panel-content">
@@ -3197,7 +2554,7 @@
             <!-- Panel 2: Files -->
             <div class="panel panel-files">
                 <div class="panel-header panel-header-files">
-                    <h2 id="filesTitle">Binaries</h2>
+                    <h2 id="filesTitle">Select a Version</h2>
                     <input type="text" class="files-filter" id="filesFilter" placeholder="Filter..." oninput="filterFiles()" style="display: none;">
                 </div>
                 <div class="files-toolbar" id="filesToolbar" style="display: none; position: relative;">
@@ -3217,10 +2574,10 @@
                 </div>
             </div>
 
-            <!-- Panel 3: Cross-Version Matrix -->
+            <!-- Panel 3: File Details -->
             <div class="panel panel-details">
                 <div class="panel-header">
-                    <h2>Cross-Version Matrix</h2>
+                    <h2>File Details</h2>
                 </div>
                 <div class="panel-content" id="detailsContent">
                     <div class="details-empty">
@@ -3261,7 +2618,7 @@
 
     <div class="footer">
         <div class="footer-stat">
-            <span class="value" id="statVersions">0</span> binaries
+            <span class="value" id="statVersions">0</span> versions
         </div>
         <div class="footer-stat">
             <span class="value" id="statFiles">0</span> unique files
@@ -3276,7 +2633,7 @@
     <!-- API Data Loading -->
     <script>
         // API Configuration
-        const API_BASE_URL = 'http://localhost:8081/api';
+        const API_BASE_URL = 'https://api.xebyte.com/api';
 
         // Global data variables (previously loaded from static files)
         let FILE_CATEGORIES = {};
@@ -3398,14 +2755,14 @@
 
                 // Basic categories fallback
                 FILE_CATEGORIES = {
-                    "Game Logic": { "color": "#00FF00", "short": "GL" },
-                    "Graphics": { "color": "#6969FF", "short": "GR" },
-                    "Audio": { "color": "#A59263", "short": "AU" },
-                    "Network": { "color": "#FF6600", "short": "NW" },
-                    "Launcher": { "color": "#FFFF00", "short": "LA" },
-                    "MPQ": { "color": "#C7B377", "short": "MPQ" },
-                    "Utility": { "color": "#808080", "short": "UT" },
-                    "Other": { "color": "#FFFFFF", "short": "OT" }
+                    "Game Logic": {"color": "#00FF00", "short": "GL"},
+                    "Graphics": {"color": "#6969FF", "short": "GR"},
+                    "Audio": {"color": "#A59263", "short": "AU"},
+                    "Network": {"color": "#FF6600", "short": "NW"},
+                    "Launcher": {"color": "#FFFF00", "short": "LA"},
+                    "MPQ": {"color": "#C7B377", "short": "MPQ"},
+                    "Utility": {"color": "#808080", "short": "UT"},
+                    "Other": {"color": "#FFFFFF", "short": "OT"}
                 };
 
                 console.log('Fallback data loaded:', {
@@ -3454,124 +2811,6 @@
                 hideLoadingToast();
                 showErrorToast(`Failed to load functions for ${filename}`);
             }
-        }
-
-        // Load binaries for a specific version
-        async function loadBinariesForVersion(gameType, version) {
-            try {
-                showLoadingToast(`Loading binaries for ${gameType} ${version}...`);
-
-                const response = await fetch(`${API_BASE_URL}/binaries?gameType=${encodeURIComponent(gameType)}&version=${encodeURIComponent(version)}`);
-                if (!response.ok) {
-                    throw new Error(`Failed to load binaries for ${gameType} ${version}: HTTP ${response.status}`);
-                }
-
-                const binariesData = await response.json();
-                console.log(`Loaded ${binariesData.length} binaries for ${gameType} ${version}:`, binariesData);
-                hideLoadingToast();
-
-                // Update the files panel with binary data
-                updateFilesTableWithBinaries(binariesData, gameType, version);
-                return binariesData;
-
-            } catch (error) {
-                console.error(`Error loading binaries for ${gameType} ${version}:`, error);
-                hideLoadingToast();
-
-                // Show unified version system message instead of error
-                showUnifiedVersionFallback(gameType, version);
-                return [];
-            }
-        }
-
-        // Show fallback message for unified version system
-        function showUnifiedVersionFallback(gameType, version) {
-            const fallbackData = {
-                files: {
-                    [`${version}_D2Game.dll`]: {
-                        name: `${version}_D2Game.dll`,
-                        size: 'Unknown',
-                        type: 'dll',
-                        unified_version: version,
-                        game_type: gameType,
-                        note: 'Unified version system - binary shared across families'
-                    },
-                    [`${version}_D2Common.dll`]: {
-                        name: `${version}_D2Common.dll`,
-                        size: 'Unknown',
-                        type: 'dll',
-                        unified_version: version,
-                        game_type: gameType,
-                        note: 'Unified version system - binary shared across families'
-                    }
-                }
-            };
-
-            // Add exception binary if appropriate
-            if (gameType === 'Classic') {
-                fallbackData.files[`Classic_${version}_Game.exe`] = {
-                    name: `Classic_${version}_Game.exe`,
-                    size: 'Unknown',
-                    type: 'exe',
-                    unified_version: version,
-                    game_type: gameType,
-                    note: 'Exception binary - specific to Classic family'
-                };
-            } else if (gameType === 'LoD') {
-                fallbackData.files[`LoD_${version}_Game.exe`] = {
-                    name: `LoD_${version}_Game.exe`,
-                    size: 'Unknown',
-                    type: 'exe',
-                    unified_version: version,
-                    game_type: gameType,
-                    note: 'Exception binary - specific to LoD family'
-                };
-            }
-
-            // Store and render the fallback data
-            const folderName = `${gameType}/${version}`;
-            FOLDERS_DATA[folderName] = fallbackData;
-            renderFilesTable(fallbackData);
-
-            showToast(`Showing unified binaries for ${gameType} ${version}`);
-        }
-
-        // Transform binary data from API into format expected by renderFilesTable
-        function updateFilesTableWithBinaries(binariesData, gameType, version) {
-            // Transform API binary data into the expected folder format
-            const transformedFolder = {
-                files: {}
-            };
-
-            binariesData.forEach(binary => {
-                // Transform binary data to match expected file format
-                const file = {
-                    category: binary.category || 'Other',
-                    category_color: getCategoryColor(binary.category || 'Other'),
-                    sha256: binary.md5, // Using md5 as the hash for now
-                    pe_version: version, // Use game version instead of PE version
-                    file_size: binary.fileSize || 0,
-                    architecture: binary.architecture || 0,
-                    ingest_date: binary.ingestDate,
-                    filename: binary.fileName,
-                    fullName: binary.fullName
-                };
-
-                transformedFolder.files[binary.fileName] = file;
-            });
-
-            // Store the data for this version
-            const folderName = `${gameType}/${version}`;
-            FOLDERS_DATA[folderName] = transformedFolder;
-
-            // Update the files table
-            renderFilesTable(transformedFolder);
-        }
-
-        // Helper function to get category color
-        function getCategoryColor(category) {
-            const categoryInfo = CATEGORIES[category] || FILE_CATEGORIES[category];
-            return categoryInfo?.color || '#FFFFFF';
         }
 
         // Toast notification functions
@@ -3624,18 +2863,18 @@
         let selectedFile = null;
         let isGrouped = true;
 
-        // Version filters: Unified system (no more Classic/LoD separation)
-        let versionFilters = {
-            preRefactor: true,   // Versions 1.00-1.03 (old codebase)
-            postRefactor: true,  // Versions 1.04+ (refactored codebase)
-            allVersions: true    // All unified versions
+        // Version filters: Pre-Refactor (1.00-1.03), Post-Refactor (1.04+), LoD (all)
+        const versionFilters = {
+            preRefactor: false,   // Classic 1.00-1.03 (old codebase)
+            postRefactor: false,  // Classic 1.04+ (refactored codebase)
+            lod: true             // All LoD versions
         };
 
-        // Unified version group definitions (no more family separation)
+        // Version group definitions
         const VERSION_GROUPS = {
-            preRefactor: ['1.00', '1.01', '1.02', '1.03'],
-            postRefactor: ['1.04b', '1.04c', '1.05', '1.05b', '1.06', '1.06b', '1.08', '1.09', '1.09b', '1.09d', '1.10', '1.11', '1.11b', '1.12a', '1.13c', '1.13d', '1.14a', '1.14b', '1.14c', '1.14d'],
-            allVersions: ['1.00', '1.01', '1.02', '1.03', '1.04b', '1.04c', '1.05', '1.05b', '1.06', '1.06b', '1.07', '1.08', '1.09', '1.09b', '1.09d', '1.10', '1.11', '1.11b', '1.12a', '1.13c', '1.13d', '1.14a', '1.14b', '1.14c', '1.14d']
+            preRefactor: ['Classic/1.00', 'Classic/1.01', 'Classic/1.02', 'Classic/1.03'],
+            postRefactor: ['Classic/1.04b', 'Classic/1.04c', 'Classic/1.05', 'Classic/1.05b', 'Classic/1.06', 'Classic/1.06b', 'Classic/1.08', 'Classic/1.09', 'Classic/1.09b', 'Classic/1.09d', 'Classic/1.10', 'Classic/1.11', 'Classic/1.11b', 'Classic/1.12a', 'Classic/1.13c', 'Classic/1.13d', 'Classic/1.14a', 'Classic/1.14b', 'Classic/1.14c', 'Classic/1.14d'],
+            lod: ['LoD/1.07', 'LoD/1.08', 'LoD/1.09', 'LoD/1.09b', 'LoD/1.09d', 'LoD/1.10', 'LoD/1.11', 'LoD/1.11b', 'LoD/1.12a', 'LoD/1.13c', 'LoD/1.13d', 'LoD/1.14a', 'LoD/1.14b', 'LoD/1.14c', 'LoD/1.14d']
         };
 
         // Legacy compatibility
@@ -3652,6 +2891,21 @@
         let currentFuncData = null;
         let currentFuncBaseName = null;
         let categoryFilter = 'all';  // 'all', 'game_logic', 'crt_runtime', 'import_thunk', 'exception', 'other'
+
+        // Compiler boundary versions (major toolchain changes)
+        const COMPILER_BOUNDARY_VERSIONS = [
+            'LoD/1.11',      // CRT/compiler changed significantly at 1.11
+            'Classic/1.11'
+        ];
+
+        // Pre-1.11 versions (before compiler boundary)
+        const PRE_111_VERSIONS = [
+            'LoD/1.07', 'LoD/1.08', 'LoD/1.09', 'LoD/1.09b', 'LoD/1.09d', 'LoD/1.10',
+            'Classic/1.00', 'Classic/1.01', 'Classic/1.02', 'Classic/1.03',
+            'Classic/1.04b', 'Classic/1.04c', 'Classic/1.05', 'Classic/1.05b',
+            'Classic/1.06', 'Classic/1.06b', 'Classic/1.08', 'Classic/1.09',
+            'Classic/1.09b', 'Classic/1.09d', 'Classic/1.10'
+        ];
 
         // Detect function category based on name patterns
         function getFunctionCategory(name) {
@@ -3894,11 +3148,11 @@
 
         // Value match bonus configuration
         const VALUE_BONUS_CONFIG = {
-            string_overlap: { max_bonus: 10, min_items: 1 },   // Strings are highly distinctive
-            instruction_overlap: { max_bonus: 8, min_items: 3 },   // Instruction patterns
-            constant_overlap: { max_bonus: 5, min_items: 2 },   // Constants (filtered)
-            global_overlap: { max_bonus: 5, min_items: 1 },   // Global values
-            tag_overlap: { max_bonus: 5, min_items: 1 }    // Function tags
+            string_overlap:      { max_bonus: 10, min_items: 1 },   // Strings are highly distinctive
+            instruction_overlap: { max_bonus: 8,  min_items: 3 },   // Instruction patterns
+            constant_overlap:    { max_bonus: 5,  min_items: 2 },   // Constants (filtered)
+            global_overlap:      { max_bonus: 5,  min_items: 1 },   // Global values
+            tag_overlap:         { max_bonus: 5,  min_items: 1 }    // Function tags
         };
 
         // Compute value-based match bonuses
@@ -4442,8 +3696,8 @@
             }
 
             // Update legacy flags for compatibility
-            showClassic = versionFilters.preRefactor || versionFilters.postRefactor || versionFilters.allVersions;
-            showLoD = versionFilters.preRefactor || versionFilters.postRefactor || versionFilters.allVersions;
+            showClassic = versionFilters.preRefactor || versionFilters.postRefactor;
+            showLoD = versionFilters.lod;
 
             updateFilterButtons();
             renderVersionList();
@@ -4530,6 +3784,58 @@
             }
         }
 
+        function renderVersionList() {
+            const container = document.getElementById('versionList');
+
+            // Filter based on granular toggle buttons
+            let versions = VERSIONS_DATA.filter(v => {
+                const fullVersion = v.folder_name; // e.g., "Classic/1.00" or "LoD/1.07"
+                return filterVersionsByType([fullVersion]).length > 0;
+            });
+
+            // Sort by version number
+            versions.sort((a, b) => {
+                const parseVer = (v) => {
+                    const match = v.version.match(/^(\d+)\.(\d+)([a-z])?(?:\s*Beta\s*(\d+))?$/i);
+                    if (!match) return [0, 0, '', 999];
+                    return [
+                        parseInt(match[1]),
+                        parseInt(match[2]),
+                        match[3] || '',
+                        match[4] ? parseInt(match[4]) : 999
+                    ];
+                };
+                const [aMaj, aMin, aLet, aBeta] = parseVer(a);
+                const [bMaj, bMin, bLet, bBeta] = parseVer(b);
+
+                if (aMaj !== bMaj) return aMaj - bMaj;
+                if (aMin !== bMin) return aMin - bMin;
+                if (aBeta !== bBeta) return aBeta - bBeta;
+                return aLet.localeCompare(bLet);
+            });
+
+            container.innerHTML = versions.map(v => {
+                const isClassic = v.game_type === 'Classic';
+                const typeClass = isClassic ? 'classic' : 'lod';
+                const changeCount = v.change_count || 0;
+                const totalFiles = v.file_count || 0;
+                const isSelected = selectedVersion === v.folder_name;
+
+                // Format: "changed / total" or "— / total" if no changes tracked
+                const changedDisplay = changeCount > 0 ? `<span class="changed">${changeCount}</span>` : '<span>—</span>';
+                const countsHtml = `${changedDisplay}<span class="separator"> / </span><span class="total">${totalFiles}</span>`;
+
+                return `
+                    <div class="version-item ${isSelected ? 'selected' : ''}"
+                         onclick="selectVersion('${v.folder_name}')"
+                         title="${v.game_type} ${v.version} - ${changeCount} of ${totalFiles} files changed">
+                        <span class="version-type ${typeClass}">${isClassic ? 'C' : 'L'}</span>
+                        <span class="version-badge ${typeClass}">${v.version}</span>
+                        <span class="file-counts">${countsHtml}</span>
+                    </div>
+                `;
+            }).join('');
+        }
 
         function selectVersion(folderName) {
             // Remember the previously selected file (base name without variant suffix)
@@ -4547,32 +3853,16 @@
             const folder = FOLDERS_DATA[folderName];
             const diff = DIFFS_DATA[folderName];
 
-            // Update title first
+            if (!folder) {
+                document.getElementById('filesTitle').textContent = 'No Data';
+                document.getElementById('filesTable').innerHTML = '<div class="details-empty">No file data available</div>';
+                selectedFile = null;
+                return;
+            }
+
+            // Update title
             const versionInfo = VERSIONS_DATA.find(v => v.folder_name === folderName);
             document.getElementById('filesTitle').textContent = `${versionInfo?.game_type || ''} ${versionInfo?.version || folderName}`;
-
-            if (!folder) {
-                // No static data available - load from API
-                if (versionInfo) {
-                    // Show toolbar and filter
-                    document.getElementById('filesToolbar').style.display = 'flex';
-                    document.getElementById('filesFilter').style.display = 'block';
-                    document.getElementById('filesFilter').value = '';
-
-                    // Render category filters
-                    renderCategoryFilters();
-                    document.getElementById('groupBtn').classList.toggle('active', isGrouped);
-
-                    // Load binaries from API
-                    loadBinariesForVersion(versionInfo.game_type, versionInfo.version);
-                    return;
-                } else {
-                    document.getElementById('filesTitle').textContent = 'No Data';
-                    document.getElementById('filesTable').innerHTML = '<div class="details-empty">No file data available</div>';
-                    selectedFile = null;
-                    return;
-                }
-            }
 
             // Show toolbar and filter
             document.getElementById('filesToolbar').style.display = 'flex';
@@ -4759,9 +4049,6 @@
         function selectFile(filename) {
             selectedFile = filename;
 
-            // Reset cross-version state for new file
-            resetCrossVersionState();
-
             // Update file list selection
             document.querySelectorAll('.file-row').forEach(el => {
                 const elFilename = el.querySelector('.filename').textContent;
@@ -4776,54 +4063,7 @@
             const baseName = filename.split(' (')[0];
             const history = FILE_HISTORY_DATA[baseName];
 
-            // If we have local file info, use the existing render method
-            if (fileInfo && (history || getFileType(filename) !== 'pe')) {
-                renderFileDetails(filename, fileInfo, history);
-            } else {
-                // For PE files or when we need detailed info, load from API
-                loadFileDetailsFromAPI(filename, fileInfo);
-            }
-        }
-
-        // Load detailed file information from the API
-        async function loadFileDetailsFromAPI(filename, basicFileInfo) {
-            if (!selectedVersion) {
-                renderEmptyDetails();
-                return;
-            }
-
-            try {
-                // Parse the selected version to get game type and version
-                const [gameType, version] = selectedVersion.split('/');
-
-                showLoadingToast(`Loading details for ${filename}...`);
-
-                const response = await fetch(`${API_BASE_URL}/files/${encodeURIComponent(gameType)}/${encodeURIComponent(version)}/${encodeURIComponent(filename)}`);
-
-                if (!response.ok) {
-                    throw new Error(`Failed to load file details: ${response.status}`);
-                }
-
-                const fileDetails = await response.json();
-                console.log('Loaded file details:', fileDetails);
-
-                hideLoadingToast();
-
-                // Render the detailed file information with new UI
-                renderFileDetailsFromAPI(fileDetails, basicFileInfo);
-
-            } catch (error) {
-                console.error('Error loading file details:', error);
-                hideLoadingToast();
-                showErrorToast(`Failed to load details for ${filename}`);
-
-                // Fall back to basic rendering if API fails
-                if (basicFileInfo) {
-                    renderFileDetails(filename, basicFileInfo, null);
-                } else {
-                    renderEmptyDetails();
-                }
-            }
+            renderFileDetails(filename, fileInfo, history);
         }
 
         function getFileType(filename) {
@@ -4863,199 +4103,6 @@
                     renderGenericPlaceholder(container, filename, fileInfo, fileType);
                     break;
             }
-        }
-
-        // Render detailed file information from API matching d2_report_viewer.html structure
-        function renderFileDetailsFromAPI(fileDetails, basicFileInfo) {
-            const container = document.getElementById('detailsContent');
-            const filename = fileDetails.filename;
-            const gameType = fileDetails.gameType;
-            const version = fileDetails.version;
-            const functions = fileDetails.functions || [];
-
-            // Create header with file info (minimal, matching d2_report_viewer.html)
-            container.innerHTML = `
-                <div class="file-details-container">
-                    <div class="file-details-header">
-                        <div class="file-details-title">
-                            <span class="file-details-filename">${filename}</span>
-                            <span class="file-details-badge" style="background-color: ${getCategoryColor(fileDetails.category)}20; color: ${getCategoryColor(fileDetails.category)}">${fileDetails.category}</span>
-                        </div>
-                        <div class="file-details-meta">
-                            <span>${gameType} ${version}</span>
-                            <span class="file-details-separator">•</span>
-                            <span>MD5: <code>${fileDetails.md5.substring(0, 8)}</code></span>
-                        </div>
-                    </div>
-                    <div id="cross-version-loading" style="display: flex; align-items: center; justify-content: center; padding: 0; color: var(--text-muted);">
-                        Loading cross-version analysis...
-                    </div>
-                </div>
-            `;
-
-            // Immediately load cross-version data
-            loadCrossVersionData();
-        }
-
-        // Reset cross-version loaded flag when new file is selected
-        function resetCrossVersionState() {
-            window.crossVersionLoaded = false;
-            window.crossVersionData = null;
-            window.crossVersionAllVersions = null;
-            window.crossVersionGroups = null;
-        }
-
-        // Load cross-version analysis data
-        async function loadCrossVersionData() {
-            if (window.crossVersionLoaded) return;
-
-            const filename = document.querySelector('.file-details-filename').textContent;
-
-            try {
-                window.crossVersionLoaded = true;
-                const response = await fetch(`${API_BASE_URL}/functions/cross-version/${encodeURIComponent(filename)}`);
-                const crossVersionData = await response.json();
-                renderCrossVersionAnalysis(crossVersionData);
-            } catch (error) {
-                console.error('Error loading cross-version analysis:', error);
-                document.getElementById('cross-version-loading').innerHTML = `
-                    <div class="error-state">
-                        <div class="error-icon">⚠</div>
-                        <div>Failed to load cross-version analysis</div>
-                        <div style="font-size: 0.8em; color: var(--text-muted); margin-top: 0.5rem;">
-                            ${error.message}
-                        </div>
-                    </div>
-                `;
-                window.crossVersionLoaded = false;
-            }
-        }
-
-        // Render Overview tab content
-        function renderOverviewTab(fileDetails, basicFileInfo) {
-            const ingestDate = fileDetails.ingestDate ? new Date(fileDetails.ingestDate).toLocaleDateString() : 'Unknown';
-
-            return `
-                <div class="file-overview">
-                    <div class="file-overview-section">
-                        <h3>File Information</h3>
-                        <div class="file-overview-grid">
-                            <div class="file-overview-item">
-                                <label>Filename:</label>
-                                <span>${fileDetails.filename}</span>
-                            </div>
-                            <div class="file-overview-item">
-                                <label>Full Name:</label>
-                                <span>${fileDetails.fullName}</span>
-                            </div>
-                            <div class="file-overview-item">
-                                <label>Category:</label>
-                                <span style="color: ${getCategoryColor(fileDetails.category)}">${fileDetails.category}</span>
-                            </div>
-                            <div class="file-overview-item">
-                                <label>Architecture:</label>
-                                <span>${fileDetails.architecture === 7 ? 'x86 (32-bit)' : `Architecture ${fileDetails.architecture}`}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="file-overview-section">
-                        <h3>Hashes & Verification</h3>
-                        <div class="file-overview-grid">
-                            <div class="file-overview-item">
-                                <label>MD5:</label>
-                                <code class="file-hash">${fileDetails.md5}</code>
-                                <button class="hash-copy-btn" onclick="copyHash('${fileDetails.md5}')" title="Copy MD5">⧉</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="file-overview-section">
-                        <h3>Analysis Statistics</h3>
-                        <div class="file-overview-grid">
-                            <div class="file-overview-item">
-                                <label>Functions Count:</label>
-                                <span>${fileDetails.functionCount || 0}</span>
-                            </div>
-                            <div class="file-overview-item">
-                                <label>Ingested:</label>
-                                <span>${ingestDate}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Render Functions tab content
-        function renderFunctionsTab(functions) {
-            if (!functions || functions.length === 0) {
-                return `
-                    <div class="file-functions-empty">
-                        <div class="details-empty-icon">⚙️</div>
-                        <div class="details-empty-text">No functions found in this file</div>
-                    </div>
-                `;
-            }
-
-            const functionsRows = functions.map((func, index) => {
-                const address = `0x${func.addr.toString(16).toUpperCase().padStart(8, '0')}`;
-                const nameClass = getGhidraNameClass(func.name_func, 'unknown');
-
-                return `
-                    <tr class="function-row">
-                        <td class="function-index">${index + 1}</td>
-                        <td class="function-address">${address}</td>
-                        <td class="function-name ${nameClass}">${func.name_func}</td>
-                        <td class="function-flags">${func.flags || 0}</td>
-                    </tr>
-                `;
-            }).join('');
-
-            return `
-                <div class="file-functions">
-                    <div class="file-functions-header">
-                        <div class="file-functions-stats">
-                            Found ${functions.length} functions
-                        </div>
-                        <div class="file-functions-search">
-                            <input type="text" placeholder="Filter functions..." onkeyup="filterFunctions(this.value)">
-                        </div>
-                    </div>
-                    <div class="file-functions-table-container">
-                        <table class="file-functions-table" id="fileFunctionsTable">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Address</th>
-                                    <th>Function Name</th>
-                                    <th>Flags</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${functionsRows}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Filter functions in the Functions tab
-        function filterFunctions(searchTerm) {
-            const table = document.getElementById('fileFunctionsTable');
-            if (!table) return;
-
-            const rows = table.querySelectorAll('tbody tr');
-            const term = searchTerm.toLowerCase();
-
-            rows.forEach(row => {
-                const functionName = row.querySelector('.function-name').textContent.toLowerCase();
-                const address = row.querySelector('.function-address').textContent.toLowerCase();
-
-                const matches = functionName.includes(term) || address.includes(term);
-                row.style.display = matches ? '' : 'none';
-            });
         }
 
         function renderPEExportsView(container, baseName, filename, fileInfo, history) {
@@ -8335,645 +7382,6 @@
 
             // Empty cell
             return '<td class="addr-cell missing">—</td>';
-        }
-
-        // Version filtering state already declared above
-
-        // Version filtering function
-        function toggleVersionFilter(filterKey) {
-            // Toggle the specific filter
-            versionFilters[filterKey] = !versionFilters[filterKey];
-
-            // Ensure at least one filter is active
-            const anyActive = Object.values(versionFilters).some(v => v);
-            if (!anyActive) {
-                versionFilters[filterKey] = true;
-            }
-
-            // Update legacy flags for compatibility
-            showClassic = versionFilters.preRefactor || versionFilters.postRefactor || versionFilters.allVersions;
-            showLoD = versionFilters.preRefactor || versionFilters.postRefactor || versionFilters.allVersions;
-
-            // Update UI
-            updateFilterButtons();
-            renderVersionList();
-        }
-
-        // Update filter button states
-        function updateFilterButtons() {
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                const filterKey = btn.onclick.toString().match(/toggleVersionFilter\('([^']+)'\)/)?.[1];
-                if (filterKey && versionFilters.hasOwnProperty(filterKey)) {
-                    btn.classList.toggle('active', versionFilters[filterKey]);
-                }
-            });
-        }
-
-        // Render version list with filtering
-        function renderVersionList() {
-            const container = document.getElementById('versionList');
-            if (!container || !VERSIONS_DATA) {
-                return;
-            }
-
-            // Filter versions based on current filters
-            const filteredVersions = VERSIONS_DATA.filter(v => {
-                const isClassic = v.game_type === 'Classic';
-                const isLoD = v.game_type === 'LoD' || v.is_lod;
-
-                // Pre-refactor: Classic versions 1.00-1.06b
-                const isPreRefactor = isClassic && !v.is_lod;
-                // Post-refactor: Classic versions 1.07+ (these should be marked as LoD in the data)
-                const isPostRefactor = isClassic && v.is_lod;
-
-                return (versionFilters.preRefactor && isPreRefactor) ||
-                       (versionFilters.postRefactor && isPostRefactor) ||
-                       (versionFilters.lod && isLoD);
-            });
-
-            // Render filtered versions
-            container.innerHTML = filteredVersions.map(v => {
-                const isClassic = v.game_type === 'Classic';
-                const isSelected = selectedVersion === v.folder_name;
-                const typeClass = isClassic ? 'classic' : 'lod';
-                const totalFiles = v.file_count || 0;
-                const changeCount = v.change_count || 0;
-
-                // Format: "changed / total" or "— / total" if no changes tracked
-                const changedDisplay = changeCount > 0 ? `<span class="changed">${changeCount}</span>` : '<span>—</span>';
-                const countsHtml = `${changedDisplay}<span class="separator"> / </span><span class="total">${totalFiles}</span>`;
-
-                return `
-                    <div class="version-item ${isSelected ? 'selected' : ''}"
-                         onclick="selectVersion('${v.folder_name}')"
-                         title="${v.game_type} ${v.version} - ${changeCount} of ${totalFiles} files changed">
-                        <span class="version-type ${typeClass}">${isClassic ? 'C' : 'L'}</span>
-                        <span class="version-badge ${typeClass}">${v.version}</span>
-                        <span class="file-counts">${countsHtml}</span>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        // Render cross-version function analysis matching d2_report_viewer.html structure
-        function renderCrossVersionAnalysis(data) {
-            const container = document.getElementById('cross-version-loading');
-
-            if (!data.functions || Object.keys(data.functions).length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-icon">📊</div>
-                        <div>No cross-version function data available</div>
-                    </div>
-                `;
-                return;
-            }
-
-            // Get all individual versions for columns (no grouping like d2_report_viewer.html)
-            const allVersions = [...new Set(
-                Object.values(data.functions)
-                    .flatMap(func => Object.keys(func.versions))
-            )].sort();
-
-            // Create individual columns for each version - no grouping
-            const versionColumns = allVersions;
-
-            // Count functions and named functions
-            const funcKeys = Object.keys(data.functions);
-            const namedCount = funcKeys.filter(key => {
-                const func = data.functions[key];
-                return func.name && !func.name.startsWith('FUN_') && !func.name.startsWith('__');
-            }).length;
-
-            const baseName = data.filename || 'Unknown';
-
-            // Create the interface matching d2_report_viewer.html exactly (no wrapper panel-content)
-            container.innerHTML = `
-                <div class="exports-container">
-                    <div class="exports-header">
-                        <div class="exports-header-title">${baseName} - Functions</div>
-                        <div class="exports-header-info">${funcKeys.length} function${funcKeys.length !== 1 ? 's' : ''} across ${versionColumns.length} version${versionColumns.length !== 1 ? 's' : ''}</div>
-                    </div>
-                    <div class="exports-toolbar">
-                        <div class="exports-toolbar-row">
-                            <input type="text" class="exports-search" id="funcSearchInput"
-                                   placeholder="Search name or address..."
-                                   oninput="onFuncSearchInput(this.value)">
-                            <div class="exports-toolbar-separator"></div>
-                            <button class="exports-toggle" id="namedOnlyToggle" onclick="toggleNamedOnly()" title="Show only named functions">
-                                <span class="exports-toggle-indicator"></span>
-                                <span>Named</span>
-                            </button>
-                            <button class="exports-toggle" id="rvaToggle" onclick="toggleRVA()" title="Show RVA instead of VA">
-                                <span class="exports-toggle-indicator"></span>
-                                <span>RVA</span>
-                            </button>
-                            <button class="exports-toggle" id="gapsOnlyToggle" onclick="toggleGapsOnly()" title="Show functions with version coverage gaps">
-                                <span class="exports-toggle-indicator"></span>
-                                <span>Gaps</span>
-                            </button>
-                            <button class="exports-toggle" id="copyOnClickToggle" onclick="toggleCopyOnClick()" title="Copy address to clipboard instead of compare">
-                                <span class="exports-toggle-indicator"></span>
-                                <span>Copy</span>
-                            </button>
-                            <button class="exports-toggle" id="signaturesToggle" onclick="toggleSignatures()" title="Show function signatures">
-                                <span class="exports-toggle-indicator"></span>
-                                <span>Sig</span>
-                            </button>
-                            <div class="exports-toolbar-separator"></div>
-                            <select class="category-filter" id="categoryFilter" onchange="onCategoryFilterChange(this.value)" title="Filter by function category">
-                                <option value="all">All</option>
-                                <option value="game">Game</option>
-                                <option value="crt">CRT</option>
-                                <option value="import">Import</option>
-                                <option value="exception">EH</option>
-                                <option value="other">Other</option>
-                            </select>
-                            <span class="exports-stats" id="funcFilterStats">
-                                ${funcKeys.length}/${funcKeys.length} (<span class="named-count">${namedCount}</span>)
-                            </span>
-                            <div class="category-legend">
-                                <span class="category-legend-item" title="Game Logic"><span class="category-legend-bar cat-game"></span>Game</span>
-                                <span class="category-legend-item" title="C Runtime"><span class="category-legend-bar cat-crt"></span>CRT</span>
-                                <span class="category-legend-item" title="Import Thunk"><span class="category-legend-bar cat-import"></span>IMP</span>
-                                <span class="category-legend-item" title="Exception Handling"><span class="category-legend-bar cat-exception"></span>EH</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="exports-table-wrapper" id="exportsTableWrapper">
-                        <table class="exports-table">
-                            <thead>
-                                <tr>
-                                    <th class="fn-name-cell sortable ${crossVersionSortColumn === 'function' ? (crossVersionSortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}" data-sort-column="function" onclick="handleTableSort('function')">Function<span class="sort-indicator"></span></th>
-                                    ${versionColumns.map((version, idx) => {
-                                        const isSorted = crossVersionSortColumn === version;
-                                        const sortClass = isSorted ? (crossVersionSortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : '';
-                                        const versionLabel = version.split('/')[1] || version; // Show just version number
-                                        return `<th class="sortable ${sortClass}" data-sort-column="${version}" onclick="handleTableSort('${version}')" title="${version}">${versionLabel}<span class="sort-indicator"></span></th>`;
-                                    }).join('')}
-                                </tr>
-                            </thead>
-                            <tbody id="funcTableBody">
-                                ${renderCrossVersionTableRows(data.functions, versionColumns)}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-
-            // Store data globally for filtering/sorting
-            window.crossVersionData = data;
-            window.crossVersionAllVersions = allVersions;
-            window.crossVersionColumns = versionColumns;
-
-            // Initialize toggle states and filters
-            window.showRVA = false;
-            window.gapsOnlyFilter = false;
-            window.copyOnClick = false;
-            window.namedOnlyFilter = false;
-            window.showSignatures = false;
-            window.funcSearchFilter = '';
-            window.categoryFilter = 'all';
-        }
-
-        // Create version groups similar to d2_report_viewer.html
-        function createVersionGroups(allVersions) {
-            const groups = [];
-
-            // Separate Classic and LoD versions
-            const classicVersions = allVersions.filter(v => v.startsWith('Classic/')).sort();
-            const lodVersions = allVersions.filter(v => v.startsWith('LoD/')).sort();
-
-            // Group Classic versions
-            if (classicVersions.length > 0) {
-                const versions = classicVersions.map(v => v.replace('Classic/', ''));
-                groups.push({
-                    startVer: versions[0],
-                    endVer: versions[versions.length - 1],
-                    versions: classicVersions
-                });
-            }
-
-            // Group LoD versions
-            if (lodVersions.length > 0) {
-                const versions = lodVersions.map(v => v.replace('LoD/', ''));
-                groups.push({
-                    startVer: versions[0],
-                    endVer: versions[versions.length - 1],
-                    versions: lodVersions
-                });
-            }
-
-            return groups;
-        }
-
-        // Render table rows for cross-version analysis
-        function renderCrossVersionTableRows(functions, versionColumns) {
-            const funcNames = Object.keys(functions).sort();
-
-            return funcNames.map(funcName => {
-                const func = functions[funcName];
-                const categoryClass = `category-${func.category.toLowerCase()}`;
-
-                // Check if function has gaps (missing in some versions)
-                const hasGaps = versionColumns.some(version => !func.versions[version]);
-
-                const addressCells = versionColumns.map(version => {
-                    const versionData = func.versions[version];
-
-                    if (versionData) {
-                        const address = window.showRVA ? `0x${versionData.rva.toString(16)}` : versionData.address;
-                        return `<td class="addr-cell" onclick="handleAddressClick('${funcName}', '${version}', '${address}')">${address}</td>`;
-                    } else {
-                        return `<td class="addr-cell missing">-</td>`;
-                    }
-                }).join('');
-
-                const rowClasses = [
-                    hasGaps && window.gapsOnlyFilter ? 'hidden' : '',
-                    `data-function="${funcName}"`,
-                    `data-category="${func.category.toLowerCase()}"`
-                ].filter(Boolean).join(' ');
-
-                return `
-                    <tr ${rowClasses}>
-                        <td class="fn-name-cell ${categoryClass}" title="${funcName}">
-                            ${funcName}
-                        </td>
-                        ${addressCells}
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        // Handle address cell clicks (copy or compare functionality)
-        function handleAddressClick(funcName, version, address) {
-            if (window.copyOnClick) {
-                navigator.clipboard.writeText(address);
-                showToast('Address copied to clipboard');
-            } else {
-                // Open compare panel to show function comparison
-                showComparePanel(funcName, version);
-            }
-        }
-
-        function showComparePanel(funcName, version) {
-            const comparePanel = document.getElementById('comparePanel');
-            const compareTitle = document.getElementById('comparePanelTitle');
-            const compareContent = document.getElementById('compareContent');
-
-            if (comparePanel && compareTitle && compareContent) {
-                compareTitle.textContent = `Compare: ${funcName}`;
-
-                compareContent.innerHTML = `
-                    <div class="compare-details">
-                        <h3>Function: ${funcName}</h3>
-                        <h4>Selected Version: ${version}</h4>
-                        <p>Comparison functionality would be implemented here.</p>
-                        <p>This would show detailed function information, cross-references, and allow comparison between different versions.</p>
-                    </div>
-                `;
-
-                comparePanel.style.display = 'block';
-                comparePanel.scrollIntoView({ behavior: 'smooth' });
-            }
-        }
-
-        function closeComparePanel() {
-            const comparePanel = document.getElementById('comparePanel');
-            if (comparePanel) {
-                comparePanel.style.display = 'none';
-            }
-        }
-
-        function showToast(message) {
-            const toast = document.getElementById('toast');
-            if (toast) {
-                toast.textContent = message;
-                toast.style.display = 'block';
-                setTimeout(() => {
-                    toast.style.display = 'none';
-                }, 2000);
-            }
-        }
-
-
-        // Toggle functions matching d2_report_viewer.html
-        function toggleRVADisplay() {
-            window.showRVA = !window.showRVA;
-            const toggle = document.getElementById('rvaToggle');
-            toggle.classList.toggle('active', window.showRVA);
-
-            if (window.crossVersionData && window.crossVersionGroups) {
-                updateTableDisplay();
-            }
-        }
-
-        function toggleGapsOnly() {
-            window.showGapsOnly = !window.showGapsOnly;
-            const toggle = document.getElementById('gapsOnlyToggle');
-            toggle.classList.toggle('active', window.showGapsOnly);
-
-            filterCrossVersionTable();
-        }
-
-        function toggleCopyOnClick() {
-            window.copyOnClick = !window.copyOnClick;
-            const toggle = document.getElementById('copyOnClickToggle');
-            toggle.classList.toggle('active', window.copyOnClick);
-        }
-
-        function updateTableDisplay() {
-            const tbody = document.getElementById('crossVersionTableBody');
-            if (tbody && window.crossVersionData && window.crossVersionGroups) {
-                tbody.innerHTML = renderCrossVersionTableRows(window.crossVersionData.functions, window.crossVersionGroups);
-                filterCrossVersionTable(); // Reapply filters
-            }
-        }
-
-        // Filter cross-version table based on search and category
-        function filterCrossVersionTable() {
-            const funcSearch = document.getElementById('funcSearch');
-            const categoryFilter = document.getElementById('categoryFilter');
-
-            if (!funcSearch || !categoryFilter) return;
-
-            const searchTerm = funcSearch.value.toLowerCase();
-            const selectedCategory = categoryFilter.value;
-
-            const tbody = document.getElementById('crossVersionTableBody');
-            if (!tbody) return;
-
-            const rows = tbody.querySelectorAll('tr');
-            let visibleCount = 0;
-            let visibleNamedCount = 0;
-
-            rows.forEach(row => {
-                const funcName = row.dataset.function;
-                const category = row.dataset.category;
-
-                if (!funcName || !category) return;
-
-                const matchesSearch = searchTerm === '' || funcName.toLowerCase().includes(searchTerm);
-                const matchesCategory = selectedCategory === 'all' || category === selectedCategory;
-
-                // Gaps filter
-                const hasGaps = row.classList.contains('gap-row');
-                const matchesGaps = !window.showGapsOnly || hasGaps;
-
-                const shouldShow = matchesSearch && matchesCategory && matchesGaps;
-                row.style.display = shouldShow ? '' : 'none';
-
-                if (shouldShow) {
-                    visibleCount++;
-                    // Count as named if doesn't start with FUN_ or __
-                    if (!funcName.startsWith('FUN_') && !funcName.startsWith('__')) {
-                        visibleNamedCount++;
-                    }
-                }
-            });
-
-            // Update stats
-            const statsElement = document.getElementById('funcFilterStats');
-            if (statsElement) {
-                const totalCount = rows.length;
-                statsElement.innerHTML = `${visibleCount}/${totalCount} (<span class="named-count">${visibleNamedCount}</span>)`;
-            }
-        }
-
-        // Sort cross-version table
-        let crossVersionSortColumn = 'function';
-        let crossVersionSortDirection = 'asc';
-
-        function sortCrossVersionTable(column) {
-            if (crossVersionSortColumn === column) {
-                crossVersionSortDirection = crossVersionSortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                crossVersionSortColumn = column;
-                crossVersionSortDirection = 'asc';
-            }
-
-            // Update sort indicators
-            document.querySelectorAll('.exports-table thead th.sortable').forEach(th => {
-                th.classList.remove('sort-asc', 'sort-desc');
-            });
-
-            const currentTh = document.querySelector(`[onclick="sortCrossVersionTable('${column}')"]`);
-            if (currentTh) {
-                currentTh.classList.add(crossVersionSortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
-            }
-
-            // Re-render table with sorted data
-            if (window.crossVersionData) {
-                const tbody = document.getElementById('crossVersionTableBody');
-                tbody.innerHTML = renderSortedCrossVersionRows(
-                    window.crossVersionData.functions,
-                    window.crossVersionAllVersions,
-                    column,
-                    crossVersionSortDirection
-                );
-
-                // Reapply filters
-                filterCrossVersionTable();
-            }
-        }
-
-        // Render sorted cross-version table rows
-        function renderSortedCrossVersionRows(functions, allVersions, sortColumn, sortDirection) {
-            const funcNames = Object.keys(functions);
-
-            // Sort function names
-            funcNames.sort((a, b) => {
-                let comparison = 0;
-
-                if (sortColumn === 'function') {
-                    comparison = a.localeCompare(b);
-                } else {
-                    // Sort by version address
-                    const aFunc = functions[a];
-                    const bFunc = functions[b];
-                    const aAddr = aFunc.versions[sortColumn]?.rva || 0;
-                    const bAddr = bFunc.versions[sortColumn]?.rva || 0;
-                    comparison = aAddr - bAddr;
-                }
-
-                return sortDirection === 'desc' ? -comparison : comparison;
-            });
-
-            return funcNames.map(funcName => {
-                const func = functions[funcName];
-                const categoryClass = `category-${func.category.toLowerCase()}`;
-
-                const addressCells = allVersions.map(version => {
-                    const versionData = func.versions[version];
-                    if (versionData) {
-                        return `<td class="addr-cell">${versionData.address}</td>`;
-                    } else {
-                        return `<td class="addr-cell missing">-</td>`;
-                    }
-                }).join('');
-
-                return `
-                    <tr data-function="${funcName}" data-category="${func.category}">
-                        <td class="fn-name-cell ${categoryClass}" title="${funcName}">
-                            ${funcName}
-                        </td>
-                        ${addressCells}
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        // Cross-version function table controls (matching d2_report_viewer.html)
-        function onFuncSearchInput(value) {
-            window.funcSearchFilter = value.toLowerCase();
-            updateCrossVersionTable();
-        }
-
-        function toggleNamedOnly() {
-            window.namedOnlyFilter = !window.namedOnlyFilter;
-            const btn = document.getElementById('namedOnlyToggle');
-            if (btn) {
-                if (window.namedOnlyFilter) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
-            }
-            updateCrossVersionTable();
-        }
-
-        function toggleRVA() {
-            window.showRVA = !window.showRVA;
-            const btn = document.getElementById('rvaToggle');
-            if (btn) {
-                if (window.showRVA) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
-            }
-            updateCrossVersionTable();
-        }
-
-        function toggleGapsOnly() {
-            window.gapsOnlyFilter = !window.gapsOnlyFilter;
-            const btn = document.getElementById('gapsOnlyToggle');
-            if (btn) {
-                if (window.gapsOnlyFilter) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
-            }
-            updateCrossVersionTable();
-        }
-
-        function toggleCopyOnClick() {
-            window.copyOnClick = !window.copyOnClick;
-            const btn = document.getElementById('copyOnClickToggle');
-            if (btn) {
-                if (window.copyOnClick) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
-            }
-        }
-
-        function toggleSignatures() {
-            window.showSignatures = !window.showSignatures;
-            const btn = document.getElementById('signaturesToggle');
-            if (btn) {
-                if (window.showSignatures) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
-            }
-            updateCrossVersionTable();
-        }
-
-        function onCategoryFilterChange(value) {
-            window.categoryFilter = value;
-            updateCrossVersionTable();
-        }
-
-        function handleTableSort(column) {
-            if (crossVersionSortColumn === column) {
-                crossVersionSortDirection = crossVersionSortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                crossVersionSortColumn = column;
-                crossVersionSortDirection = 'asc';
-            }
-            updateCrossVersionTable();
-        }
-
-        function updateCrossVersionTable() {
-            if (!window.crossVersionData) return;
-
-            const data = window.crossVersionData;
-            const versionColumns = window.crossVersionColumns;
-
-            // Apply filters
-            let filteredFunctions = Object.keys(data.functions);
-
-            // Search filter
-            if (window.funcSearchFilter) {
-                filteredFunctions = filteredFunctions.filter(key => {
-                    const func = data.functions[key];
-                    return func.name.toLowerCase().includes(window.funcSearchFilter) ||
-                           Object.values(func.versions).some(v =>
-                               v.address.toLowerCase().includes(window.funcSearchFilter)
-                           );
-                });
-            }
-
-            // Named only filter
-            if (window.namedOnlyFilter) {
-                filteredFunctions = filteredFunctions.filter(key => {
-                    const func = data.functions[key];
-                    return func.name && !func.name.startsWith('FUN_') && !func.name.startsWith('__');
-                });
-            }
-
-            // Category filter
-            if (window.categoryFilter && window.categoryFilter !== 'all') {
-                filteredFunctions = filteredFunctions.filter(key => {
-                    const func = data.functions[key];
-                    return func.category === window.categoryFilter;
-                });
-            }
-
-            // Gaps only filter
-            if (window.gapsOnlyFilter) {
-                filteredFunctions = filteredFunctions.filter(key => {
-                    const func = data.functions[key];
-                    return Object.keys(func.versions).length < versionColumns.length;
-                });
-            }
-
-            // Build filtered functions object
-            const filteredData = {};
-            filteredFunctions.forEach(key => {
-                filteredData[key] = data.functions[key];
-            });
-
-            // Update table body
-            const tableBody = document.getElementById('funcTableBody');
-            if (tableBody) {
-                tableBody.innerHTML = renderCrossVersionTableRows(filteredData, versionColumns);
-            }
-
-            // Update stats
-            const stats = document.getElementById('funcFilterStats');
-            if (stats) {
-                const namedCount = filteredFunctions.filter(key => {
-                    const func = data.functions[key];
-                    return func.name && !func.name.startsWith('FUN_') && !func.name.startsWith('__');
-                }).length;
-                stats.innerHTML = `${filteredFunctions.length}/${Object.keys(data.functions).length} (<span class="named-count">${namedCount}</span>)`;
-            }
         }
     </script>
 </body>
