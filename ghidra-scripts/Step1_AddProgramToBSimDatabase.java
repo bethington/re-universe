@@ -608,7 +608,13 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             "4 = Cancel\n\n" +
             "For missing binaries, choose option 2.";
 
-        String response = askString("Processing Mode", message, "2");
+        String response;
+        try {
+            response = askString("Processing Mode", message, "2");
+        } catch (CancelledException e) {
+            println("Operation cancelled by user");
+            return ProcessingMode.CANCELLED;
+        }
 
         if (response == null) {
             println("Operation cancelled");
@@ -740,8 +746,6 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                     default:
                         throw new RuntimeException("SKIP_EXISTING");
                 }
-
-                return existingId;
             }
         }
 
