@@ -603,10 +603,13 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
      */
     private int getOrCreateExecutableUnified(Connection conn, String programName, String programPath, UnifiedVersionInfo versionInfo) throws SQLException {
 
+        // Generate unified executable name that matches database constraints
+        String unifiedName = generateUnifiedExecutableName(programName, versionInfo);
+
         // Check if executable already exists
         String selectSql = "SELECT id FROM exetable WHERE name_exec = ?";
         try (PreparedStatement stmt = conn.prepareStatement(selectSql)) {
-            stmt.setString(1, programName);
+            stmt.setString(1, unifiedName);
             ResultSet rs = stmt.executeQuery();
 
             if (rs.next()) {
@@ -643,8 +646,8 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             "VALUES (?, ?, ?, NOW(), ?) RETURNING id";
 
         try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
-            stmt.setString(1, programName);
-            stmt.setString(2, generateMD5(programName));
+            stmt.setString(1, unifiedName);
+            stmt.setString(2, generateMD5(unifiedName));
             stmt.setString(3, getArchitectureString());
             stmt.setString(4, versionInfo.gameVersion);
 
@@ -673,8 +676,8 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             String basicInsertSql = "INSERT INTO exetable (name_exec, md5, architecture, ingest_date) " +
                 "VALUES (?, ?, ?, NOW()) RETURNING id";
             try (PreparedStatement stmt = conn.prepareStatement(basicInsertSql)) {
-                stmt.setString(1, programName);
-                stmt.setString(2, generateMD5(programName));
+                stmt.setString(1, unifiedName);
+                stmt.setString(2, generateMD5(unifiedName));
                 stmt.setString(3, getArchitectureString());
 
                 ResultSet rs = stmt.executeQuery();
@@ -1436,5 +1439,28 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             }
         }
         return false;
+    }
+
+    /**
+     * Generate unified executable name that matches database constraint patterns
+     */
+    private String generateUnifiedExecutableName(String programName, UnifiedVersionInfo versionInfo) {
+        // Handle special cases for Game.exe
+        if (programName.equals("Game.exe") || programName.equals("Diablo_II.exe")) {
+            // Use pattern: (Classic|LoD)_1.[version]_Game.exe
+            return String.format("%s_%s_%s", versionInfo.familyType, versionInfo.gameVersion, programName);
+        }
+
+        // For all other executables, use pattern: 1.[version]_[FileName].dll/exe
+        // Extract just the filename without any path
+        String fileName = programName;
+        if (fileName.contains("/")) {
+            fileName = fileName.substring(fileName.lastIndexOf("/") + 1);
+        }
+        if (fileName.contains("\\")) {
+            fileName = fileName.substring(fileName.lastIndexOf("\\") + 1);
+        }
+
+        return String.format("%s_%s", versionInfo.gameVersion, fileName);
     }
 }
