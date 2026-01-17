@@ -421,7 +421,12 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
             // Get executable ID
             int executableId = getExecutableId(conn, programName, versionInfo);
             if (executableId == -1) {
-                throw new Exception("Executable not found in database. Run AddProgramToBSimDatabase first.");
+                // Provide more helpful error message
+                String unifiedName = generateUnifiedExecutableName(programName, versionInfo);
+                throw new Exception(String.format("Executable not found in database.\n" +
+                    "  Tried: '%s', unified: '%s', version: %s\n" +
+                    "  Run AddProgramToBSimDatabase first for this binary.",
+                    programName, unifiedName, versionInfo.getDisplayInfo()));
             }
 
             println("Found executable ID: " + executableId);
@@ -550,8 +555,8 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
                 }
 
                 try {
-                    // Get function ID from desctable
-                    int functionId = getFunctionId(conn, function.getName(), executableId);
+                    // Get function ID from desctable (try address first, then name)
+                    int functionId = getFunctionId(conn, function, executableId);
                     if (functionId == -1) {
                         continue; // Function not in database
                     }
@@ -597,18 +602,31 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
         }
     }
 
-    private int getFunctionId(Connection conn, String functionName, int executableId) throws SQLException {
-        String sql = "SELECT id FROM desctable WHERE name_func = ? AND id_exe = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, functionName);
+    private int getFunctionId(Connection conn, Function function, int executableId) throws SQLException {
+        // Try matching by address first (most reliable)
+        long address = function.getEntryPoint().getOffset();
+        String addressSql = "SELECT id FROM desctable WHERE addr = ? AND id_exe = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(addressSql)) {
+            stmt.setLong(1, address);
             stmt.setInt(2, executableId);
             ResultSet rs = stmt.executeQuery();
-
             if (rs.next()) {
                 return rs.getInt("id");
             }
-            return -1;
         }
+
+        // Fallback to name matching (for backward compatibility)
+        String nameSql = "SELECT id FROM desctable WHERE name_func = ? AND id_exe = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(nameSql)) {
+            stmt.setString(1, function.getName());
+            stmt.setInt(2, executableId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("id");
+            }
+        }
+
+        return -1;
     }
 
     private FunctionSignature generateFunctionSignature(Function function) {
