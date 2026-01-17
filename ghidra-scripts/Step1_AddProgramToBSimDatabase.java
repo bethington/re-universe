@@ -36,7 +36,6 @@
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.*;
 import ghidra.program.model.address.*;
-import ghidra.program.model.lang.FlowType;
 import ghidra.util.exception.CancelledException;
 import ghidra.framework.model.*;
 import ghidra.program.database.ProgramDB;
@@ -1027,9 +1026,9 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             InstructionIterator instructions = program.getListing().getInstructions(body, true);
             while (instructions.hasNext()) {
                 Instruction instr = instructions.next();
-                FlowType flowType = instr.getFlowType();
 
-                if (flowType.isConditional() || flowType.isJump()) {
+                // Check if instruction has conditional or jump flow
+                if (instr.getFlowType().isConditional() || instr.getFlowType().isJump()) {
                     branches++;
                 }
             }
