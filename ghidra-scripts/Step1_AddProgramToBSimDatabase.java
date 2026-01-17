@@ -56,8 +56,15 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
     private static final String MODE_ALL = "All Programs in Project";
     private static final String MODE_VERSION = "Programs by Version Filter";
 
-    // Flag to auto-update existing executables without prompting
-    private boolean autoUpdateExisting = false;
+    // Processing modes for handling existing executables
+    private enum ProcessingMode {
+        UPDATE_ALL,     // Process all binaries, updating existing ones
+        ADD_MISSING,    // Only process binaries not yet in database
+        ASK_INDIVIDUAL, // Prompt individually for each binary
+        CANCELLED       // User cancelled operation
+    }
+
+    private ProcessingMode processingMode = ProcessingMode.ASK_INDIVIDUAL;
 
     // Helper class for unified version parsing
     private static class UnifiedVersionInfo {
@@ -415,12 +422,16 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             return;
         }
 
-        // Ask if user wants to auto-update existing executables
-        autoUpdateExisting = askYesNo("Auto-Update Existing",
-            "Automatically update existing executables without prompting for each one?");
+        // Ask user for processing mode
+        processingMode = askProcessingMode();
+        if (processingMode == ProcessingMode.CANCELLED) {
+            println("Operation cancelled by user");
+            return;
+        }
 
         int successCount = 0;
         int errorCount = 0;
+        int skippedCount = 0;
 
         for (int i = 0; i < programFiles.size(); i++) {
             DomainFile file = programFiles.get(i);
@@ -436,12 +447,17 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 processProjectFile(file);
                 successCount++;
             } catch (Exception e) {
-                printerr("Error processing " + file.getName() + ": " + e.getMessage());
-                errorCount++;
+                if ("SKIP_EXISTING".equals(e.getMessage())) {
+                    println("  Skipped " + file.getName() + " (existing executable)");
+                    skippedCount++;
+                } else {
+                    printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                    errorCount++;
+                }
             }
         }
 
-        println(String.format("Completed: %d successful, %d errors", successCount, errorCount));
+        println(String.format("Completed: %d successful, %d errors, %d skipped", successCount, errorCount, skippedCount));
     }
 
     /**
@@ -506,11 +522,15 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             return;
         }
 
-        autoUpdateExisting = askYesNo("Auto-Update Existing",
-            "Automatically update existing executables without prompting for each one?");
+        processingMode = askProcessingMode();
+        if (processingMode == ProcessingMode.CANCELLED) {
+            println("Operation cancelled by user");
+            return;
+        }
 
         int successCount = 0;
         int errorCount = 0;
+        int skippedCount = 0;
 
         for (int i = 0; i < matchingFiles.size(); i++) {
             DomainFile file = matchingFiles.get(i);
@@ -526,12 +546,17 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 processProjectFile(file);
                 successCount++;
             } catch (Exception e) {
-                printerr("Error processing " + file.getName() + ": " + e.getMessage());
-                errorCount++;
+                if ("SKIP_EXISTING".equals(e.getMessage())) {
+                    println("  Skipped " + file.getName() + " (existing executable)");
+                    skippedCount++;
+                } else {
+                    printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                    errorCount++;
+                }
             }
         }
 
-        println(String.format("Completed: %d successful, %d errors", successCount, errorCount));
+        println(String.format("Completed: %d successful, %d errors, %d skipped", successCount, errorCount, skippedCount));
     }
 
     /**
@@ -568,6 +593,38 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
         } finally {
             program.release(this);
+        }
+    }
+
+    /**
+     * Ask user for processing mode when handling existing executables
+     */
+    private ProcessingMode askProcessingMode() {
+        String[] choices = {
+            "Update All - Process all binaries, updating existing ones",
+            "Add Missing - Only process binaries not yet in database",
+            "Ask Individual - Prompt individually for each binary",
+            "Cancel - Exit the operation"
+        };
+
+        int choice = askChoice("Processing Mode",
+            "How should existing executables be handled?",
+            choices,
+            "Add Missing - Only process binaries not yet in database");
+
+        switch (choice) {
+            case 0:
+                println("Selected: Update All mode");
+                return ProcessingMode.UPDATE_ALL;
+            case 1:
+                println("Selected: Add Missing mode");
+                return ProcessingMode.ADD_MISSING;
+            case 2:
+                println("Selected: Ask Individual mode");
+                return ProcessingMode.ASK_INDIVIDUAL;
+            default:
+                println("Operation cancelled");
+                return ProcessingMode.CANCELLED;
         }
     }
 
@@ -655,14 +712,29 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                     println("  Note: Could not update version fields (function may not exist)");
                 }
 
-                // Check if auto-update is enabled
-                if (!autoUpdateExisting) {
-                    // In batch mode, default to updating existing executables
-                    // to avoid blocking automated processing
-                    println("  Executable exists - proceeding with function processing (batch mode)");
-                } else {
-                    println("  Auto-updating existing executable...");
+                // Handle based on processing mode
+                switch (processingMode) {
+                    case UPDATE_ALL:
+                        println("  Auto-updating existing executable...");
+                        return existingId;
+
+                    case ADD_MISSING:
+                        println("  Skipping existing executable (Add Missing mode)");
+                        throw new RuntimeException("SKIP_EXISTING");
+
+                    case ASK_INDIVIDUAL:
+                        boolean update = askYesNo("Executable Exists",
+                            "Executable already exists in database. Update function data?");
+                        if (!update) {
+                            throw new RuntimeException("SKIP_EXISTING");
+                        }
+                        println("  Updating existing executable...");
+                        return existingId;
+
+                    default:
+                        throw new RuntimeException("SKIP_EXISTING");
                 }
+
                 return existingId;
             }
         }
