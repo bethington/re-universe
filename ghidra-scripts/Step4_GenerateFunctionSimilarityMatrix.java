@@ -472,15 +472,18 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
         List<ExecutableInfo> executables = new ArrayList<>();
 
         String sql = """
-            SELECT id, name_exec,
+            SELECT DISTINCT e.id, e.name_exec,
                    CASE
-                       WHEN name_exec ~ '^Classic_' THEN 'Classic'
-                       WHEN name_exec ~ '^LoD_' THEN 'LoD'
+                       WHEN e.name_exec ~ '^Classic_' THEN 'Classic'
+                       WHEN e.name_exec ~ '^LoD_' THEN 'LoD'
+                       WHEN e.name_exec ~ '^1\\.' THEN 'Unified'
                        ELSE 'Other'
                    END as game_type
-            FROM exetable
-            WHERE id != ? AND name_exec ~ '^(Classic|LoD)_'
-            ORDER BY name_exec
+            FROM exetable e
+            JOIN desctable d ON e.id = d.id_exe
+            JOIN enhanced_signatures es ON d.id = es.function_id
+            WHERE e.id != ?
+            ORDER BY e.name_exec
             """;
 
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
