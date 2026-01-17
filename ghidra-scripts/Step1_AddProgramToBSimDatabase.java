@@ -600,33 +600,38 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
      * Ask user for processing mode when handling existing executables
      */
     private ProcessingMode askProcessingMode() {
-        // Use a series of dialogs since askChoice API might be version-dependent
-
         String message = "How should existing executables be handled?\n\n" +
-            "• Update All: Process all binaries, updating existing ones\n" +
-            "• Add Missing: Only process binaries not yet in database\n" +
-            "• Ask Individual: Prompt individually for each binary";
+            "Enter the number for your choice:\n" +
+            "1 = Update All (process all binaries, updating existing ones)\n" +
+            "2 = Add Missing (only process binaries not yet in database) [RECOMMENDED]\n" +
+            "3 = Ask Individual (prompt individually for each binary)\n" +
+            "4 = Cancel\n\n" +
+            "For missing binaries, choose option 2.";
 
-        if (askYesNo("Processing Mode - Add Missing?",
-            message + "\n\nDo you want 'Add Missing' mode (recommended for missing binaries)?")) {
-            println("Selected: Add Missing mode");
-            return ProcessingMode.ADD_MISSING;
+        String response = askString("Processing Mode", message, "2");
+
+        if (response == null) {
+            println("Operation cancelled");
+            return ProcessingMode.CANCELLED;
         }
 
-        if (askYesNo("Processing Mode - Update All?",
-            "Do you want 'Update All' mode (process all binaries, updating existing ones)?")) {
-            println("Selected: Update All mode");
-            return ProcessingMode.UPDATE_ALL;
+        switch (response.trim()) {
+            case "1":
+                println("Selected: Update All mode");
+                return ProcessingMode.UPDATE_ALL;
+            case "2":
+                println("Selected: Add Missing mode");
+                return ProcessingMode.ADD_MISSING;
+            case "3":
+                println("Selected: Ask Individual mode");
+                return ProcessingMode.ASK_INDIVIDUAL;
+            case "4":
+                println("Operation cancelled");
+                return ProcessingMode.CANCELLED;
+            default:
+                println("Invalid selection, defaulting to Add Missing mode");
+                return ProcessingMode.ADD_MISSING;
         }
-
-        if (askYesNo("Processing Mode - Ask Individual?",
-            "Do you want 'Ask Individual' mode (prompt individually for each binary)?")) {
-            println("Selected: Ask Individual mode");
-            return ProcessingMode.ASK_INDIVIDUAL;
-        }
-
-        println("Operation cancelled");
-        return ProcessingMode.CANCELLED;
     }
 
     /**
