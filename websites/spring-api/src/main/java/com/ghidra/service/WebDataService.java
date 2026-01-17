@@ -241,6 +241,159 @@ public class WebDataService {
         return index;
     }
 
+    /**
+     * Get cross-version function data for a specific binary file.
+     * Returns functions with addresses across all versions, handling Classic/LoD deduplication.
+     * DLLs are shared between Classic and LoD (except for .exe files), so we use unique version numbers.
+     */
+    @Cacheable(value = "crossVersionFunctions", key = "#filename")
+    public Map<String, Object> getCrossVersionFunctions(String filename) {
+        // Get all executables matching this filename pattern (e.g., *_D2Client.dll)
+        String executablesSql = """
+            SELECT
+                e.id,
+                e.name_exec,
+                e.md5
+            FROM exetable e
+            WHERE e.name_exec LIKE ?
+            ORDER BY e.name_exec
+        """;
+
+        String filenamePattern = "%_" + filename;
+        List<Map<String, Object>> executables = jdbcTemplate.queryForList(executablesSql, filenamePattern);
+
+        if (executables.isEmpty()) {
+            Map<String, Object> emptyResponse = new HashMap<>();
+            emptyResponse.put("filename", filename);
+            emptyResponse.put("versions", new ArrayList<>());
+            emptyResponse.put("functions", new HashMap<>());
+            emptyResponse.put("error", "No executables found matching " + filename);
+            return emptyResponse;
+        }
+
+        // Build version list - deduplicate by using unique version numbers
+        // Classic and LoD share DLLs (same binary), so we only need one column per version number
+        Map<String, Long> versionToExeId = new LinkedHashMap<>(); // Preserve insertion order
+        Map<String, String> versionToMd5 = new HashMap<>();
+        List<String> allVersions = new ArrayList<>();
+        boolean isExe = filename.toLowerCase().endsWith(".exe");
+
+        for (Map<String, Object> exe : executables) {
+            String nameExec = (String) exe.get("name_exec");
+            Long exeId = (Long) exe.get("id");
+            String md5 = (String) exe.get("md5");
+
+            // Parse version from name: Classic_1.00_D2Client.dll -> 1.00
+            String[] parts = nameExec.split("_");
+            if (parts.length >= 3) {
+                String gameType = parts[0]; // Classic or LoD
+                String version = parts[1];  // 1.00, 1.07, etc.
+
+                // For .exe files, include gameType in the key (they differ between Classic/LoD)
+                // For .dll files, just use version number (same binary shared)
+                String versionKey = isExe ? (gameType + "/" + version) : version;
+
+                // Only add if we haven't seen this version (or if it's an exe, which can differ)
+                if (!versionToExeId.containsKey(versionKey)) {
+                    versionToExeId.put(versionKey, exeId);
+                    versionToMd5.put(versionKey, md5);
+                    allVersions.add(versionKey);
+                }
+            }
+        }
+
+        // Sort versions naturally (1.00, 1.01, 1.02, ..., 1.10, 1.11, etc.)
+        allVersions.sort((a, b) -> {
+            // Extract numeric version for comparison
+            String verA = a.contains("/") ? a.split("/")[1] : a;
+            String verB = b.contains("/") ? b.split("/")[1] : b;
+            return compareVersions(verA, verB);
+        });
+
+        // Get all function data for these executables
+        String functionsSql = """
+            SELECT
+                d.name_func,
+                d.addr,
+                d.flags,
+                e.id as exe_id,
+                e.name_exec
+            FROM desctable d
+            JOIN exetable e ON d.id_exe = e.id
+            WHERE e.name_exec LIKE ?
+            ORDER BY d.name_func, e.name_exec
+        """;
+
+        List<Map<String, Object>> functionResults = jdbcTemplate.queryForList(functionsSql, filenamePattern);
+
+        // Build function map: function_name -> { name, addresses: { version: address }, category }
+        Map<String, Map<String, Object>> functionsMap = new LinkedHashMap<>();
+
+        for (Map<String, Object> row : functionResults) {
+            String funcName = (String) row.get("name_func");
+            Long addr = (Long) row.get("addr");
+            String nameExec = (String) row.get("name_exec");
+
+            // Parse version from executable name
+            String[] parts = nameExec.split("_");
+            if (parts.length < 3) continue;
+
+            String gameType = parts[0];
+            String version = parts[1];
+            String versionKey = isExe ? (gameType + "/" + version) : version;
+
+            // Initialize function entry if not exists
+            functionsMap.computeIfAbsent(funcName, k -> {
+                Map<String, Object> funcData = new LinkedHashMap<>();
+                funcData.put("name", funcName);
+                funcData.put("category", categorizeFunctionName(funcName));
+                funcData.put("addresses", new LinkedHashMap<String, String>());
+                return funcData;
+            });
+
+            // Add address for this version
+            @SuppressWarnings("unchecked")
+            Map<String, String> addresses = (Map<String, String>) functionsMap.get(funcName).get("addresses");
+            addresses.put(versionKey, "0x" + String.format("%08x", addr).toUpperCase());
+        }
+
+        // Build response
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("filename", filename);
+        response.put("versions", allVersions);
+        response.put("versionMd5s", versionToMd5);
+        response.put("functions", functionsMap);
+        response.put("functionCount", functionsMap.size());
+        response.put("versionCount", allVersions.size());
+        response.put("isExe", isExe);
+        response.put("generated", new Date().toString());
+
+        return response;
+    }
+
+    /**
+     * Compare version strings like "1.00", "1.07", "1.13d" naturally
+     */
+    private int compareVersions(String v1, String v2) {
+        // Extract numeric parts
+        String num1 = v1.replaceAll("[^0-9.]", "");
+        String num2 = v2.replaceAll("[^0-9.]", "");
+
+        String[] parts1 = num1.split("\\.");
+        String[] parts2 = num2.split("\\.");
+
+        for (int i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+            int p1 = (i < parts1.length && !parts1[i].isEmpty()) ? Integer.parseInt(parts1[i]) : 0;
+            int p2 = (i < parts2.length && !parts2[i].isEmpty()) ? Integer.parseInt(parts2[i]) : 0;
+            if (p1 != p2) return p1 - p2;
+        }
+
+        // If numeric parts are equal, compare the suffix (e.g., "a", "b", "c")
+        String suffix1 = v1.replaceAll("[0-9.]", "");
+        String suffix2 = v2.replaceAll("[0-9.]", "");
+        return suffix1.compareTo(suffix2);
+    }
+
     @Cacheable(value = "functions", key = "#filename")
     public Map<String, Object> getFunctions(String filename) {
         // Get function data for specific executable

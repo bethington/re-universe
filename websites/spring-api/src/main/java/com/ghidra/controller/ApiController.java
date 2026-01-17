@@ -127,6 +127,23 @@ public class ApiController {
     }
 
     /**
+     * Get cross-version function data for a specific binary file.
+     * Returns function addresses across all versions of the binary.
+     * Example: GET /api/functions/cross-version/D2Client.dll
+     */
+    @GetMapping("/functions/cross-version/{filename}")
+    public ResponseEntity<Map<String, Object>> getCrossVersionFunctions(
+            @PathVariable String filename) {
+        try {
+            Map<String, Object> functions = webDataService.getCrossVersionFunctions(filename);
+            return ResponseEntity.ok(functions);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
      * Clears all caches. Call this after ingesting new binaries to refresh data.
      * Example: POST /api/cache/clear
      */

@@ -2780,33 +2780,59 @@
 
         // Modified loadFunctionData to use API
         async function loadFunctionData(filename, forceGroup = false) {
-            if (!filename) return;
+            if (!filename) return null;
 
             // Check if already loaded
             const dataVarName = `FUNCTIONS_${filename.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`;
             if (window[dataVarName] && !forceGroup) {
                 console.log(`Function data for ${filename} already loaded`);
-                return;
+                return window[dataVarName];
             }
 
             try {
                 showLoadingToast(`Loading functions for ${filename}...`);
 
-                const response = await fetch(`${API_BASE_URL}/functions/${filename}`);
+                // Use the new cross-version API endpoint
+                const response = await fetch(`${API_BASE_URL}/functions/cross-version/${filename}`);
                 if (!response.ok) {
                     throw new Error(`Failed to load function data for ${filename}`);
                 }
 
-                const functionData = await response.json();
+                const apiData = await response.json();
+
+                // Transform API response to match expected format for renderFunctionsTable
+                const functionData = {
+                    versions: apiData.versions || [],
+                    functions: {},
+                    filename: filename,
+                    versionMd5s: apiData.versionMd5s || {},
+                    isExe: apiData.isExe || false
+                };
+
+                // Transform functions: { funcName: { addresses: { version: addr } } }
+                // to: { funcName: { name, addresses: { version: addr } } }
+                if (apiData.functions) {
+                    for (const [funcName, funcData] of Object.entries(apiData.functions)) {
+                        functionData.functions[funcName] = {
+                            name: funcData.name || funcName,
+                            category: funcData.category || 'Game',
+                            addresses: funcData.addresses || {}
+                        };
+                    }
+                }
+
                 window[dataVarName] = functionData;
 
-                console.log(`Loaded function data for ${filename}:`, Object.keys(functionData).length, 'functions');
+                console.log(`Loaded function data for ${filename}:`, Object.keys(functionData.functions).length, 'functions,', functionData.versions.length, 'versions');
                 hideLoadingToast();
+
+                return functionData;
 
             } catch (error) {
                 console.error(`Error loading function data for ${filename}:`, error);
                 hideLoadingToast();
                 showErrorToast(`Failed to load functions for ${filename}`);
+                return null;
             }
         }
 
@@ -4204,25 +4230,25 @@
         }
 
         function renderPEExportsView(container, baseName, filename, fileInfo, history) {
-            // Check FUNCTION_INDEX (function data from d2_function_extractor.py)
-            // Use case-insensitive lookup to handle D2Sound.dll vs D2sound.dll etc.
-            const indexKey = findFunctionIndexFile(baseName);
-            console.log('renderPEExportsView:', baseName, 'indexKey:', indexKey);
+            // For PE files, always try to load function data from the API
+            // baseName is the filename without path (e.g., "D2Client.dll")
+            console.log('renderPEExportsView:', baseName);
 
-            if (indexKey) {
-                container.innerHTML = '<div style="padding:20px;color:#888;">Loading function data...</div>';
-                loadFunctionData(indexKey).then(funcData => {
-                    console.log('Function data loaded:', baseName, 'count:', Object.keys(funcData.functions || {}).length);
+            container.innerHTML = '<div style="padding:20px;color:#888;">Loading function data...</div>';
+
+            loadFunctionData(baseName).then(funcData => {
+                if (funcData && funcData.functions && Object.keys(funcData.functions).length > 0) {
+                    console.log('Function data loaded:', baseName, 'count:', Object.keys(funcData.functions).length);
                     renderFunctionsTable(container, baseName, funcData, filename, fileInfo);
-                }).catch(err => {
-                    console.error('Failed to load function data:', err);
+                } else {
+                    // No function data from API, fall back to exports
+                    console.log('No function data from API, falling back to exports');
                     renderExportsTable(container, baseName, filename, fileInfo);
-                });
-                return;
-            }
-
-            // Fall back to exports data only
-            renderExportsTable(container, baseName, filename, fileInfo);
+                }
+            }).catch(err => {
+                console.error('Failed to load function data:', err);
+                renderExportsTable(container, baseName, filename, fileInfo);
+            });
         }
 
         function renderExportsTable(container, baseName, filename, fileInfo) {
@@ -4706,10 +4732,20 @@
 
             // Rebuild version groups if empty (safety fallback)
             if (!versionGroups || versionGroups.length === 0) {
-                const allVersions = funcData.versions;
+                const allVersions = funcData.versions || [];
                 versionGroups = [];
 
-                if (history && history.variants) {
+                // Check if using API format (flat array of version strings)
+                if (allVersions.length > 0 && typeof allVersions[0] === 'string') {
+                    // API format: each version gets its own column
+                    for (const version of allVersions) {
+                        versionGroups.push({
+                            versions: [version],
+                            startVer: version.split('/')[1] || version,
+                            endVer: version.split('/')[1] || version
+                        });
+                    }
+                } else if (history && history.variants) {
                     for (const variant of history.variants) {
                         const versionsWithFuncs = variant.versions.filter(v => {
                             if (!allVersions.includes(v)) return false;
@@ -4968,8 +5004,19 @@
             // This ensures column groupings match the variant count shown in the header
             const versionGroups = [];
 
-            if (history && history.variants) {
-                // Use the pre-computed variant groupings from FILE_HISTORY_DATA
+            // If using API data (funcData.versions is a flat array of version strings),
+            // create one column per version (no grouping needed - API already deduplicates)
+            if (allVersions && allVersions.length > 0 && typeof allVersions[0] === 'string') {
+                // API format: each version gets its own column
+                for (const version of allVersions) {
+                    versionGroups.push({
+                        versions: [version],
+                        startVer: version.split('/')[1] || version,
+                        endVer: version.split('/')[1] || version
+                    });
+                }
+            } else if (history && history.variants) {
+                // Legacy format: Use the pre-computed variant groupings from FILE_HISTORY_DATA
                 for (const variant of history.variants) {
                     // Filter to only versions that have function data AND match Classic/LoD filter
                     const versionsWithFuncs = variant.versions.filter(v => {
@@ -4989,7 +5036,7 @@
                 }
             } else {
                 // Fallback: group all versions together if no history data
-                const filteredVersions = filterVersionsByType(allVersions);
+                const filteredVersions = filterVersionsByType(allVersions || []);
                 if (filteredVersions.length > 0) {
                     const startVer = filteredVersions[0].split('/')[1] || filteredVersions[0];
                     const endVer = filteredVersions[filteredVersions.length - 1].split('/')[1] || filteredVersions[filteredVersions.length - 1];
