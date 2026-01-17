@@ -3906,36 +3906,108 @@
 
         function renderBinariesTable(binaries) {
             const container = document.getElementById('filesTable');
+            const filterText = document.getElementById('filesFilter')?.value.toLowerCase() || '';
 
             if (!binaries || binaries.length === 0) {
                 container.innerHTML = '<div class="details-empty">No binaries found</div>';
                 return;
             }
 
-            const tableHtml = `
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Category</th>
-                            <th>Type</th>
-                            <th>Arch</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${binaries.map(binary => `
-                            <tr class="file-row" onclick="selectFile('${binary.fileName}')">
-                                <td class="filename">${binary.fileName}</td>
-                                <td>${binary.category || ''}</td>
-                                <td>${binary.fileType || ''}</td>
-                                <td>${binary.architecture || ''}-bit</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
+            // Filter by text if filter exists
+            let filteredBinaries = binaries;
+            if (filterText) {
+                filteredBinaries = binaries.filter(b => b.fileName.toLowerCase().includes(filterText));
+            }
 
-            container.innerHTML = tableHtml;
+            // Filter by category
+            filteredBinaries = filteredBinaries.filter(binary => {
+                const category = binary.category || 'Other';
+                return categoryFilters[category];
+            });
+
+            if (filteredBinaries.length === 0) {
+                container.innerHTML = '<div class="details-empty">No files match the filter</div>';
+                return;
+            }
+
+            // Convert to [filename, file] format for compatibility
+            const files = filteredBinaries.map(b => [b.fileName, b]);
+            const fileCount = files.length;
+
+            if (isGrouped) {
+                // Group by category
+                const grouped = {};
+                files.forEach(([filename, file]) => {
+                    const category = file.category || 'Other';
+                    if (!grouped[category]) {
+                        grouped[category] = [];
+                    }
+                    grouped[category].push([filename, file]);
+                });
+
+                // Sort categories by defined order, sort files within each category
+                const categoryOrder = Object.keys(CATEGORIES);
+                const sortedCategories = Object.keys(grouped).sort((a, b) => {
+                    return categoryOrder.indexOf(a) - categoryOrder.indexOf(b);
+                });
+
+                let html = '';
+                sortedCategories.forEach(category => {
+                    const categoryFiles = grouped[category].sort((a, b) => a[0].localeCompare(b[0]));
+                    const categoryInfo = CATEGORIES[category] || { color: '#FFFFFF', short: '??' };
+
+                    // Category header with column headers
+                    html += `
+                        <div class="category-header">
+                            <span class="category-dot" style="background-color: ${categoryInfo.color}"></span>
+                            <span class="category-name">${category}</span>
+                            <span class="column-header version">Type</span>
+                            <span class="column-header hash">Hash</span>
+                        </div>
+                    `;
+
+                    // Files in this category
+                    html += categoryFiles.map(([filename, file]) => renderBinaryRow(filename, file)).join('');
+                });
+
+                container.innerHTML = html;
+            } else {
+                // Table header row (only in non-grouped mode)
+                const tableHeader = `
+                    <div class="table-header">
+                        <span></span>
+                        <span>${fileCount} Files</span>
+                        <span>Type</span>
+                        <span>Hash</span>
+                    </div>
+                `;
+                // Sort alphabetically
+                files.sort((a, b) => a[0].localeCompare(b[0]));
+                container.innerHTML = tableHeader + files.map(([filename, file]) => renderBinaryRow(filename, file)).join('');
+            }
+        }
+
+        function renderBinaryRow(filename, file) {
+            const categoryColor = CATEGORIES[file.category]?.color || getCategoryColor(file.category);
+            const isSelected = selectedFile === filename;
+            const fileType = file.fileType || '—';
+            
+            // Hash display - last 4 characters with copy button
+            const fullHash = file.md5 || '';
+            const shortHash = fullHash ? fullHash.slice(-4) : '—';
+            const hashCell = fullHash
+                ? `<span class="hash-short" title="${fullHash}">${shortHash}</span><button class="hash-copy-btn" onclick="event.stopPropagation(); copyHash('${fullHash}')" title="Copy full hash">⧉</button>`
+                : `<span class="hash-short">—</span>`;
+
+            return `
+                <div class="file-row ${isSelected ? 'selected' : ''}"
+                     onclick="selectFile('${filename.replace(/'/g, "\\'")}')">
+                    <div class="category-indicator" style="background-color: ${categoryColor}"></div>
+                    <span class="filename" title="${filename}">${filename}</span>
+                    <span class="version-id" title="${fileType}">${fileType}</span>
+                    <div class="hash-cell">${hashCell}</div>
+                </div>
+            `;
         }
 
         function formatFileSize(sizeStr) {
