@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BSim Analysis Portal</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            margin: 0;
+            padding: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            padding: 40px;
+        }
+        .tool-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 25px;
+            border-left: 4px solid #3498db;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .tool-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .tool-card h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+            font-size: 1.3em;
+        }
+        .tool-card p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .tool-button {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .tool-button:hover {
+            background: #2980b9;
+        }
+        .tool-button.primary {
+            background: #e74c3c;
+        }
+        .tool-button.primary:hover {
+            background: #c0392b;
+        }
+        .status {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 20px;
+            margin: 20px 40px;
+        }
+        .deployment-info {
+            background: #e8f4f8;
+            padding: 20px 40px;
+            border-top: 1px solid #e9ecef;
+        }
+        .deployment-info h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        .deployment-info ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .deployment-info li {
+            margin-bottom: 5px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>BSim Analysis Portal</h1>
+            <p>Comprehensive Binary Similarity Analysis for Diablo 2 Reverse Engineering</p>
+        </div>
+
+        <div class="status">
+            <strong>✅ System Deployed:</strong> All components are running with enhanced cross-version analysis capabilities.
+        </div>
+
+        <div class="tools-grid">
+            <div class="tool-card">
+                <h3>🎯 Cross-Version Matrix</h3>
+                <p>Interactive function similarity matrix with advanced tagging, bullseye targeting, and real-time comparison across all Diablo 2 versions including mods.</p>
+                <a href="cross-version-matrix.html" class="tool-button primary">Launch Matrix</a>
+            </div>
+
+            <div class="tool-card">
+                <h3>🗄️ Database Setup</h3>
+                <p>Run the database setup script to create enhanced tables for function analysis, tagging, and similarity matrices before using the analysis tools.</p>
+                <a href="#" class="tool-button" onclick="showSetupInstructions()">Setup Instructions</a>
+            </div>
+
+            <div class="tool-card">
+                <h3>📊 Ghidra Scripts</h3>
+                <p>Enhanced Ghidra scripts with comprehensive function tagging, folder structure parsing, and advanced similarity analysis.</p>
+                <a href="#" class="tool-button" onclick="showScriptInfo()">Script Info</a>
+            </div>
+
+            <div class="tool-card">
+                <h3>🔌 API Access</h3>
+                <p>Programmatic access to similarity data, function analysis, and cross-version comparisons through the enhanced BSim API.</p>
+                <a href="#" class="tool-button" onclick="showApiInfo()">API Documentation</a>
+            </div>
+        </div>
+
+        <div class="deployment-info">
+            <h4>🚀 Deployment Status</h4>
+            <ul>
+                <li><strong>Database:</strong> PostgreSQL with lshvector extension (10.0.0.30:5432)</li>
+                <li><strong>Ghidra Server:</strong> Running on ports 13100-13102</li>
+                <li><strong>API Service:</strong> Available on port 8081</li>
+                <li><strong>Web Interface:</strong> Accessible through this portal</li>
+            </ul>
+
+            <h4>📋 Quick Start</h4>
+            <ul>
+                <li>1. Run <code>Setup_CrossVersionAnalysisStructures.java</code> in Ghidra to create database schema</li>
+                <li>2. Use <code>Step1_AddProgramToBSimDatabase.java</code> to ingest binaries with enhanced tagging</li>
+                <li>3. Run <code>Compute_EnhancedSimilarityMatrix.java</code> for similarity analysis</li>
+                <li>4. Access the <strong>Cross-Version Matrix</strong> for interactive visualization</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function showSetupInstructions() {
+            alert('Database Setup:\\n\\n1. Open Ghidra and connect to the BSim server\\n2. Run the script: Setup_CrossVersionAnalysisStructures.java\\n3. This creates the enhanced tables for function analysis\\n4. Then proceed with binary ingestion using Step1');
+        }
+
+        function showScriptInfo() {
+            alert('Enhanced Ghidra Scripts:\\n\\n• Step1_AddProgramToBSimDatabase.java - Comprehensive tagging and analysis\\n• Step2_GenerateBSimSignatures.java - Enhanced signature generation\\n• Step3a-3e_Populate*.java - Optional enrichment scripts\\n• Step4_GenerateFunctionSimilarityMatrix.java - Similarity analysis\\n• Step5_CompleteSimilarityWorkflow.java - Automated pipeline\\n• Compute_EnhancedSimilarityMatrix.java - Advanced similarity scoring\\n• Utility scripts for analysis and querying');
+        }
+
+        function showApiInfo() {
+            alert('API Access:\\n\\nUse CrossVersionMatrixAPI.java methods:\\n\\n• getAvailableVersions() - List all versions\\n• getAvailableBinaries() - List binaries for version\\n• getFunctionMatrix() - Get similarity matrix data\\n• getFunctionComparison() - Detailed comparison\\n\\nDatabase direct access: 10.0.0.30:5432');
+        }
+    </script>
+</body>
+</html>
