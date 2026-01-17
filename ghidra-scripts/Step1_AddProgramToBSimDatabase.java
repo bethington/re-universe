@@ -861,18 +861,26 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             String functionName = function.getName();
             Address entryPoint = function.getEntryPoint();
 
-            // Clear existing auto-generated tags to avoid duplicates
-            clearAutoTags(function);
+            // Start Ghidra transaction for function tag modifications
+            int transactionID = program.startTransaction("Apply Function Tags");
+            try {
+                // Clear existing auto-generated tags to avoid duplicates
+                clearAutoTags(function);
 
-            // Apply all tagging categories
-            applyLibraryFunctionTags(function, functionName);
-            applyFunctionTypeTags(program, function);
-            applyCallingPatternTags(program, function);
-            applyGameLogicTags(program, function, functionName);
-            applyUtilityFunctionTags(program, function);
-            applyModRelevantTags(program, function);
-            applyComplexityTags(program, function);
-            applyArchitecturalTags(program, function);
+                // Apply all tagging categories
+                applyLibraryFunctionTags(function, functionName);
+                applyFunctionTypeTags(program, function);
+                applyCallingPatternTags(program, function);
+                applyGameLogicTags(program, function, functionName);
+                applyUtilityFunctionTags(program, function);
+                applyModRelevantTags(program, function);
+                applyComplexityTags(program, function);
+                applyArchitecturalTags(program, function);
+
+            } finally {
+                // End Ghidra transaction
+                program.endTransaction(transactionID, true);
+            }
 
         } catch (Exception e) {
             // Don't fail the entire process if tagging fails
