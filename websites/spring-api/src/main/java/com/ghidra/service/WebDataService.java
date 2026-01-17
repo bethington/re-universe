@@ -94,14 +94,21 @@ public class WebDataService {
             ORDER BY name_exec
         """;
 
-        String pattern = gameType + "_" + version + "_%";
+        // Match actual naming convention: "1.01_D2Game.dll"
+        String pattern = version + "_%";
         List<Map<String, Object>> results = jdbcTemplate.queryForList(sql, pattern);
         List<BinaryData> binaries = new ArrayList<>();
 
         for (Map<String, Object> row : results) {
             String nameExec = (String) row.get("name_exec");
             String md5 = (String) row.get("md5");
-            Integer architecture = (Integer) row.get("architecture");
+            Object archObj = row.get("architecture");
+            Integer architecture = null;
+            if (archObj instanceof String) {
+                architecture = "x86".equals(archObj) ? 32 : 64;
+            } else if (archObj instanceof Integer) {
+                architecture = (Integer) archObj;
+            }
 
             // Convert Timestamp to ZonedDateTime
             ZonedDateTime ingestDate = null;

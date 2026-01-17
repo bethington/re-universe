@@ -3855,7 +3855,9 @@
             }).join('');
         }
 
-        function selectVersion(folderName) {
+        async function selectVersion(folderName) {
+            console.log('selectVersion called with:', folderName);
+
             // Remember the previously selected file (base name without variant suffix)
             const previousFile = selectedFile;
             const previousFileBase = previousFile ? previousFile.split(' (')[0] : null;
@@ -3867,73 +3869,79 @@
                 el.classList.toggle('selected', el.getAttribute('onclick').includes(folderName));
             });
 
-            // Update files panel
-            const folder = FOLDERS_DATA[folderName];
-            const diff = DIFFS_DATA[folderName];
+            // Extract gameType and version from folderName (e.g., "Classic/1.01")
+            const [gameType, version] = folderName.split('/');
+            console.log('Loading binaries for:', gameType, version);
 
-            if (!folder) {
-                // Title remains static as "Binaries"
-                document.getElementById('filesTable').innerHTML = '<div class="details-empty">No file data available</div>';
-                selectedFile = null;
+            try {
+                // Load binaries from API
+                const response = await fetch(`https://api.xebyte.com/api/binaries?gameType=${gameType}&version=${version}`);
+                if (!response.ok) {
+                    console.error('Failed to fetch binaries:', response.status);
+                    document.getElementById('filesTable').innerHTML = '<div class="details-empty">Failed to load binaries</div>';
+                    return;
+                }
+
+                const binaries = await response.json();
+                console.log('Loaded binaries:', binaries.length);
+
+                if (binaries.length === 0) {
+                    document.getElementById('filesTable').innerHTML = '<div class="details-empty">No binaries found for this version</div>';
+                    return;
+                }
+
+                // Show toolbar and filter
+                document.getElementById('filesToolbar').style.display = 'flex';
+                document.getElementById('filesFilter').style.display = 'block';
+                document.getElementById('filesFilter').value = '';
+
+                // Render binaries
+                renderBinariesTable(binaries);
+
+            } catch (error) {
+                console.error('Error loading binaries:', error);
+                document.getElementById('filesTable').innerHTML = '<div class="details-empty">Error loading binaries</div>';
+            }
+        }
+
+        function renderBinariesTable(binaries) {
+            const container = document.getElementById('filesTable');
+
+            if (!binaries || binaries.length === 0) {
+                container.innerHTML = '<div class="details-empty">No binaries found</div>';
                 return;
             }
 
-            // Update title
-            const versionInfo = VERSIONS_DATA.find(v => v.folder_name === folderName);
-            // Title remains static as "Binaries"
+            const tableHtml = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Size</th>
+                            <th>Functions</th>
+                            <th>Arch</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${binaries.map(binary => `
+                            <tr class="file-row" onclick="selectFile('${binary.name}')">
+                                <td class="filename">${binary.name}</td>
+                                <td>${formatFileSize(binary.md5)}</td>
+                                <td>${binary.function_count || 0}</td>
+                                <td>${binary.architecture || ''}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
 
-            // Show toolbar and filter
-            document.getElementById('filesToolbar').style.display = 'flex';
-            document.getElementById('filesFilter').style.display = 'block';
-            document.getElementById('filesFilter').value = '';
+            container.innerHTML = tableHtml;
+        }
 
-            // Render category filters
-            renderCategoryFilters();
-            document.getElementById('groupBtn').classList.toggle('active', isGrouped);
-
-            // Render files
-            renderFilesTable(folder);
-
-            // Try to re-select the same file in the new version
-            if (previousFileBase) {
-                // Look for exact match first, then base name match
-                let fileToSelect = null;
-
-                if (folder.files[previousFile]) {
-                    // Exact match (including variant suffix like "Game.exe (NoCD)")
-                    fileToSelect = previousFile;
-                } else if (folder.files[previousFileBase]) {
-                    // Base name match
-                    fileToSelect = previousFileBase;
-                } else {
-                    // Look for any file with the same base name
-                    for (const filename of Object.keys(folder.files)) {
-                        if (filename.split(' (')[0] === previousFileBase) {
-                            fileToSelect = filename;
-                            break;
-                        }
-                    }
-                }
-
-                if (fileToSelect) {
-                    selectFile(fileToSelect);
-                    // Scroll the file into view in the files panel
-                    setTimeout(() => {
-                        const fileRow = document.querySelector('.file-row.selected');
-                        if (fileRow) {
-                            fileRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }
-                    }, 50);
-                } else {
-                    // File doesn't exist in this version - clear selection
-                    selectedFile = null;
-                    renderEmptyDetails();
-                }
-            } else {
-                // No previous file selected
-                selectedFile = null;
-                renderEmptyDetails();
-            }
+        function formatFileSize(sizeStr) {
+            // For now, just return the MD5 since we don't have size data
+            // This could be enhanced to show actual file sizes if available
+            return sizeStr ? sizeStr.substring(0, 8) : '';
         }
 
         function renderFilesTable(folder) {
