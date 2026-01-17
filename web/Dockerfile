@@ -1,8 +1,8 @@
 # BSim Analysis Portal - Static Web Application
 FROM nginx:alpine
 
-# Copy the static HTML file
-COPY index.html /usr/share/nginx/html/
+# Copy all static HTML files
+COPY *.html /usr/share/nginx/html/
 
 # Create custom nginx configuration for SPA
 COPY nginx.conf /etc/nginx/nginx.conf
