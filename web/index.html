@@ -4287,7 +4287,7 @@
             const container = document.getElementById('detailsContent');
             const fileType = getFileType(filename);
             const baseName = filename.split(' (')[0];
-            
+
             console.log('renderFileDetails: fileType=', fileType, 'filename=', filename);
 
             // For PE files (DLL/EXE), always try to load from API even if fileInfo is null
