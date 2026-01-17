@@ -195,8 +195,72 @@ public class WebDataService {
     }
 
     public Map<String, Object> getFolders() {
-        // Placeholder - would need to implement based on actual file organization
-        return new HashMap<>();
+        // Build folders structure from exetable data
+        // Format: { "Classic/1.00": { "files": { "D2Game.dll": { ... }, ... } }, ... }
+        String sql = """
+            SELECT
+                name_exec,
+                md5,
+                architecture,
+                ingest_date
+            FROM exetable
+            WHERE name_exec IS NOT NULL
+            ORDER BY name_exec
+        """;
+
+        List<Map<String, Object>> results = jdbcTemplate.queryForList(sql);
+        Map<String, Object> folders = new LinkedHashMap<>();
+
+        for (Map<String, Object> row : results) {
+            String nameExec = (String) row.get("name_exec");
+            if (nameExec == null || nameExec.isEmpty()) continue;
+
+            // Parse gameType, version, and fileName from name_exec
+            // Format: "Classic_1.00_D2Game.dll" or "LoD_1.07_D2Game.dll"
+            String[] parts = nameExec.split("_", 3);
+            if (parts.length < 3) continue;
+
+            String gameType = parts[0];
+            String version = parts[1];
+            String fileName = parts[2];
+            String folderName = gameType + "/" + version;
+
+            // Get or create folder entry
+            @SuppressWarnings("unchecked")
+            Map<String, Object> folder = (Map<String, Object>) folders.computeIfAbsent(folderName, k -> {
+                Map<String, Object> newFolder = new LinkedHashMap<>();
+                newFolder.put("files", new LinkedHashMap<String, Object>());
+                return newFolder;
+            });
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> files = (Map<String, Object>) folder.get("files");
+
+            // Build file entry
+            String md5 = (String) row.get("md5");
+            Object archObj = row.get("architecture");
+            String arch = "x86";
+            if (archObj instanceof Integer && (Integer) archObj == 64) {
+                arch = "x64";
+            } else if (archObj instanceof String) {
+                arch = (String) archObj;
+            }
+
+            String fileType = extractFileExtension(fileName);
+            String category = categorizeFile(fileName);
+
+            Map<String, Object> fileData = new LinkedHashMap<>();
+            fileData.put("name", fileName);
+            fileData.put("full_name", nameExec);
+            fileData.put("md5", md5);
+            fileData.put("arch", arch);
+            fileData.put("type", fileType);
+            fileData.put("category", category);
+
+            files.put(fileName, fileData);
+        }
+
+        return folders;
     }
 
     public Map<String, Object> getFileHistory() {
