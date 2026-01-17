@@ -21,6 +21,7 @@ import org.springframework.context.annotation.Primary;
  * - "categories" - File category definitions
  * - "functions" - Function data per executable
  * - "functionIndex" - Index of all executables with functions
+ * - "crossVersionFunctions" - Cross-version function matrix data
  */
 @Configuration
 @EnableCaching
@@ -38,7 +39,9 @@ public class CacheConfig {
             "exports",
             "textContent",
             "functions",
-            "functionIndex"
+            "functionIndex",
+            "crossVersionFunctions",
+            "crossVersionAnalysis"
         );
     }
 }
