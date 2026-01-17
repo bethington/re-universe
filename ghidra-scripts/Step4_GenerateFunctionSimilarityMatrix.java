@@ -42,12 +42,120 @@ import ghidra.util.exception.CancelledException;
 import ghidra.framework.model.*;
 import java.sql.*;
 import java.util.*;
+import java.util.regex.*;
 
 public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
 
     private static final String DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
     private static final String DB_USER = "ben";
     private static final String DB_PASS = "goodyx12";
+
+    // Unified version info helper
+    private static class UnifiedVersionInfo {
+        String gameVersion = null;
+        String familyType = "Unified";
+        boolean isException = false;
+
+        UnifiedVersionInfo(String executableName) {
+            parseUnifiedName(executableName);
+        }
+
+        private void parseUnifiedName(String executableName) {
+            if (executableName == null || executableName.isEmpty()) return;
+
+            // Try to extract version info from file path first
+            if (executableName.contains("/") || executableName.contains("\\")) {
+                parseFromPath(executableName);
+                if (gameVersion != null) return; // Successfully parsed from path
+            }
+
+            // Standard binaries: 1.03_D2Game.dll
+            Pattern standardPattern = Pattern.compile("^(1\\.[0-9]{1,2}[a-z]?)_([A-Za-z0-9_]+)\\.(dll|exe)$");
+            Matcher standardMatcher = standardPattern.matcher(executableName);
+
+            if (standardMatcher.matches()) {
+                gameVersion = standardMatcher.group(1);
+                familyType = "Unified";
+                isException = false;
+                return;
+            }
+
+            // Exception binaries: Classic_1.03_Game.exe
+            Pattern exceptionPattern = Pattern.compile("^(Classic|LoD)_(1\\.[0-9]{1,2}[a-z]?)_(Game|Diablo_II)\\.(exe|dll)$");
+            Matcher exceptionMatcher = exceptionPattern.matcher(executableName);
+
+            if (exceptionMatcher.matches()) {
+                familyType = exceptionMatcher.group(1);
+                gameVersion = exceptionMatcher.group(2);
+                isException = true;
+            }
+        }
+
+        private void parseFromPath(String fullPath) {
+            // Parse paths like "/Classic/1.05b/D2Sound.dll" or "/PD2/Game.exe"
+            String[] pathParts = fullPath.split("[/\\\\]");
+
+            for (int i = 0; i < pathParts.length; i++) {
+                String part = pathParts[i];
+                if (part.isEmpty()) continue; // Skip empty parts from leading slashes
+
+                // Check for family type (Classic, LoD, PD2, etc.)
+                if (part.equalsIgnoreCase("Classic") || part.equalsIgnoreCase("LoD")) {
+                    familyType = part;
+                    isException = true;
+
+                    // Look for version in next part
+                    if (i + 1 < pathParts.length) {
+                        String nextPart = pathParts[i + 1];
+                        // Updated regex to handle 1.00, 1.05b, 1.13c, etc.
+                        if (nextPart.matches("1\\.[0-9]{1,2}[a-z]?")) {
+                            gameVersion = nextPart;
+                        }
+                    }
+                    return;
+                }
+
+                // Check for PD2 or mod paths
+                if (part.equalsIgnoreCase("PD2")) {
+                    familyType = "PD2";
+                    gameVersion = "PD2";
+                    isException = false;
+                    return;
+                }
+
+                // Direct version pattern (like "1.05b" or "1.00")
+                if (part.matches("1\\.[0-9]{1,2}[a-z]?")) {
+                    gameVersion = part;
+                    if (familyType == null) {
+                        familyType = "Unified";
+                    }
+                    return;
+                }
+            }
+
+            // Fallback: try to infer from filename
+            String fileName = fullPath;
+            if (fileName.contains("/")) fileName = fileName.substring(fileName.lastIndexOf("/") + 1);
+            if (fileName.contains("\\")) fileName = fileName.substring(fileName.lastIndexOf("\\") + 1);
+
+            if (fileName.equals("Game.exe") || fileName.equals("Diablo II.exe")) {
+                familyType = "Classic";
+                gameVersion = "Unknown";
+                isException = true;
+            }
+        }
+
+        public String getDisplayInfo() {
+            if (gameVersion == null) return "Unknown format";
+            return isException ?
+                String.format("%s %s (Exception)", familyType, gameVersion) :
+                String.format("Unified %s (Standard)", gameVersion);
+        }
+
+        public boolean isValid() {
+            return gameVersion != null;
+        }
+    }
 
     // Similarity thresholds
     private static final double MIN_SIMILARITY = 0.7;
@@ -251,13 +359,20 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
     private void generateSimilarityMatrix(Program program, String programName) throws Exception {
         println("Connecting to BSim database...");
 
+        UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(programName);
+        println("Processing: " + programName + " (" + versionInfo.getDisplayInfo() + ")");
+
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
             println("Connected to BSim database successfully");
 
             // Get current executable info
-            int currentExeId = getExecutableId(conn, programName);
+            int currentExeId = getExecutableId(conn, programName, versionInfo);
             if (currentExeId == -1) {
-                throw new RuntimeException("Current executable not found. Run AddProgramToBSimDatabase.java first.");
+                String unifiedName = generateUnifiedExecutableName(programName, versionInfo);
+                throw new RuntimeException(String.format("Current executable not found in database.\n" +
+                    "  Tried: '%s', unified: '%s', version: %s\n" +
+                    "  Run AddProgramToBSimDatabase.java first.",
+                    programName, unifiedName, versionInfo.getDisplayInfo()));
             }
 
             // Get all other executables for comparison
@@ -273,16 +388,84 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
         }
     }
 
-    private int getExecutableId(Connection conn, String programName) throws SQLException {
-        String sql = "SELECT id FROM exetable WHERE name_exec = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+    private int getExecutableId(Connection conn, String programName, UnifiedVersionInfo versionInfo) throws SQLException {
+        // First try with the original name (for backward compatibility)
+        String originalSql = "SELECT id FROM exetable WHERE name_exec = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(originalSql)) {
             stmt.setString(1, programName);
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
                 return rs.getInt("id");
             }
         }
+
+        // Try with unified name format (generated by Step1)
+        String unifiedName = generateUnifiedExecutableName(programName, versionInfo);
+        String unifiedSql = "SELECT id FROM exetable WHERE name_exec = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(unifiedSql)) {
+            stmt.setString(1, unifiedName);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                println("Found executable using unified name: " + unifiedName);
+                return rs.getInt("id");
+            }
+        }
+
+        // Try partial matching for executables stored with different naming patterns
+        // Order by function count to prefer more complete entries
+        String partialSql = """
+            SELECT e.id, e.name_exec, COUNT(d.id) as function_count
+            FROM exetable e
+            LEFT JOIN desctable d ON d.id_exe = e.id
+            WHERE e.name_exec ILIKE ?
+            GROUP BY e.id, e.name_exec
+            ORDER BY function_count DESC, e.name_exec
+            """;
+        try (PreparedStatement stmt = conn.prepareStatement(partialSql)) {
+            // Extract just the base filename
+            String baseFileName = programName;
+            if (baseFileName.contains("/")) {
+                baseFileName = baseFileName.substring(baseFileName.lastIndexOf("/") + 1);
+            }
+            if (baseFileName.contains("\\")) {
+                baseFileName = baseFileName.substring(baseFileName.lastIndexOf("\\") + 1);
+            }
+
+            stmt.setString(1, "%" + baseFileName);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                int id = rs.getInt("id");
+                String foundName = rs.getString("name_exec");
+                int functionCount = rs.getInt("function_count");
+                println("Found executable using partial match: " + foundName + " (" + functionCount + " functions) for " + baseFileName);
+                return id;
+            }
+        }
+
         return -1;
+    }
+
+    /**
+     * Generate unified executable name (matching Step1 logic)
+     */
+    private String generateUnifiedExecutableName(String programName, UnifiedVersionInfo versionInfo) {
+        String fileName = programName;
+        if (fileName.contains("/")) {
+            fileName = fileName.substring(fileName.lastIndexOf("/") + 1);
+        }
+        if (fileName.contains("\\")) {
+            fileName = fileName.substring(fileName.lastIndexOf("\\") + 1);
+        }
+        fileName = fileName.replace(" ", "_");
+
+        // Handle null/missing version info
+        String gameVersion = versionInfo.gameVersion != null ? versionInfo.gameVersion : "Unknown";
+        String familyType = versionInfo.familyType != null ? versionInfo.familyType : "Unified";
+
+        if (fileName.equals("Game.exe") || fileName.equals("Diablo_II.exe")) {
+            return String.format("%s_%s_Diablo_II.exe", familyType, gameVersion);
+        }
+        return String.format("%s_%s", gameVersion, fileName);
     }
 
     private List<ExecutableInfo> getOtherExecutables(Connection conn, int currentExeId) throws SQLException {
