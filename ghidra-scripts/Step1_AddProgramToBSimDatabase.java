@@ -723,7 +723,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         int skippedCount = 0;
 
         String checkSql = "SELECT id FROM desctable WHERE name_func = ? AND id_exe = ? AND addr = ?";
-        String insertSql = "INSERT INTO desctable (name_func, id_exe, id_signature, flags, addr) VALUES (?, ?, ?, ?, ?)";
+        String insertSql = "INSERT INTO desctable (name_func, id_exe, id_signature, flags, addr) VALUES (?, ?, ?, ?, ?) RETURNING id";
 
         try (PreparedStatement checkStmt = conn.prepareStatement(checkSql);
              PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
@@ -758,16 +758,21 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                     insertStmt.setInt(4, 0);
                     insertStmt.setLong(5, function.getEntryPoint().getOffset());
 
-                    int rowsAffected = insertStmt.executeUpdate();
-                    if (rowsAffected > 0) {
+                    ResultSet insertRs = insertStmt.executeQuery();
+                    if (insertRs.next()) {
+                        int functionId = insertRs.getInt("id");
                         addedCount++;
 
                         // Apply comprehensive function tagging and analysis
                         applyFunctionTags(program, function);
 
-                        // Store detailed function analysis metrics
-                        storeFunctionAnalysis(conn, function, executableId, program);
+                        // Store detailed function analysis metrics with known function ID
+                        storeFunctionAnalysisWithId(conn, function, functionId, executableId, program);
+
+                        // Store function tags with known function ID
+                        storeFunctionTagsWithId(conn, function, functionId, executableId);
                     }
+                    insertRs.close();
 
                 } catch (SQLException e) {
                     if (!e.getMessage().contains("duplicate key")) {
@@ -1001,6 +1006,103 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             }
         }
         throw new SQLException("Function not found in database: " + function.getName());
+    }
+
+    /**
+     * Store function analysis with known function ID (more efficient)
+     */
+    private void storeFunctionAnalysisWithId(Connection conn, Function function, int functionId, int executableId, Program program) {
+        try {
+            // Calculate comprehensive function metrics
+            FunctionAnalysisMetrics metrics = calculateFunctionMetrics(program, function);
+
+            // Store function analysis data
+            String insertAnalysisSql = """
+                INSERT INTO function_analysis
+                (function_id, executable_id, function_name, entry_address, instruction_count,
+                 basic_block_count, cyclomatic_complexity, calls_made, calls_received,
+                 has_loops, has_recursion, max_depth, stack_frame_size, calling_convention,
+                 is_leaf_function, is_library_function, is_thunk, confidence_score)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (function_id, executable_id) DO UPDATE SET
+                instruction_count = EXCLUDED.instruction_count,
+                cyclomatic_complexity = EXCLUDED.cyclomatic_complexity,
+                analysis_timestamp = CURRENT_TIMESTAMP
+            """;
+
+            try (PreparedStatement stmt = conn.prepareStatement(insertAnalysisSql)) {
+                stmt.setInt(1, functionId);
+                stmt.setInt(2, executableId);
+                stmt.setString(3, function.getName());
+                stmt.setLong(4, function.getEntryPoint().getOffset());
+                stmt.setInt(5, metrics.instructionCount);
+                stmt.setInt(6, metrics.basicBlockCount);
+                stmt.setInt(7, metrics.cyclomaticComplexity);
+                stmt.setInt(8, metrics.callsMade);
+                stmt.setInt(9, metrics.callsReceived);
+                stmt.setBoolean(10, metrics.hasLoops);
+                stmt.setBoolean(11, metrics.hasRecursion);
+                stmt.setInt(12, metrics.maxDepth);
+                stmt.setInt(13, metrics.stackFrameSize);
+                stmt.setString(14, metrics.callingConvention);
+                stmt.setBoolean(15, metrics.isLeafFunction);
+                stmt.setBoolean(16, metrics.isLibraryFunction);
+                stmt.setBoolean(17, metrics.isThunk);
+                stmt.setFloat(18, metrics.confidenceScore);
+
+                stmt.executeUpdate();
+            }
+
+        } catch (SQLException e) {
+            // Log but don't fail the entire process
+            println("Warning: Could not store analysis for function " + function.getName() + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Store function tags with known function ID (more efficient)
+     */
+    private void storeFunctionTagsWithId(Connection conn, Function function, int functionId, int executableId) {
+        try {
+            // Clear existing auto-generated tags
+            String deleteSql = "DELETE FROM function_tags WHERE function_id = ? AND executable_id = ? AND auto_generated = true";
+            try (PreparedStatement deleteStmt = conn.prepareStatement(deleteSql)) {
+                deleteStmt.setInt(1, functionId);
+                deleteStmt.setInt(2, executableId);
+                deleteStmt.executeUpdate();
+            }
+
+            // Insert new tags from Ghidra function tags
+            String insertSql = """
+                INSERT INTO function_tags (function_id, executable_id, tag_category, tag_value, confidence, auto_generated)
+                VALUES (?, ?, ?, ?, ?, true)
+                ON CONFLICT (function_id, executable_id, tag_category, tag_value) DO NOTHING
+            """;
+
+            try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
+                // Get all tags from Ghidra and convert to strings
+                Set<ghidra.program.model.listing.FunctionTag> functionTags = function.getTags();
+
+                for (ghidra.program.model.listing.FunctionTag tagObj : functionTags) {
+                    String tag = tagObj.getName();
+                    if (tag.contains("_")) {
+                        String[] parts = tag.split("_", 2);
+                        String category = parts[0];
+                        String value = parts.length > 1 ? parts[1] : tag;
+
+                        insertStmt.setInt(1, functionId);
+                        insertStmt.setInt(2, executableId);
+                        insertStmt.setString(3, category);
+                        insertStmt.setString(4, value);
+                        insertStmt.setFloat(5, 0.8f); // Default confidence
+                        insertStmt.executeUpdate();
+                    }
+                }
+            }
+
+        } catch (SQLException e) {
+            println("Warning: Could not tag function " + function.getName() + ": " + e.getMessage());
+        }
     }
 
     /**
