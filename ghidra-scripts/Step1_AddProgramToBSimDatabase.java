@@ -1468,13 +1468,6 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
      * Generate unified executable name that matches database constraint patterns
      */
     private String generateUnifiedExecutableName(String programName, UnifiedVersionInfo versionInfo) {
-        // Handle special cases for Game.exe
-        if (programName.equals("Game.exe") || programName.equals("Diablo_II.exe")) {
-            // Use pattern: (Classic|LoD)_1.[version]_Game.exe
-            return String.format("%s_%s_%s", versionInfo.familyType, versionInfo.gameVersion, programName);
-        }
-
-        // For all other executables, use pattern: 1.[version]_[FileName].dll/exe
         // Extract just the filename without any path
         String fileName = programName;
         if (fileName.contains("/")) {
@@ -1484,6 +1477,16 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             fileName = fileName.substring(fileName.lastIndexOf("\\") + 1);
         }
 
+        // Normalize filename to remove spaces and special characters
+        fileName = fileName.replace(" ", "_");
+
+        // Handle special cases for Game.exe and Diablo II.exe
+        if (fileName.equals("Game.exe") || fileName.equals("Diablo_II.exe")) {
+            // Use pattern: (Classic|LoD)_1.[version]_Diablo_II.exe
+            return String.format("%s_%s_Diablo_II.exe", versionInfo.familyType, versionInfo.gameVersion);
+        }
+
+        // For all other executables, use pattern: 1.[version]_[FileName].dll/exe
         return String.format("%s_%s", versionInfo.gameVersion, fileName);
     }
 }
