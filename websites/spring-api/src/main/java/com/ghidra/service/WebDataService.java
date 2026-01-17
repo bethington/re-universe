@@ -28,11 +28,14 @@ public class WebDataService {
                 CASE
                     WHEN name_exec LIKE 'LoD_%' THEN 'LoD'
                     WHEN name_exec LIKE 'Classic_%' THEN 'Classic'
+                    WHEN name_exec ~ '^1\\.[0-9]+[a-z]?_' THEN 'Classic'
                     ELSE 'Unknown'
                 END AS game_type,
                 CASE
                     WHEN name_exec ~ '^(Classic|LoD)_([0-9]+\\.[0-9]+[a-z]?)_' THEN
                         substring(name_exec, '_(\\d+\\.\\d+[a-z]?)_')
+                    WHEN name_exec ~ '^(1\\.[0-9]+[a-z]?)_' THEN
+                        substring(name_exec, '^(\\d+\\.\\d+[a-z]?)_')
                     ELSE 'Unknown'
                 END AS version,
                 COUNT(*) as file_count
@@ -69,8 +72,8 @@ public class WebDataService {
                 .changeCount(fileCount)
                 .isLod(isLod)
                 .rawPeVersion(rawPeVersion)
-                .totalSizeReadable("Unknown")
-                .nocdStatus("unknown")
+                .totalSizeReadable(null)
+                .nocdStatus(null)
                 .build();
 
             versions.add(versionData);

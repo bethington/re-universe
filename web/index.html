@@ -2539,13 +2539,6 @@
                 <div class="panel-header">
                     <h2>Versions</h2>
                 </div>
-                <div class="version-filters">
-                    <div class="filter-buttons">
-                        <button class="filter-btn pre-refactor" onclick="toggleVersionFilter('preRefactor')" title="Classic 1.00-1.03 (Pre-refactor codebase)">Pre</button>
-                        <button class="filter-btn post-refactor" onclick="toggleVersionFilter('postRefactor')" title="Classic 1.04+ (Post-refactor codebase)">Post</button>
-                        <button class="filter-btn lod active" onclick="toggleVersionFilter('lod')" title="Lord of Destruction (All versions)">LoD</button>
-                    </div>
-                </div>
                 <div class="panel-content">
                     <div class="version-list" id="versionList"></div>
                 </div>
@@ -2554,7 +2547,7 @@
             <!-- Panel 2: Files -->
             <div class="panel panel-files">
                 <div class="panel-header panel-header-files">
-                    <h2 id="filesTitle">Select a Version</h2>
+                    <h2 id="filesTitle">Binaries</h2>
                     <input type="text" class="files-filter" id="filesFilter" placeholder="Filter..." oninput="filterFiles()" style="display: none;">
                 </div>
                 <div class="files-toolbar" id="filesToolbar" style="display: none; position: relative;">
@@ -2673,9 +2666,11 @@
         // API loading functions
         async function loadAPIData() {
             try {
+                console.log('Starting API data load...');
                 showLoadingToast('Loading BSim data from API...');
 
                 // Load core data in parallel
+                console.log('Fetching data from API endpoints...');
                 const [categoriesRes, versionsRes, foldersRes, historyRes, diffsRes, exportsRes, textRes, functionsIndexRes] = await Promise.all([
                     fetch(`${API_BASE_URL}/categories`).catch(() => ({ ok: false, error: 'categories' })),
                     fetch(`${API_BASE_URL}/versions`).catch(() => ({ ok: false, error: 'versions' })),
@@ -2688,9 +2683,12 @@
                 ]);
 
                 // Process responses
+                console.log('Processing API responses...');
+                console.log('Versions response status:', versionsRes.ok);
                 if (categoriesRes.ok) FILE_CATEGORIES = await categoriesRes.json();
                 if (versionsRes.ok) {
                     const rawVersions = await versionsRes.json();
+                    console.log('Raw versions data:', rawVersions.length, 'items');
                     // Transform camelCase API response to snake_case for compatibility
                     VERSIONS_DATA = rawVersions.map(v => ({
                         folder_name: v.folderName,
@@ -2711,12 +2709,11 @@
                 if (textRes.ok) TEXT_CONTENT_DATA = await textRes.json();
                 if (functionsIndexRes.ok) FUNCTION_INDEX_V2 = await functionsIndexRes.json();
 
-                console.log('API Data loaded:', {
-                    categories: Object.keys(FILE_CATEGORIES).length,
-                    versions: VERSIONS_DATA.length,
-                    folders: Object.keys(FOLDERS_DATA).length,
-                    functions: Object.keys(FUNCTION_INDEX_V2.files || {}).length
-                });
+                console.log('API Data loaded successfully!');
+                console.log('- Categories:', Object.keys(FILE_CATEGORIES).length);
+                console.log('- Versions:', VERSIONS_DATA.length);
+                console.log('- Folders:', Object.keys(FOLDERS_DATA).length);
+                console.log('- Functions:', Object.keys(FUNCTION_INDEX_V2.files || {}).length);
 
                 hideLoadingToast();
                 return true;
@@ -2865,8 +2862,8 @@
 
         // Version filters: Pre-Refactor (1.00-1.03), Post-Refactor (1.04+), LoD (all)
         const versionFilters = {
-            preRefactor: false,   // Classic 1.00-1.03 (old codebase)
-            postRefactor: false,  // Classic 1.04+ (refactored codebase)
+            preRefactor: true,    // Classic 1.00-1.03 (old codebase)
+            postRefactor: true,   // Classic 1.04+ (refactored codebase)
             lod: true             // All LoD versions
         };
 
@@ -2892,20 +2889,6 @@
         let currentFuncBaseName = null;
         let categoryFilter = 'all';  // 'all', 'game_logic', 'crt_runtime', 'import_thunk', 'exception', 'other'
 
-        // Compiler boundary versions (major toolchain changes)
-        const COMPILER_BOUNDARY_VERSIONS = [
-            'LoD/1.11',      // CRT/compiler changed significantly at 1.11
-            'Classic/1.11'
-        ];
-
-        // Pre-1.11 versions (before compiler boundary)
-        const PRE_111_VERSIONS = [
-            'LoD/1.07', 'LoD/1.08', 'LoD/1.09', 'LoD/1.09b', 'LoD/1.09d', 'LoD/1.10',
-            'Classic/1.00', 'Classic/1.01', 'Classic/1.02', 'Classic/1.03',
-            'Classic/1.04b', 'Classic/1.04c', 'Classic/1.05', 'Classic/1.05b',
-            'Classic/1.06', 'Classic/1.06b', 'Classic/1.08', 'Classic/1.09',
-            'Classic/1.09b', 'Classic/1.09d', 'Classic/1.10'
-        ];
 
         // Detect function category based on name patterns
         function getFunctionCategory(name) {
@@ -3660,15 +3643,58 @@
         let categoryFilters = {};
         Object.keys(CATEGORIES).forEach(cat => categoryFilters[cat] = true);
 
+        // Simplified version loading for debugging
+        async function loadVersionsOnly() {
+            try {
+                console.log('Loading versions only...');
+                const response = await fetch('https://api.xebyte.com/api/versions');
+                if (!response.ok) throw new Error('Versions API failed');
+
+                const rawVersions = await response.json();
+                console.log('Got versions:', rawVersions.length);
+
+                VERSIONS_DATA = rawVersions.map(v => ({
+                    folder_name: v.folderName,
+                    game_type: v.gameType,
+                    version: v.version,
+                    file_count: v.fileCount,
+                    change_count: v.changeCount,
+                    is_lod: v.isLod,
+                    raw_pe_version: v.rawPeVersion,
+                    total_size_readable: v.totalSizeReadable,
+                    nocd_status: v.nocdStatus
+                }));
+
+                console.log('Transformed VERSIONS_DATA:', VERSIONS_DATA.length);
+                return true;
+            } catch (error) {
+                console.error('Failed to load versions:', error);
+                return false;
+            }
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', async function () {
-            // Load data from API instead of static files
+            console.log('DOM loaded, starting simplified initialization...');
+
+            // Try simplified version loading first
+            const versionsLoaded = await loadVersionsOnly();
+            if (versionsLoaded && VERSIONS_DATA.length > 0) {
+                console.log('Versions loaded successfully, rendering...');
+                renderVersionList();
+                return;
+            }
+
+            // Fallback to full API loading
+            console.log('Falling back to full API loading...');
             const dataLoaded = await loadAPIData();
+            console.log('Data loaded result:', dataLoaded, 'VERSIONS_DATA.length:', VERSIONS_DATA.length);
             if (!dataLoaded || !VERSIONS_DATA.length) {
-                console.error('Failed to load API data');
+                console.error('Failed to load API data - dataLoaded:', dataLoaded, 'versions:', VERSIONS_DATA.length);
                 showErrorToast('Failed to load BSim data from API');
                 return;
             }
+            console.log('Proceeding with UI initialization...');
 
             // Update footer stats
             document.getElementById('statVersions').textContent = VERSIONS_DATA.length;
@@ -3682,6 +3708,7 @@
             document.getElementById('statHashes').textContent = totalVariants;
 
             updateFilterButtons();
+            console.log('About to render version list with', VERSIONS_DATA.length, 'versions');
             renderVersionList();
         });
 
@@ -3718,16 +3745,8 @@
 
         // Helper to filter versions by filter state
         function filterVersionsByType(versions) {
-            return versions.filter(v => {
-                // Check each group
-                for (const [groupKey, groupVersions] of Object.entries(VERSION_GROUPS)) {
-                    if (groupVersions.includes(v)) {
-                        return versionFilters[groupKey];
-                    }
-                }
-                // If version not in any group, show it if any filter is active
-                return true;
-            });
+            // Always return all versions - no filtering
+            return versions;
         }
 
         // Get active filter names for display
@@ -3785,13 +3804,12 @@
         }
 
         function renderVersionList() {
+            console.log('renderVersionList called with', VERSIONS_DATA.length, 'versions');
             const container = document.getElementById('versionList');
+            console.log('Version container element:', container ? 'found' : 'NOT FOUND');
 
-            // Filter based on granular toggle buttons
-            let versions = VERSIONS_DATA.filter(v => {
-                const fullVersion = v.folder_name; // e.g., "Classic/1.00" or "LoD/1.07"
-                return filterVersionsByType([fullVersion]).length > 0;
-            });
+            // Show all versions - no filtering
+            let versions = VERSIONS_DATA;
 
             // Sort by version number
             versions.sort((a, b) => {
@@ -3854,7 +3872,7 @@
             const diff = DIFFS_DATA[folderName];
 
             if (!folder) {
-                document.getElementById('filesTitle').textContent = 'No Data';
+                // Title remains static as "Binaries"
                 document.getElementById('filesTable').innerHTML = '<div class="details-empty">No file data available</div>';
                 selectedFile = null;
                 return;
@@ -3862,7 +3880,7 @@
 
             // Update title
             const versionInfo = VERSIONS_DATA.find(v => v.folder_name === folderName);
-            document.getElementById('filesTitle').textContent = `${versionInfo?.game_type || ''} ${versionInfo?.version || folderName}`;
+            // Title remains static as "Binaries"
 
             // Show toolbar and filter
             document.getElementById('filesToolbar').style.display = 'flex';
