@@ -657,11 +657,9 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
                 // Check if auto-update is enabled
                 if (!autoUpdateExisting) {
-                    boolean update = askYesNo("Executable Exists",
-                        "Executable already exists in database. Update function data?");
-                    if (!update) {
-                        throw new RuntimeException("Operation cancelled - executable exists");
-                    }
+                    // In batch mode, default to updating existing executables
+                    // to avoid blocking automated processing
+                    println("  Executable exists - proceeding with function processing (batch mode)");
                 } else {
                     println("  Auto-updating existing executable...");
                 }
