@@ -601,42 +601,43 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
      */
     private ProcessingMode askProcessingMode() {
         String message = "How should existing executables be handled?\n\n" +
-            "Enter the number for your choice:\n" +
-            "1 = Update All (process all binaries, updating existing ones)\n" +
-            "2 = Add Missing (only process binaries not yet in database) [RECOMMENDED]\n" +
-            "3 = Ask Individual (prompt individually for each binary)\n" +
-            "4 = Cancel\n\n" +
-            "For missing binaries, choose option 2.";
+            "Choose your processing mode:\n\n" +
+            "• Update All: Process all binaries, updating existing ones\n" +
+            "• Add Missing: Only process binaries not yet in database (recommended)\n" +
+            "• Ask Individual: Prompt individually for each binary\n" +
+            "• Cancel: Exit the operation";
 
-        String response;
+        java.util.List<String> choices = java.util.Arrays.asList(
+            "Update All",
+            "Add Missing (Recommended)",
+            "Ask Individual",
+            "Cancel"
+        );
+
+        int choice;
         try {
-            response = askString("Processing Mode", message, "2");
+            choice = askChoice("Processing Mode", message, choices, "Add Missing (Recommended)");
         } catch (CancelledException e) {
             println("Operation cancelled by user");
             return ProcessingMode.CANCELLED;
         }
 
-        if (response == null) {
-            println("Operation cancelled");
-            return ProcessingMode.CANCELLED;
-        }
-
-        switch (response.trim()) {
-            case "1":
+        switch (choice) {
+            case 0:
                 println("Selected: Update All mode");
                 return ProcessingMode.UPDATE_ALL;
-            case "2":
+            case 1:
                 println("Selected: Add Missing mode");
                 return ProcessingMode.ADD_MISSING;
-            case "3":
+            case 2:
                 println("Selected: Ask Individual mode");
                 return ProcessingMode.ASK_INDIVIDUAL;
-            case "4":
+            case 3:
                 println("Operation cancelled");
                 return ProcessingMode.CANCELLED;
             default:
-                println("Invalid selection, defaulting to Add Missing mode");
-                return ProcessingMode.ADD_MISSING;
+                println("Operation cancelled");
+                return ProcessingMode.CANCELLED;
         }
     }
 
