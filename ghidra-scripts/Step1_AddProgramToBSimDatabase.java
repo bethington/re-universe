@@ -582,30 +582,43 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
             println("Connected to BSim database successfully");
 
-            // Set up transaction handling
-            conn.setAutoCommit(false);
+            // Use individual transactions for better error isolation
+            conn.setAutoCommit(true);
 
+            // Step 1: Get or create executable (separate transaction)
+            int executableId;
             try {
-                // Get or create executable with unified version info
-                int executableId = getOrCreateExecutableUnified(conn, programName, programPath, versionInfo);
-                println("Executable ID: " + executableId);
-
-                // Process functions
-                processFunctions(conn, executableId, programName, program);
-
-                // Update materialized views for cross-version analysis
-                refreshMaterializedViews(conn);
-
-                // Commit transaction
+                conn.setAutoCommit(false);
+                executableId = getOrCreateExecutableUnified(conn, programName, programPath, versionInfo);
                 conn.commit();
-                println("Transaction committed successfully");
-
+                println("Executable ID: " + executableId);
             } catch (Exception e) {
-                // Rollback on error
                 conn.rollback();
-                println("Transaction rolled back due to error");
+                printerr("Error creating executable entry: " + e.getMessage());
                 throw e;
             }
+
+            // Step 2: Process functions (separate transaction for each batch)
+            try {
+                conn.setAutoCommit(true); // Use autocommit for function processing
+                processFunctions(conn, executableId, programName, program);
+            } catch (Exception e) {
+                printerr("Error processing functions: " + e.getMessage());
+                throw e;
+            }
+
+            // Step 3: Update materialized views (separate transaction, non-critical)
+            try {
+                conn.setAutoCommit(false);
+                refreshMaterializedViews(conn);
+                conn.commit();
+            } catch (Exception e) {
+                conn.rollback();
+                println("Warning: Could not refresh materialized views: " + e.getMessage());
+                // Don't fail the entire process for view refresh issues
+            }
+
+            println("Database operations completed successfully");
 
         } catch (SQLException e) {
             printerr("Database error: " + e.getMessage());
@@ -688,6 +701,8 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         } catch (SQLException e) {
             // Fall back to basic insert without version field
             println("  Note: Using basic insert (unified version schema not available)");
+            println("  Original error: " + e.getMessage());
+
             String basicInsertSql = "INSERT INTO exetable (name_exec, md5, architecture, ingest_date) " +
                 "VALUES (?, ?, ?, NOW()) RETURNING id";
             try (PreparedStatement stmt = conn.prepareStatement(basicInsertSql)) {
@@ -695,16 +710,71 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 stmt.setString(2, generateMD5(unifiedName));
                 stmt.setString(3, getArchitectureString());
 
+                println("  Attempting basic insert with name: " + unifiedName);
                 ResultSet rs = stmt.executeQuery();
                 if (rs.next()) {
                     int newId = rs.getInt("id");
                     println("Created new executable record with ID: " + newId);
                     return newId;
                 }
+            } catch (SQLException basicInsertError) {
+                printerr("Error in basic insert for '" + unifiedName + "': " + basicInsertError.getMessage());
+
+                // Check if it's a constraint violation and try to work around it
+                if (basicInsertError.getMessage().contains("proper_executable_naming")) {
+                    println("  Constraint violation detected. Trying with normalized filename...");
+                    String normalizedName = normalizeExecutableName(unifiedName);
+                    return tryInsertWithNormalizedName(conn, normalizedName);
+                }
+                throw basicInsertError;
             }
         }
 
         throw new SQLException("Failed to create executable record");
+    }
+
+    /**
+     * Normalize executable name to work around naming constraints
+     */
+    private String normalizeExecutableName(String originalName) {
+        // Remove problematic characters and apply basic normalization
+        String normalized = originalName.replaceAll("[^a-zA-Z0-9._-]", "_");
+
+        // If it's just a basic DLL/EXE name without version, try to make it comply
+        if (!normalized.matches(".*\\d+\\.\\d+.*")) {
+            // Add a default version if none present
+            if (normalized.endsWith(".dll")) {
+                normalized = "Unknown_" + normalized;
+            } else if (normalized.endsWith(".exe")) {
+                normalized = "Unknown_" + normalized;
+            }
+        }
+
+        return normalized;
+    }
+
+    /**
+     * Try insert with normalized name as last resort
+     */
+    private int tryInsertWithNormalizedName(Connection conn, String normalizedName) throws SQLException {
+        String basicInsertSql = "INSERT INTO exetable (name_exec, md5, architecture, ingest_date) " +
+            "VALUES (?, ?, ?, NOW()) RETURNING id";
+
+        try (PreparedStatement stmt = conn.prepareStatement(basicInsertSql)) {
+            stmt.setString(1, normalizedName);
+            stmt.setString(2, generateMD5(normalizedName));
+            stmt.setString(3, getArchitectureString());
+
+            println("  Attempting insert with normalized name: " + normalizedName);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                int newId = rs.getInt("id");
+                println("Created executable record with normalized name, ID: " + newId);
+                return newId;
+            }
+        }
+
+        throw new SQLException("Failed to create executable record even with normalized name");
     }
 
     /**
