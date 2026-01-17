@@ -582,15 +582,30 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
             println("Connected to BSim database successfully");
 
-            // Get or create executable with unified version info
-            int executableId = getOrCreateExecutableUnified(conn, programName, programPath, versionInfo);
-            println("Executable ID: " + executableId);
+            // Set up transaction handling
+            conn.setAutoCommit(false);
 
-            // Process functions
-            processFunctions(conn, executableId, programName, program);
+            try {
+                // Get or create executable with unified version info
+                int executableId = getOrCreateExecutableUnified(conn, programName, programPath, versionInfo);
+                println("Executable ID: " + executableId);
 
-            // Update materialized views for cross-version analysis
-            refreshMaterializedViews(conn);
+                // Process functions
+                processFunctions(conn, executableId, programName, program);
+
+                // Update materialized views for cross-version analysis
+                refreshMaterializedViews(conn);
+
+                // Commit transaction
+                conn.commit();
+                println("Transaction committed successfully");
+
+            } catch (Exception e) {
+                // Rollback on error
+                conn.rollback();
+                println("Transaction rolled back due to error");
+                throw e;
+            }
 
         } catch (SQLException e) {
             printerr("Database error: " + e.getMessage());
