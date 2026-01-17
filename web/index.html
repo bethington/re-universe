@@ -4246,6 +4246,7 @@
 
         function selectFile(filename) {
             console.log('selectFile called with:', filename);
+            console.log('selectedVersion:', selectedVersion);
             selectedFile = filename;
 
             // Update file list selection
@@ -4256,13 +4257,21 @@
 
             // Get file info from current version
             const folder = FOLDERS_DATA[selectedVersion];
+            console.log('FOLDERS_DATA keys:', Object.keys(FOLDERS_DATA || {}));
+            console.log('folder:', folder ? 'found' : 'null');
             const fileInfo = folder?.files?.[filename];
+            console.log('fileInfo:', fileInfo ? 'found' : 'null');
 
             // Get file history
             const baseName = filename.split(' (')[0];
+            console.log('baseName:', baseName);
             const history = FILE_HISTORY_DATA[baseName];
+            console.log('FILE_HISTORY_DATA keys:', Object.keys(FILE_HISTORY_DATA || {}).length);
+            console.log('history:', history ? 'found' : 'null');
 
+            console.log('Calling renderFileDetails...');
             renderFileDetails(filename, fileInfo, history);
+            console.log('renderFileDetails returned');
         }
 
         function getFileType(filename) {
