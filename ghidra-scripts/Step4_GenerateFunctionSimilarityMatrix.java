@@ -159,7 +159,7 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
 
     // Similarity thresholds
     private static final double MIN_SIMILARITY = 0.7;
-    private static final double MIN_CONFIDENCE = 25.0;
+    private static final double MIN_CONFIDENCE = 15.0; // Lowered from 25.0 as confidence calc only goes to ~55
 
     // Mode selection constants
     private static final String MODE_SINGLE = "Single Program (current)";
@@ -540,18 +540,40 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
                     long currentFuncId = getFunctionId(conn, currentFunction.getName(), currentExeId);
                     if (currentFuncId == -1) continue;
 
-                    // Generate structural signature for current function
-                    FunctionSignature currentSig = generateFunctionSignature(currentFunction);
-                    if (currentSig == null) continue;
+                    // Get enhanced signature for current function from database
+                    FunctionSignature currentSig = getFunctionSignatureFromDatabase(conn, currentFuncId);
+                    if (currentSig == null) {
+                        // Fallback to live analysis if no database signature
+                        currentSig = generateFunctionSignature(currentFunction);
+                        if (currentSig == null) continue;
+                    }
 
                     // Compare against functions in other executables
                     for (ExecutableInfo otherExe : otherExecutables) {
                         List<FunctionCandidate> candidates = getSimilarFunctionCandidates(
                             conn, currentFunction, otherExe.id);
 
+                        // Debug: Show candidate count for first few functions
+                        if (processedCount <= 3) {
+                            println(String.format("  Function '%s' has %d candidates in %s",
+                                currentFunction.getName(), candidates.size(), otherExe.name));
+                        }
+
                         for (FunctionCandidate candidate : candidates) {
                             double similarity = calculateSimilarity(currentSig, candidate.signature);
                             double confidence = calculateConfidence(currentSig, candidate.signature);
+
+                            // Debug output for first few functions to understand scoring
+                            if (processedCount <= 3) {
+                                String candidatePreview = candidate.name.substring(0, Math.min(candidate.name.length(), 20));
+                                println(String.format("    Candidate '%s': sim=%.3f, conf=%.1f | Source: inst=%d, Target: inst=%d",
+                                    candidatePreview, similarity, confidence,
+                                    currentSig.instructionCount, candidate.signature.instructionCount));
+
+                                if (similarity >= MIN_SIMILARITY && confidence >= MIN_CONFIDENCE) {
+                                    println("      ✅ MATCH FOUND!");
+                                }
+                            }
 
                             if (similarity >= MIN_SIMILARITY && confidence >= MIN_CONFIDENCE) {
                                 // Store similarity relationship
@@ -592,6 +614,24 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
             }
         }
         return -1;
+    }
+
+    private FunctionSignature getFunctionSignatureFromDatabase(Connection conn, long functionId) throws SQLException {
+        String sql = """
+            SELECT instruction_count, basic_block_count, call_count, feature_vector
+            FROM enhanced_signatures
+            WHERE function_id = ?
+            """;
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setLong(1, functionId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return createSignatureFromDatabase(rs);
+            }
+        }
+        return null;
     }
 
     private FunctionSignature generateFunctionSignature(Function function) {
@@ -698,23 +738,20 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
     private List<FunctionCandidate> getSimilarFunctionCandidates(Connection conn, Function sourceFunc, int targetExeId) throws SQLException {
         List<FunctionCandidate> candidates = new ArrayList<>();
 
-        // Get functions from target executable with similar characteristics
+        // Get functions from target executable with their actual enhanced signatures
         String sql = """
-            SELECT id, name_func, addr
-            FROM desctable
-            WHERE id_exe = ?
-            AND LENGTH(name_func) BETWEEN ? AND ?
-            ORDER BY addr
-            LIMIT 100
+            SELECT d.id, d.name_func, d.addr,
+                   es.instruction_count, es.basic_block_count, es.call_count, es.feature_vector
+            FROM desctable d
+            JOIN enhanced_signatures es ON d.id = es.function_id
+            WHERE d.id_exe = ?
+            AND es.instruction_count > 0
+            ORDER BY d.addr
+            LIMIT 200
             """;
-
-        int minNameLength = Math.max(1, sourceFunc.getName().length() - 5);
-        int maxNameLength = sourceFunc.getName().length() + 10;
 
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, targetExeId);
-            stmt.setInt(2, minNameLength);
-            stmt.setInt(3, maxNameLength);
 
             ResultSet rs = stmt.executeQuery();
             while (rs.next()) {
@@ -723,14 +760,32 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
                 candidate.name = rs.getString("name_func");
                 candidate.address = rs.getLong("addr");
 
-                // Create placeholder signature for comparison
-                candidate.signature = createPlaceholderSignature(candidate.name);
+                // Create signature from enhanced_signatures data
+                candidate.signature = createSignatureFromDatabase(rs);
 
                 candidates.add(candidate);
             }
         }
 
         return candidates;
+    }
+
+    private FunctionSignature createSignatureFromDatabase(ResultSet rs) throws SQLException {
+        FunctionSignature sig = new FunctionSignature();
+        sig.instructionCount = rs.getInt("instruction_count");
+        sig.branchCount = rs.getInt("basic_block_count"); // Use basic blocks as branch indicator
+        sig.callCount = rs.getInt("call_count");
+
+        // Use feature vector as mnemonic pattern (truncated for comparison)
+        String featureVector = rs.getString("feature_vector");
+        if (featureVector != null && featureVector.length() > 0) {
+            sig.mnemonicPattern = featureVector.substring(0, Math.min(featureVector.length(), 50));
+        } else {
+            sig.mnemonicPattern = "";
+        }
+
+        sig.parameterCount = 0; // Will enhance later if needed
+        return sig;
     }
 
     private FunctionSignature createPlaceholderSignature(String functionName) {
