@@ -161,4 +161,22 @@ public class ApiController {
             "cacheType", "ConcurrentMapCache (in-memory)"
         ));
     }
+
+    /**
+     * Lightweight health check endpoint that doesn't depend on external services.
+     * Returns basic application status and build info.
+     */
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, Object>> health() {
+        return ResponseEntity.ok(Map.of(
+            "status", "UP",
+            "application", "BSim Analysis API",
+            "version", "1.0.0",
+            "timestamp", java.time.Instant.now().toString(),
+            "checks", Map.of(
+                "app", "UP",
+                "jvm", "UP"
+            )
+        ));
+    }
 }
