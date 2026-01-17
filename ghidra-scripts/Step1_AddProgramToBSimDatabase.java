@@ -36,6 +36,7 @@
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.*;
 import ghidra.program.model.address.*;
+import ghidra.program.model.lang.FlowType;
 import ghidra.util.exception.CancelledException;
 import ghidra.framework.model.*;
 import ghidra.program.database.ProgramDB;
@@ -309,9 +310,6 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
         String programName = currentProgram.getName();
 
-        // Parse unified version information
-        UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(programName, programPath);
-
         // Get the project path
         String programPath = "";
         DomainFile domainFile = currentProgram.getDomainFile();
@@ -320,6 +318,9 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         } else {
             programPath = currentProgram.getExecutablePath();
         }
+
+        // Parse unified version information
+        UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(programName, programPath);
 
         println("Program: " + programName);
         println("Project Path: " + programPath);
@@ -938,10 +939,11 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         """;
 
         try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
-            // Get all tags from Ghidra
-            Collection<String> tags = function.getTags();
+            // Get all tags from Ghidra and convert to strings
+            Set<ghidra.program.model.listing.FunctionTag> functionTags = function.getTags();
 
-            for (String tag : tags) {
+            for (ghidra.program.model.listing.FunctionTag tagObj : functionTags) {
+                String tag = tagObj.getName();
                 if (tag.contains("_")) {
                     String[] parts = tag.split("_", 2);
                     String category = parts[0];
