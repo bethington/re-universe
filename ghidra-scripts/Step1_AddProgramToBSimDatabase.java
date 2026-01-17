@@ -1130,6 +1130,8 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             // Determine function characteristics
             metrics.isLeafFunction = calledFunctions.isEmpty();
             metrics.isLibraryFunction = isLibraryFunction(function.getName());
+            metrics.callingConvention = function.getCallingConventionName();
+            metrics.isThunk = function.isThunk();
 
             // Basic complexity estimation
             metrics.cyclomaticComplexity = estimateCyclomaticComplexity(program, function);
@@ -1206,6 +1208,8 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         boolean isLeafFunction = false;
         boolean isLibraryFunction = false;
         float confidenceScore = 0.5f;
+        String callingConvention = "UNKNOWN";
+        boolean isThunk = false;
     }
 
     /**
