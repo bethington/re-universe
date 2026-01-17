@@ -4285,20 +4285,25 @@
 
         function renderFileDetails(filename, fileInfo, history) {
             const container = document.getElementById('detailsContent');
+            const fileType = getFileType(filename);
+            const baseName = filename.split(' (')[0];
+            
+            console.log('renderFileDetails: fileType=', fileType, 'filename=', filename);
 
+            // For PE files (DLL/EXE), always try to load from API even if fileInfo is null
+            if (fileType === 'pe') {
+                renderPEExportsView(container, baseName, filename, fileInfo, history);
+                return;
+            }
+
+            // For other file types, require fileInfo or history
             if (!fileInfo && !history) {
                 renderEmptyDetails();
                 return;
             }
 
-            const fileType = getFileType(filename);
-            const baseName = filename.split(' (')[0];
-
             // Render based on file type
             switch (fileType) {
-                case 'pe':
-                    renderPEExportsView(container, baseName, filename, fileInfo, history);
-                    break;
                 case 'mpq':
                     renderMPQPlaceholder(container, filename, fileInfo);
                     break;
