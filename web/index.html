@@ -3917,18 +3917,18 @@
                     <thead>
                         <tr>
                             <th>Name</th>
-                            <th>Size</th>
-                            <th>Functions</th>
+                            <th>Category</th>
+                            <th>Type</th>
                             <th>Arch</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${binaries.map(binary => `
-                            <tr class="file-row" onclick="selectFile('${binary.name}')">
-                                <td class="filename">${binary.name}</td>
-                                <td>${formatFileSize(binary.md5)}</td>
-                                <td>${binary.function_count || 0}</td>
-                                <td>${binary.architecture || ''}</td>
+                            <tr class="file-row" onclick="selectFile('${binary.fileName}')">
+                                <td class="filename">${binary.fileName}</td>
+                                <td>${binary.category || ''}</td>
+                                <td>${binary.fileType || ''}</td>
+                                <td>${binary.architecture || ''}-bit</td>
                             </tr>
                         `).join('')}
                     </tbody>
