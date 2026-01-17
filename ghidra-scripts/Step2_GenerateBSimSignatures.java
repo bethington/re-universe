@@ -100,6 +100,7 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
 
             for (int i = 0; i < pathParts.length; i++) {
                 String part = pathParts[i];
+                if (part.isEmpty()) continue; // Skip empty parts from leading slashes
 
                 // Check for family type (Classic, LoD, PD2, etc.)
                 if (part.equalsIgnoreCase("Classic") || part.equalsIgnoreCase("LoD")) {
@@ -109,7 +110,8 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
                     // Look for version in next part
                     if (i + 1 < pathParts.length) {
                         String nextPart = pathParts[i + 1];
-                        if (nextPart.matches("1\\.[0-9]+[a-z]?")) {
+                        // Updated regex to handle 1.00, 1.05b, 1.13c, etc.
+                        if (nextPart.matches("1\\.[0-9]{1,2}[a-z]?")) {
                             gameVersion = nextPart;
                         }
                     }
@@ -124,8 +126,8 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
                     return;
                 }
 
-                // Direct version pattern (like "1.05b")
-                if (part.matches("1\\.[0-9]+[a-z]?")) {
+                // Direct version pattern (like "1.05b" or "1.00")
+                if (part.matches("1\\.[0-9]{1,2}[a-z]?")) {
                     gameVersion = part;
                     if (familyType == null) {
                         familyType = "Unified";
@@ -469,7 +471,15 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
         }
 
         // Try partial matching for executables stored with different naming patterns
-        String partialSql = "SELECT id, name_exec FROM exetable WHERE name_exec ILIKE ?";
+        // Order by function count to prefer more complete entries
+        String partialSql = """
+            SELECT e.id, e.name_exec, COUNT(d.id) as function_count
+            FROM exetable e
+            LEFT JOIN desctable d ON d.id_exe = e.id
+            WHERE e.name_exec ILIKE ?
+            GROUP BY e.id, e.name_exec
+            ORDER BY function_count DESC, e.name_exec
+            """;
         try (PreparedStatement stmt = conn.prepareStatement(partialSql)) {
             // Extract just the base filename
             String baseFileName = programName;
@@ -485,7 +495,8 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
             if (rs.next()) {
                 int id = rs.getInt("id");
                 String foundName = rs.getString("name_exec");
-                println("Found executable using partial match: " + foundName + " for " + baseFileName);
+                int functionCount = rs.getInt("function_count");
+                println("Found executable using partial match: " + foundName + " (" + functionCount + " functions) for " + baseFileName);
                 return id;
             }
         }
