@@ -104,6 +104,27 @@ get_recent_activity() {
     fi
 }
 
+# Function to get data quality metrics
+get_data_quality() {
+    if check_container_status; then
+        docker exec $CONTAINER_NAME psql -U ben -d bsim -t -c "
+        WITH stats AS (
+            SELECT
+                COUNT(DISTINCT d.name_func) as unique_functions,
+                COUNT(d.name_func) as total_entries,
+                COUNT(d.name_func) - COUNT(DISTINCT d.name_func) as duplicates
+            FROM desctable d
+            JOIN exetable e ON d.id_exe = e.id
+        )
+        SELECT
+            unique_functions || ',' || total_entries || ',' || duplicates || ',' ||
+            ROUND(100.0 * duplicates / total_entries, 1) || '%'
+        FROM stats;" 2>/dev/null | xargs || echo "N/A,N/A,N/A,N/A"
+    else
+        echo "N/A,N/A,N/A,N/A"
+    fi
+}
+
 # Function to show basic status
 show_basic_status() {
     clear
@@ -139,6 +160,29 @@ show_basic_status() {
     echo ""
     print_header "=== Quick Stats ==="
     get_database_stats
+
+    # Data quality metrics
+    echo ""
+    print_header "=== Data Quality ==="
+    quality_stats=$(get_data_quality)
+    IFS=',' read -r unique total duplicates percentage <<< "$quality_stats"
+    echo "Unique Functions: $unique"
+    echo "Total Entries: $total"
+    echo "Duplicates: $duplicates ($percentage)"
+
+    # Quality status indicator
+    if [ "$percentage" != "N/A" ]; then
+        dup_num=$(echo "$percentage" | sed 's/%//' | cut -d'.' -f1)
+        if [ "$dup_num" -gt 50 ]; then
+            echo -e "${RED}⚠️  Data Quality: CRITICAL - High duplicate rate${NC}"
+        elif [ "$dup_num" -gt 25 ]; then
+            echo -e "${YELLOW}⚠️  Data Quality: WARNING - Moderate duplicates${NC}"
+        elif [ "$dup_num" -gt 5 ]; then
+            echo -e "${YELLOW}ℹ️  Data Quality: OK - Low duplicates${NC}"
+        else
+            echo -e "${GREEN}✅ Data Quality: GOOD - Minimal duplicates${NC}"
+        fi
+    fi
 }
 
 # Function to show detailed metrics
