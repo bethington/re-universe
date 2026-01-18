@@ -3,6 +3,9 @@
 -- ============================================================================
 -- These constraints prevent duplicate data when re-running BSim population scripts
 -- Run this migration to enable safer upsert operations in Step1_AddProgramToBSimDatabase.java
+--
+-- Note: exetable.md5 is already UNIQUE in standard BSim schema (used for ON CONFLICT)
+-- The name_exec unique constraint was removed to follow standard BSim behavior
 
 -- Add unique constraint on desctable for (id_exe, addr)
 -- This ensures one function per address per executable
@@ -28,30 +31,30 @@ BEGIN
     END IF;
 END $$;
 
--- Add unique constraint on exetable for name_exec
--- This ensures one executable per name
+-- Remove name_exec unique constraint if it exists (not standard BSim behavior)
+-- Standard BSim uses md5 as the unique identifier for executables
 DO $$
 BEGIN
-    -- First, remove any existing duplicates (keep the first one by id)
-    DELETE FROM exetable a
-    USING exetable b
-    WHERE a.id > b.id
-      AND a.name_exec = b.name_exec;
-    
-    -- Add unique constraint if it doesn't exist
-    IF NOT EXISTS (
+    IF EXISTS (
         SELECT 1 FROM pg_constraint 
         WHERE conname = 'exetable_unique_name'
     ) THEN
-        ALTER TABLE exetable 
-        ADD CONSTRAINT exetable_unique_name UNIQUE (name_exec);
-        RAISE NOTICE 'Added unique constraint exetable_unique_name';
-    ELSE
-        RAISE NOTICE 'Constraint exetable_unique_name already exists';
+        ALTER TABLE exetable DROP CONSTRAINT exetable_unique_name;
+        RAISE NOTICE 'Removed non-standard exetable_unique_name constraint';
     END IF;
+    
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'exetable_name_exec_key'
+    ) THEN
+        ALTER TABLE exetable DROP CONSTRAINT exetable_name_exec_key;
+        RAISE NOTICE 'Removed non-standard exetable_name_exec_key constraint';
+    END IF;
+    
+    RAISE NOTICE 'exetable.md5 is already UNIQUE (standard BSim behavior)';
 END $$;
 
--- Verify constraints were added
+-- Verify constraints
 SELECT 
     tc.constraint_name,
     tc.table_name,

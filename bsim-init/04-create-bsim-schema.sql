@@ -257,8 +257,8 @@ CREATE INDEX idx_pathtable_val ON pathtable(val);
 
 \echo 'Adding unique constraints for script compatibility...'
 
--- Add unique constraint for ON CONFLICT support in Ghidra scripts
-ALTER TABLE exetable ADD CONSTRAINT exetable_name_exec_key UNIQUE (name_exec);
+-- Note: md5 is already UNIQUE in the exetable definition (standard BSim behavior)
+-- ON CONFLICT (md5) is used in Ghidra scripts for idempotent inserts
 ALTER TABLE desctable ADD CONSTRAINT desctable_exe_addr_key UNIQUE (id_exe, addr);
 
 -- =========================================================================

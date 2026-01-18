@@ -834,10 +834,10 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
         // Create new executable record with authentic BSim schema using lookup table IDs
         // Include game_version and version_family for version tracking
-        // Use ON CONFLICT for idempotent insert (requires unique constraint on name_exec)
+        // Use ON CONFLICT (md5) for idempotent insert (standard BSim behavior - md5 is unique)
         String insertSql = "INSERT INTO exetable (name_exec, md5, architecture, name_compiler, ingest_date, repository, path, game_version, version_family) " +
             "VALUES (?, ?, get_or_create_arch_id(?), get_or_create_compiler_id(?), NOW(), get_or_create_repository_id(?), get_or_create_path_id(?), ?, ?) " +
-            "ON CONFLICT (name_exec) DO UPDATE SET md5 = EXCLUDED.md5, ingest_date = NOW(), game_version = EXCLUDED.game_version, version_family = EXCLUDED.version_family " +
+            "ON CONFLICT (md5) DO UPDATE SET name_exec = EXCLUDED.name_exec, ingest_date = NOW(), game_version = EXCLUDED.game_version, version_family = EXCLUDED.version_family " +
             "RETURNING id";
 
         try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
@@ -887,7 +887,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
             String basicInsertSql = "INSERT INTO exetable (name_exec, md5, architecture, name_compiler, ingest_date, repository, path, game_version, version_family) " +
                 "VALUES (?, ?, get_or_create_arch_id(?), get_or_create_compiler_id(?), NOW(), get_or_create_repository_id(?), get_or_create_path_id(?), ?, ?) " +
-                "ON CONFLICT (name_exec) DO UPDATE SET md5 = EXCLUDED.md5, ingest_date = NOW(), game_version = EXCLUDED.game_version, version_family = EXCLUDED.version_family " +
+                "ON CONFLICT (md5) DO UPDATE SET name_exec = EXCLUDED.name_exec, ingest_date = NOW(), game_version = EXCLUDED.game_version, version_family = EXCLUDED.version_family " +
                 "RETURNING id";
             try (PreparedStatement stmt = conn.prepareStatement(basicInsertSql)) {
                 stmt.setString(1, unifiedName);
@@ -968,7 +968,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         
         String basicInsertSql = "INSERT INTO exetable (name_exec, md5, architecture, name_compiler, ingest_date, repository, path, game_version, version_family) " +
             "VALUES (?, ?, get_or_create_arch_id(?), get_or_create_compiler_id(?), NOW(), get_or_create_repository_id(?), get_or_create_path_id(?), NULL, NULL) " +
-            "ON CONFLICT (name_exec) DO UPDATE SET md5 = EXCLUDED.md5, ingest_date = NOW() " +
+            "ON CONFLICT (md5) DO UPDATE SET name_exec = EXCLUDED.name_exec, ingest_date = NOW() " +
             "RETURNING id";
 
         try (PreparedStatement stmt = conn.prepareStatement(basicInsertSql)) {

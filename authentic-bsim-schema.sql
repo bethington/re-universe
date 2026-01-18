@@ -188,7 +188,8 @@ CREATE INDEX IF NOT EXISTS idx_desctable_signature ON desctable(id_signature);
 -- ============================================================================
 
 -- Add unique constraint for ON CONFLICT support in Ghidra scripts
-ALTER TABLE exetable ADD CONSTRAINT IF NOT EXISTS exetable_name_exec_key UNIQUE (name_exec);
+-- Note: md5 is already UNIQUE in exetable (standard BSim behavior)
+-- name_exec unique constraint removed - not part of authentic BSim schema
 ALTER TABLE desctable ADD CONSTRAINT IF NOT EXISTS desctable_exe_addr_key UNIQUE (id_exe, addr);
 
 -- ============================================================================
