@@ -46,7 +46,7 @@ import java.util.regex.*;
 
 public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
 
-    private static final String DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
+    private static final String DB_URL = "jdbc:postgresql://localhost:5432/bsim";
     private static final String DB_USER = "ben";
     private static final String DB_PASS = "goodyx12";
 
@@ -383,7 +383,7 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
             println("Found " + otherExecutables.size() + " other executables for comparison");
 
             // Process similarity for current program's functions
-            processFunctionSimilarities(conn, program, currentExeId, otherExecutables);
+            processFunctionSimilarities(conn, program, currentExeId, otherExecutables, versionInfo);
 
         } catch (SQLException e) {
             printerr("Database error: " + e.getMessage());
@@ -506,7 +506,7 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
     }
 
     private void processFunctionSimilarities(Connection conn, Program program, int currentExeId,
-                                           List<ExecutableInfo> otherExecutables) throws Exception {
+                                           List<ExecutableInfo> otherExecutables, UnifiedVersionInfo currentVersionInfo) throws Exception {
 
         println("Processing function similarities...");
         monitor.setMessage("Generating similarity matrix");
@@ -529,6 +529,23 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
                 similarity_score = EXCLUDED.similarity_score,
                 confidence_score = EXCLUDED.confidence_score,
                 updated_at = now()
+            """;
+
+        // Prepare statement for single-match cross-version system
+        String insertEquivalenceSql = """
+            INSERT INTO function_equivalence (primary_function_id, primary_version, binary_name, canonical_name)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (primary_function_id) DO NOTHING
+            """;
+
+        String insertBestMatchSql = """
+            INSERT INTO function_version_matches (equivalence_id, target_function_id, target_version, similarity_score, match_method)
+            VALUES (?, ?, ?, ?, 'similarity_analysis')
+            ON CONFLICT (equivalence_id, target_version) DO UPDATE SET
+                target_function_id = EXCLUDED.target_function_id,
+                similarity_score = EXCLUDED.similarity_score,
+                analyzed_at = NOW()
+            WHERE EXCLUDED.similarity_score > function_version_matches.similarity_score
             """;
 
         // Set connection for better performance
@@ -621,6 +638,89 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
 
         println(String.format("Generated %d similarity relationships for %d functions",
             similarityCount, processedCount));
+
+        // Now populate the single-match cross-version system
+        populateSingleMatchCrossVersionSystem(conn, currentExeId, currentVersionInfo);
+    }
+
+    /**
+     * Populate the single-match cross-version system using similarity matrix data
+     */
+    private void populateSingleMatchCrossVersionSystem(Connection conn, int currentExeId,
+            UnifiedVersionInfo currentVersionInfo) throws SQLException {
+
+        if (currentVersionInfo == null || currentVersionInfo.gameVersion == null) {
+            println("Skipping cross-version system - no version information");
+            return;
+        }
+
+        println("Populating single-match cross-version system for version " + currentVersionInfo.gameVersion);
+
+        // Step 1: Create equivalence records for functions in current version (as primary)
+        String createEquivalenceSql = """
+            INSERT INTO function_equivalence (primary_function_id, primary_version, binary_name, canonical_name)
+            SELECT d.id, ?, ?, d.name_func
+            FROM desctable d
+            WHERE d.id_exe = ?
+            ON CONFLICT (primary_function_id) DO NOTHING
+            """;
+
+        int equivalenceCount = 0;
+        try (PreparedStatement stmt = conn.prepareStatement(createEquivalenceSql)) {
+            stmt.setString(1, currentVersionInfo.gameVersion);
+            stmt.setString(2, extractBinaryName(currentVersionInfo));
+            stmt.setInt(3, currentExeId);
+            equivalenceCount = stmt.executeUpdate();
+        }
+
+        println(String.format("Created %d function equivalence records for primary version %s",
+            equivalenceCount, currentVersionInfo.gameVersion));
+
+        // Step 2: For each function in primary version, find single best match per target version
+        String findBestMatchesSql = """
+            WITH best_matches AS (
+                SELECT
+                    fe.id as equivalence_id,
+                    fsm.target_function_id,
+                    target_exe.game_version as target_version,
+                    fsm.similarity_score,
+                    ROW_NUMBER() OVER (PARTITION BY fe.id, target_exe.game_version ORDER BY fsm.similarity_score DESC) as rank
+                FROM function_equivalence fe
+                JOIN function_similarity_matrix fsm ON fe.primary_function_id = fsm.source_function_id
+                JOIN desctable target_func ON fsm.target_function_id = target_func.id
+                JOIN exetable target_exe ON target_func.id_exe = target_exe.id
+                WHERE fe.primary_version = ?
+                AND fe.binary_name = ?
+                AND target_exe.game_version != fe.primary_version
+                AND fsm.similarity_score >= 0.7  -- Only high-confidence matches
+            )
+            INSERT INTO function_version_matches (equivalence_id, target_function_id, target_version, similarity_score, match_method)
+            SELECT equivalence_id, target_function_id, target_version, similarity_score, 'step4_similarity'
+            FROM best_matches
+            WHERE rank = 1
+            ON CONFLICT (equivalence_id, target_version) DO UPDATE SET
+                target_function_id = EXCLUDED.target_function_id,
+                similarity_score = EXCLUDED.similarity_score,
+                analyzed_at = NOW()
+            WHERE EXCLUDED.similarity_score > function_version_matches.similarity_score
+            """;
+
+        int matchCount = 0;
+        try (PreparedStatement stmt = conn.prepareStatement(findBestMatchesSql)) {
+            stmt.setString(1, currentVersionInfo.gameVersion);
+            stmt.setString(2, extractBinaryName(currentVersionInfo));
+            matchCount = stmt.executeUpdate();
+        }
+
+        println(String.format("Found %d single best matches across other versions", matchCount));
+    }
+
+    /**
+     * Extract binary name from version info
+     */
+    private String extractBinaryName(UnifiedVersionInfo versionInfo) {
+        // For now, use a default binary name - this could be enhanced to detect actual binary
+        return "D2Game.dll"; // Most common binary for analysis
     }
 
     private long getFunctionId(Connection conn, String functionName, int executableId) throws SQLException {

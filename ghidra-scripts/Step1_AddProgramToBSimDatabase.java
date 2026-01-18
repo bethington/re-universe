@@ -23,7 +23,7 @@
 // - Applies comprehensive function tagging (library, game logic, utility, mod-relevant)
 // - Analyzes function complexity, calling patterns, and architectural features
 // - Populates base tables required for subsequent BSim operations
-// - Uses remote PostgreSQL database (10.0.0.30:5432) for enterprise deployment
+// - Uses remote PostgreSQL database (localhost:5432) for enterprise deployment
 //
 // WORKFLOW POSITION: Must be run before Step2 (signature generation)
 //
@@ -46,8 +46,8 @@ import java.util.regex.*;
 
 public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
-    // Default BSim database configuration
-    private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
+    // Default BSim database configuration (updated for authentic schema)
+    private static final String DEFAULT_DB_URL = "jdbc:postgresql://localhost:5432/bsim";
     private static final String DEFAULT_DB_USER = "ben";
     private static final String DEFAULT_DB_PASS = "goodyx12";
 
@@ -725,23 +725,8 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 int existingId = rs.getInt("id");
                 println("Executable already exists in database with ID: " + existingId);
 
-                // Update version info using unified schema function (with savepoint protection)
-                try {
-                    java.sql.Savepoint savepoint = conn.setSavepoint("before_update_version");
-                    try {
-                        String updateSql = "SELECT populate_version_fields_from_filename()";
-                        try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
-                            updateStmt.executeQuery();
-                            println("  Updated version fields using unified system");
-                        }
-                        conn.releaseSavepoint(savepoint);
-                    } catch (SQLException updateEx) {
-                        conn.rollback(savepoint);
-                        println("  Note: Could not update version fields (function may not exist)");
-                    }
-                } catch (SQLException savepointEx) {
-                    println("  Note: Savepoint not available for version update");
-                }
+                // No additional updates needed for authentic BSim schema
+                println("  Using existing executable with authentic BSim schema");
 
                 // Handle based on processing mode
                 switch (processingMode) {
@@ -768,10 +753,10 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             }
         }
 
-        // Create new executable record with unified version system
+        // Create new executable record with authentic BSim schema using lookup table IDs
         // Use ON CONFLICT for idempotent insert (requires unique constraint on name_exec)
-        String insertSql = "INSERT INTO exetable (name_exec, md5, architecture, ingest_date, game_version) " +
-            "VALUES (?, ?, ?, NOW(), ?) " +
+        String insertSql = "INSERT INTO exetable (name_exec, md5, architecture, name_compiler, ingest_date, repository, path) " +
+            "VALUES (?, ?, get_or_create_arch_id(?), get_or_create_compiler_id(?), NOW(), get_or_create_repository_id(?), get_or_create_path_id(?)) " +
             "ON CONFLICT (name_exec) DO UPDATE SET md5 = EXCLUDED.md5, ingest_date = NOW() " +
             "RETURNING id";
 
@@ -779,7 +764,9 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             stmt.setString(1, unifiedName);
             stmt.setString(2, generateMD5(unifiedName));
             stmt.setString(3, getArchitectureString());
-            stmt.setString(4, versionInfo.gameVersion);
+            stmt.setString(4, getCompilerString());
+            stmt.setString(5, getRepositoryString());
+            stmt.setString(6, getPathString());
 
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
@@ -787,27 +774,8 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 println("Created new executable record with ID: " + newId);
                 println("  " + versionInfo.getDisplayInfo());
 
-                // Trigger version field population using SAVEPOINT so failure doesn't abort transaction
-                try {
-                    // Create a savepoint so if the populate function fails, we can recover
-                    java.sql.Savepoint savepoint = conn.setSavepoint("before_populate");
-                    try {
-                        String populateSql = "SELECT populate_version_fields_from_filename()";
-                        try (PreparedStatement populateStmt = conn.prepareStatement(populateSql)) {
-                            populateStmt.executeQuery();
-                            println("  Version fields populated using unified schema");
-                        }
-                        // Release savepoint on success
-                        conn.releaseSavepoint(savepoint);
-                    } catch (SQLException popEx) {
-                        // Rollback to savepoint (NOT full rollback) to recover transaction
-                        conn.rollback(savepoint);
-                        println("  Note: Version field population function not available");
-                    }
-                } catch (SQLException savepointEx) {
-                    // Savepoint itself failed - just log and continue
-                    println("  Note: Could not use savepoint for version population");
-                }
+                // Authentic BSim schema doesn't require additional version field population
+                println("  Executable created with authentic BSim schema");
 
                 return newId;
             }
@@ -823,17 +791,20 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 println("  Warning: Rollback failed: " + rollbackError.getMessage());
             }
 
-            // Fall back to basic insert without version field
-            println("  Attempting basic insert (unified version schema not available)");
+            // Fall back to basic insert with authentic BSim schema (lookup table IDs)
+            println("  Attempting basic insert with authentic BSim schema");
 
-            String basicInsertSql = "INSERT INTO exetable (name_exec, md5, architecture, ingest_date) " +
-                "VALUES (?, ?, ?, NOW()) " +
+            String basicInsertSql = "INSERT INTO exetable (name_exec, md5, architecture, name_compiler, ingest_date, repository, path) " +
+                "VALUES (?, ?, get_or_create_arch_id(?), get_or_create_compiler_id(?), NOW(), get_or_create_repository_id(?), get_or_create_path_id(?)) " +
                 "ON CONFLICT (name_exec) DO UPDATE SET md5 = EXCLUDED.md5, ingest_date = NOW() " +
                 "RETURNING id";
             try (PreparedStatement stmt = conn.prepareStatement(basicInsertSql)) {
                 stmt.setString(1, unifiedName);
                 stmt.setString(2, generateMD5(unifiedName));
                 stmt.setString(3, getArchitectureString());
+                stmt.setString(4, getCompilerString());
+                stmt.setString(5, getRepositoryString());
+                stmt.setString(6, getPathString());
 
                 println("  Attempting basic insert with name: " + unifiedName);
                 ResultSet rs = stmt.executeQuery();
@@ -892,8 +863,8 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             println("  Warning: Rollback failed before normalized insert: " + e.getMessage());
         }
         
-        String basicInsertSql = "INSERT INTO exetable (name_exec, md5, architecture, ingest_date) " +
-            "VALUES (?, ?, ?, NOW()) " +
+        String basicInsertSql = "INSERT INTO exetable (name_exec, md5, architecture, name_compiler, ingest_date, repository, path) " +
+            "VALUES (?, ?, get_or_create_arch_id(?), get_or_create_compiler_id(?), NOW(), get_or_create_repository_id(?), get_or_create_path_id(?)) " +
             "ON CONFLICT (name_exec) DO UPDATE SET md5 = EXCLUDED.md5, ingest_date = NOW() " +
             "RETURNING id";
 
@@ -901,6 +872,9 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             stmt.setString(1, normalizedName);
             stmt.setString(2, generateMD5(normalizedName));
             stmt.setString(3, getArchitectureString());
+            stmt.setString(4, getCompilerString());
+            stmt.setString(5, getRepositoryString());
+            stmt.setString(6, getPathString());
 
             println("  Attempting insert with normalized name: " + normalizedName);
             ResultSet rs = stmt.executeQuery();
@@ -1045,6 +1019,18 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
                         // Store function tags with known function ID
                         storeFunctionTagsWithId(conn, function, functionId, executableId);
+
+                        // EFFICIENCY ENHANCEMENT: Populate additional tables during initial processing
+                        // This reduces the need for later scripts to re-process the same functions
+
+                        // Store function signatures (normally done in Step3d)
+                        storeFunctionSignatureWithId(conn, function, functionId, executableId, program);
+
+                        // Store basic cross-references (normally done in Step3c)
+                        storeFunctionCallsWithId(conn, function, functionId, executableId, program);
+
+                        // Store API usage if function uses imports/exports (normally done in Step3e)
+                        storeApiUsageWithId(conn, function, functionId, executableId, program);
                     }
 
                 } catch (SQLException e) {
@@ -1068,23 +1054,30 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
     }
 
     /**
-     * Refresh materialized views for cross-version analysis
+     * Refresh materialized views for cross-version analysis (authentic BSim schema)
      */
     private void refreshMaterializedViews(Connection conn) throws SQLException {
-        println("Refreshing materialized views for cross-version analysis...");
+        println("Checking for materialized views to refresh...");
 
         try (Statement stmt = conn.createStatement()) {
-            // Use the unified system refresh function
-            stmt.execute("SELECT refresh_cross_version_data()");
-            println("Refreshed cross-version materialized views");
-        } catch (SQLException e) {
-            // Fall back to manual refresh
-            try (Statement stmt = conn.createStatement()) {
-                stmt.execute("REFRESH MATERIALIZED VIEW cross_version_functions");
-                println("Refreshed cross_version_functions view");
-            } catch (SQLException e2) {
-                println("Note: Could not refresh materialized views");
+            // Check if any materialized views exist in the authentic schema
+            ResultSet rs = stmt.executeQuery("SELECT matviewname FROM pg_matviews WHERE schemaname = 'public'");
+            if (rs.next()) {
+                // Refresh any materialized views that exist
+                do {
+                    String viewName = rs.getString("matviewname");
+                    try {
+                        stmt.execute("REFRESH MATERIALIZED VIEW " + viewName);
+                        println("Refreshed materialized view: " + viewName);
+                    } catch (SQLException e) {
+                        println("Note: Could not refresh materialized view " + viewName + ": " + e.getMessage());
+                    }
+                } while (rs.next());
+            } else {
+                println("No materialized views found to refresh");
             }
+        } catch (SQLException e) {
+            println("Note: Could not check for materialized views: " + e.getMessage());
         }
     }
 
@@ -1108,17 +1101,49 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
     }
 
     /**
-     * Get architecture as string for unified schema
+     * Get architecture as string for authentic BSim schema (for lookup table)
      */
     private String getArchitectureString() {
         String arch = currentProgram.getLanguage().getProcessor().toString().toLowerCase();
         if (arch.contains("x86") && arch.contains("64")) {
-            return "x64";
+            return "x86_64";  // Use standard lookup table value
         } else if (arch.contains("x86")) {
             return "x86";
         } else {
             return "unknown";
         }
+    }
+
+    /**
+     * Get compiler as string for authentic BSim schema (for lookup table)
+     */
+    private String getCompilerString() {
+        // Try to detect compiler from program metadata or default to unknown
+        return "unknown";  // Can be enhanced with more sophisticated detection
+    }
+
+    /**
+     * Get repository as string for authentic BSim schema (for lookup table)
+     */
+    private String getRepositoryString() {
+        // For local Ghidra analysis, use "local" repository
+        return "local";
+    }
+
+    /**
+     * Get path as string for authentic BSim schema (for lookup table)
+     */
+    private String getPathString() {
+        // Extract path from current program or use unknown
+        if (currentProgram != null && currentProgram.getExecutablePath() != null) {
+            String path = currentProgram.getExecutablePath();
+            if (path.contains("/") || path.contains("\\")) {
+                // Get directory portion
+                int lastSlash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+                return path.substring(0, lastSlash);
+            }
+        }
+        return "unknown";
     }
 
     /**
@@ -1867,5 +1892,144 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
         // For all other executables, use pattern: 1.[version]_[FileName].dll/exe
         return String.format("%s_%s", versionInfo.gameVersion, fileName);
+    }
+
+    /**
+     * Store function signature during Step1 for efficiency
+     */
+    private void storeFunctionSignatureWithId(Connection conn, Function function, int functionId,
+                                            int executableId, Program program) {
+        try {
+            // Generate basic signature information that can be extracted immediately
+            String parameterTypes = getFunctionParameterTypes(function);
+            String returnType = getFunctionReturnType(function);
+            int parameterCount = function.getParameterCount();
+
+            String insertSql = """
+                INSERT INTO function_signatures
+                (function_id, executable_id, parameter_types, return_type, parameter_count, calling_convention)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT (function_id, executable_id) DO NOTHING
+                """;
+
+            try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+                stmt.setInt(1, functionId);
+                stmt.setInt(2, executableId);
+                stmt.setString(3, parameterTypes);
+                stmt.setString(4, returnType);
+                stmt.setInt(5, parameterCount);
+                stmt.setString(6, function.getCallingConventionName());
+                stmt.executeUpdate();
+            }
+
+        } catch (SQLException e) {
+            // Don't fail entire process for signature storage
+            println("Note: Could not store signature for " + function.getName() + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Store function calls during Step1 for efficiency
+     */
+    private void storeFunctionCallsWithId(Connection conn, Function function, int functionId,
+                                        int executableId, Program program) {
+        try {
+            // Get functions called by this function
+            Set<Function> calledFunctions = function.getCalledFunctions(null);
+
+            if (calledFunctions.isEmpty()) return;
+
+            String insertSql = """
+                INSERT INTO function_calls (caller_function_id, caller_executable_id, callee_name, call_type, call_count)
+                VALUES (?, ?, ?, 'direct', 1)
+                ON CONFLICT (caller_function_id, caller_executable_id, callee_name)
+                DO UPDATE SET call_count = function_calls.call_count + 1
+                """;
+
+            try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+                for (Function calledFunc : calledFunctions) {
+                    stmt.setInt(1, functionId);
+                    stmt.setInt(2, executableId);
+                    stmt.setString(3, calledFunc.getName());
+                    stmt.addBatch();
+                }
+                stmt.executeBatch();
+            }
+
+        } catch (SQLException e) {
+            println("Note: Could not store calls for " + function.getName() + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Store API usage during Step1 for efficiency
+     */
+    private void storeApiUsageWithId(Connection conn, Function function, int functionId,
+                                   int executableId, Program program) {
+        try {
+            // Check if function uses any imported APIs
+            Set<Function> calledFunctions = function.getCalledFunctions(null);
+
+            String insertSql = """
+                INSERT INTO function_api_usage (function_id, executable_id, api_name, usage_type, usage_count)
+                VALUES (?, ?, ?, 'call', 1)
+                ON CONFLICT (function_id, executable_id, api_name)
+                DO UPDATE SET usage_count = function_api_usage.usage_count + 1
+                """;
+
+            try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+                int apiCount = 0;
+                for (Function calledFunc : calledFunctions) {
+                    // Only store external/imported functions as API usage
+                    if (calledFunc.isExternal() || calledFunc.getName().startsWith("_")) {
+                        stmt.setInt(1, functionId);
+                        stmt.setInt(2, executableId);
+                        stmt.setString(3, calledFunc.getName());
+                        stmt.addBatch();
+                        apiCount++;
+                    }
+                }
+
+                if (apiCount > 0) {
+                    stmt.executeBatch();
+                }
+            }
+
+        } catch (SQLException e) {
+            println("Note: Could not store API usage for " + function.getName() + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Extract function parameter types as string
+     */
+    private String getFunctionParameterTypes(Function function) {
+        try {
+            Parameter[] params = function.getParameters();
+            if (params.length == 0) return "void";
+
+            StringBuilder types = new StringBuilder();
+            for (int i = 0; i < params.length; i++) {
+                if (i > 0) types.append(", ");
+                types.append(params[i].getDataType().getName());
+            }
+            return types.toString();
+        } catch (Exception e) {
+            return "unknown";
+        }
+    }
+
+    /**
+     * Extract function return type as string
+     */
+    private String getFunctionReturnType(Function function) {
+        try {
+            if (function.getReturnType() != null) {
+                return function.getReturnType().getName();
+            }
+            return "void";
+        } catch (Exception e) {
+            return "unknown";
+        }
     }
 }

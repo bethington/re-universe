@@ -1,341 +1,479 @@
--- BSim Schema Extension for Documentation Propagation
--- Purpose: Add documentation storage and cross-version mapping to BSim database
--- See: docs/BSIM-SCHEMA-EXTENSION.md for full documentation
+-- Architecturally Sound BSim Schema Extensions
+-- Purpose: Minimal extensions to authentic BSim schema for enhanced analysis
+-- Design Principles:
+--   1. Extend existing tables instead of creating many new ones
+--   2. Use generic relationships, not hard-coded version columns
+--   3. Minimize table proliferation - consolidate related data
+--   4. Support script requirements with minimal schema changes
 --
 -- Auto-executed on container initialization via /docker-entrypoint-initdb.d/
 -- Runs after: 04-create-bsim-schema.sql (requires base BSim tables to exist)
 --
--- Manual run: psql -U $BSIM_DB_USER -d $BSIM_DB_NAME -f 05-bsim-schema-extension.sql
--- Via Docker: docker exec -i bsim-postgres psql -U $BSIM_DB_USER -d $BSIM_DB_NAME < bsim-init/05-bsim-schema-extension.sql
---
--- Idempotent: Safe to re-run (uses IF NOT EXISTS, ADD COLUMN IF NOT EXISTS, ON CONFLICT)
+-- Idempotent: Safe to re-run (uses IF NOT EXISTS, ADD COLUMN IF NOT EXISTS)
 
 BEGIN;
 
 -- ============================================================================
--- STEP 1: Extend desctable with documentation columns
+-- STEP 1: Extend authentic BSim tables with minimal additions
 -- ============================================================================
 
--- Documentation content
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS return_type VARCHAR(256);
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS calling_convention VARCHAR(64);
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS namespace VARCHAR(256);
-
--- Plate comment sections (parsed from Ghidra's plate comment format)
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS plate_summary TEXT;
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS plate_algorithm TEXT;
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS plate_parameters TEXT;
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS plate_returns TEXT;
-
--- Metadata
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS completeness_score FLOAT;
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS doc_source VARCHAR(32);
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS propagated_from BIGINT;
+-- Extend desctable (authentic BSim function table) with documentation fields
+ALTER TABLE desctable ADD COLUMN IF NOT EXISTS return_type TEXT;
+ALTER TABLE desctable ADD COLUMN IF NOT EXISTS calling_convention VARCHAR(32);
+ALTER TABLE desctable ADD COLUMN IF NOT EXISTS namespace_path TEXT;
+ALTER TABLE desctable ADD COLUMN IF NOT EXISTS plate_comment TEXT;
+ALTER TABLE desctable ADD COLUMN IF NOT EXISTS doc_source VARCHAR(16) DEFAULT 'manual';
+ALTER TABLE desctable ADD COLUMN IF NOT EXISTS completeness_score REAL DEFAULT 0.0;
 ALTER TABLE desctable ADD COLUMN IF NOT EXISTS documented_at TIMESTAMP;
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS id_equivalence BIGINT;
+ALTER TABLE desctable ADD COLUMN IF NOT EXISTS enhanced_signature TEXT;
 
--- Add self-referential FK for propagated_from
-ALTER TABLE desctable DROP CONSTRAINT IF EXISTS fk_desc_propagated_from;
-ALTER TABLE desctable ADD CONSTRAINT fk_desc_propagated_from 
-    FOREIGN KEY (propagated_from) REFERENCES desctable(id) ON DELETE SET NULL;
-
--- ============================================================================
--- STEP 2: Extend exetable with version metadata
--- ============================================================================
-
+-- Extend exetable (authentic BSim executable table) with version metadata
 ALTER TABLE exetable ADD COLUMN IF NOT EXISTS game_version VARCHAR(16);
-ALTER TABLE exetable ADD COLUMN IF NOT EXISTS version_family VARCHAR(16);
 ALTER TABLE exetable ADD COLUMN IF NOT EXISTS is_reference BOOLEAN DEFAULT FALSE;
 
 -- ============================================================================
--- STEP 3: Create func_parameters table
+-- STEP 2: Create minimal support tables for data that doesn't fit in BSim core
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS func_parameters (
+-- Function parameters (referenced by scripts)
+CREATE TABLE IF NOT EXISTS function_parameters (
     id BIGSERIAL PRIMARY KEY,
-    id_desc BIGINT NOT NULL REFERENCES desctable(id) ON DELETE CASCADE,
+    function_id BIGINT REFERENCES desctable(id) ON DELETE CASCADE,
     ordinal INTEGER NOT NULL,
     param_name VARCHAR(128),
     param_type VARCHAR(256),
-    storage VARCHAR(64),
-    comment TEXT,
-    UNIQUE(id_desc, ordinal)
+    storage_location VARCHAR(64),
+    param_comment TEXT,
+    UNIQUE(function_id, ordinal)
 );
 
-CREATE INDEX IF NOT EXISTS idx_func_params_desc ON func_parameters(id_desc);
+CREATE INDEX IF NOT EXISTS idx_func_params_function ON function_parameters(function_id);
 
-COMMENT ON TABLE func_parameters IS 'Function parameters - mirrors Ghidra get_function_documentation() output';
-COMMENT ON COLUMN func_parameters.ordinal IS 'Parameter position (0-based)';
-COMMENT ON COLUMN func_parameters.storage IS 'Register or stack location, e.g., ECX, Stack[0x4]';
-
--- ============================================================================
--- STEP 4: Create func_local_variables table
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS func_local_variables (
+-- Function signatures (expected by Step3d)
+CREATE TABLE IF NOT EXISTS function_signatures (
     id BIGSERIAL PRIMARY KEY,
-    id_desc BIGINT NOT NULL REFERENCES desctable(id) ON DELETE CASCADE,
-    var_name VARCHAR(128),
-    var_type VARCHAR(256),
-    storage VARCHAR(64),
-    is_parameter BOOLEAN DEFAULT FALSE,
-    propagation_confidence VARCHAR(16)
-);
-
-CREATE INDEX IF NOT EXISTS idx_func_locals_desc ON func_local_variables(id_desc);
-
-COMMENT ON TABLE func_local_variables IS 'Local variables - best effort propagation (stack layouts may change)';
-COMMENT ON COLUMN func_local_variables.propagation_confidence IS 'high/medium/low based on storage match likelihood';
-
--- ============================================================================
--- STEP 5: Create func_comments table
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS func_comments (
-    id BIGSERIAL PRIMARY KEY,
-    id_desc BIGINT NOT NULL REFERENCES desctable(id) ON DELETE CASCADE,
-    relative_offset INTEGER NOT NULL,
-    comment_type VARCHAR(16) NOT NULL,
-    comment_text TEXT NOT NULL,
-    instruction_bytes BYTEA,
-    is_relocatable BOOLEAN DEFAULT TRUE,
-    UNIQUE(id_desc, relative_offset, comment_type)
-);
-
-CREATE INDEX IF NOT EXISTS idx_func_comments_desc ON func_comments(id_desc);
-
-COMMENT ON TABLE func_comments IS 'Inline comments with relative offsets for cross-version relocation';
-COMMENT ON COLUMN func_comments.relative_offset IS 'Bytes from function start address';
-COMMENT ON COLUMN func_comments.comment_type IS 'eol, pre, or post';
-COMMENT ON COLUMN func_comments.instruction_bytes IS 'Optional: bytes at offset for pattern matching';
-
--- ============================================================================
--- STEP 6: Create func_tags junction table
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS func_tags (
-    id_desc BIGINT NOT NULL REFERENCES desctable(id) ON DELETE CASCADE,
-    tag_name VARCHAR(128) NOT NULL,
-    added_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (id_desc, tag_name)
-);
-
-CREATE INDEX IF NOT EXISTS idx_func_tags_name ON func_tags(tag_name);
-
-COMMENT ON TABLE func_tags IS 'Function tags for categorization and workflow (DOCUMENTED, NEEDS_REVIEW, etc.)';
-
--- ============================================================================
--- STEP 7: Create version_equivalence table
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS version_equivalence (
-    id BIGSERIAL PRIMARY KEY,
-    canonical_name VARCHAR(256) NOT NULL,
-    binary_name VARCHAR(128) NOT NULL,
+    function_id BIGINT REFERENCES desctable(id) ON DELETE CASCADE,
+    signature_text TEXT,
+    parameter_count INTEGER DEFAULT 0,
+    return_type VARCHAR(256),
+    calling_convention VARCHAR(32),
     created_at TIMESTAMP DEFAULT NOW(),
-    
-    -- One column per D2 version (nullable FK to desctable)
-    v1_00 BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_01 BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_02 BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_03 BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_04b BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_04c BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_05 BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_05b BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_06 BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_06b BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_07 BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_08 BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_09 BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_09b BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_09d BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_10 BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_11 BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_11b BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_12a BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_13c BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_13d BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_14a BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_14b BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_14c BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    v1_14d BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    
-    UNIQUE(canonical_name, binary_name)
+    UNIQUE(function_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_version_equiv_name ON version_equivalence(canonical_name);
-CREATE INDEX IF NOT EXISTS idx_version_equiv_binary ON version_equivalence(binary_name);
+CREATE INDEX IF NOT EXISTS idx_func_sig_function ON function_signatures(function_id);
 
-COMMENT ON TABLE version_equivalence IS 'Maps equivalent functions across all D2 versions';
-COMMENT ON COLUMN version_equivalence.canonical_name IS 'Function name from reference version';
-COMMENT ON COLUMN version_equivalence.binary_name IS 'Original DLL name (1.14.x functions live in Game.exe but retain original DLL association)';
-
--- Add FK constraint from desctable to version_equivalence
-ALTER TABLE desctable DROP CONSTRAINT IF EXISTS fk_desc_equivalence;
-ALTER TABLE desctable ADD CONSTRAINT fk_desc_equivalence 
-    FOREIGN KEY (id_equivalence) REFERENCES version_equivalence(id) ON DELETE SET NULL;
-
--- ============================================================================
--- STEP 8: Create ordinal_mappings table
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS ordinal_mappings (
-    id SERIAL PRIMARY KEY,
-    dll_name VARCHAR(64) NOT NULL,
-    ordinal_number INTEGER NOT NULL,
-    resolved_name VARCHAR(256),
-    signature TEXT,
-    description TEXT,
-    min_version VARCHAR(16),
-    max_version VARCHAR(16),
-    
-    UNIQUE(dll_name, ordinal_number, min_version)
-);
-
-CREATE INDEX IF NOT EXISTS idx_ordinal_dll ON ordinal_mappings(dll_name, ordinal_number);
-
-COMMENT ON TABLE ordinal_mappings IS 'Resolves ordinal imports (e.g., Ordinal_10398) to human-readable names';
-COMMENT ON COLUMN ordinal_mappings.min_version IS 'First D2 version with this ordinal';
-COMMENT ON COLUMN ordinal_mappings.max_version IS 'Last D2 version (NULL = still valid in latest)';
-
--- Insert some known ordinal mappings for Storm.dll and Fog.dll
-INSERT INTO ordinal_mappings (dll_name, ordinal_number, resolved_name, description) VALUES
-    ('Storm.dll', 401, 'SFileOpenArchive', 'Open MPQ archive'),
-    ('Storm.dll', 402, 'SFileCloseArchive', 'Close MPQ archive'),
-    ('Storm.dll', 403, 'SFileOpenFile', 'Open file from MPQ'),
-    ('Storm.dll', 404, 'SFileCloseFile', 'Close MPQ file handle'),
-    ('Storm.dll', 405, 'SFileGetFileSize', 'Get file size'),
-    ('Storm.dll', 406, 'SFileReadFile', 'Read from MPQ file'),
-    ('Storm.dll', 501, 'SMemAlloc', 'Allocate memory'),
-    ('Storm.dll', 502, 'SMemFree', 'Free memory'),
-    ('Storm.dll', 503, 'SMemReAlloc', 'Reallocate memory'),
-    ('Fog.dll', 10000, 'Fog_AllocMem', 'Allocate memory via Fog'),
-    ('Fog.dll', 10001, 'Fog_FreeMem', 'Free memory via Fog'),
-    ('Fog.dll', 10024, 'Fog_GetErrorHandler', 'Get error handler'),
-    ('Fog.dll', 10025, 'Fog_SetErrorHandler', 'Set error handler'),
-    ('Fog.dll', 10101, 'Fog_Assert', 'Assert with message')
-ON CONFLICT (dll_name, ordinal_number, min_version) DO NOTHING;
-
--- ============================================================================
--- STEP 9: Create data_types table
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS data_types (
+-- Enhanced signatures (expected by Step2 and Step5)
+CREATE TABLE IF NOT EXISTS enhanced_signatures (
     id BIGSERIAL PRIMARY KEY,
-    type_name VARCHAR(256) NOT NULL,
-    category_path VARCHAR(512),
-    type_kind VARCHAR(32) NOT NULL,
-    size_bytes INTEGER,
-    alignment INTEGER,
-    definition_json JSONB,
-    definition_gdt TEXT,
-    source_program VARCHAR(128),
-    source_version VARCHAR(16),
+    function_id BIGINT REFERENCES desctable(id) ON DELETE CASCADE,
+    executable_id INTEGER REFERENCES exetable(id) ON DELETE CASCADE,
+    signature_hash TEXT,
+    signature_data TEXT,
+    lsh_vector TEXT,
+    confidence_score REAL,
     created_at TIMESTAMP DEFAULT NOW(),
-    
-    UNIQUE(type_name, source_version)
+    UNIQUE(function_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_data_types_name ON data_types(type_name);
+CREATE INDEX IF NOT EXISTS idx_enhanced_sig_function ON enhanced_signatures(function_id);
+CREATE INDEX IF NOT EXISTS idx_enhanced_sig_executable ON enhanced_signatures(executable_id);
 
-COMMENT ON TABLE data_types IS 'Serialized struct/enum definitions for cross-binary type propagation';
-COMMENT ON COLUMN data_types.type_kind IS 'struct, enum, typedef, or union';
-COMMENT ON COLUMN data_types.definition_json IS 'JSONB with fields array: [{offset, name, type, size, comment}]';
-COMMENT ON COLUMN data_types.definition_gdt IS 'Alternative: Ghidra GDT export format';
-
--- ============================================================================
--- STEP 10: Create similarity_match_log table
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS similarity_match_log (
+-- Function similarity matrix (expected by Step4)
+CREATE TABLE IF NOT EXISTS function_similarity_matrix (
     id BIGSERIAL PRIMARY KEY,
-    source_id_desc BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    target_id_desc BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
-    similarity_score FLOAT NOT NULL,
-    confidence_score FLOAT,
-    matched_at TIMESTAMP DEFAULT NOW(),
-    propagated_fields TEXT[],
+    source_function_id BIGINT REFERENCES desctable(id) ON DELETE CASCADE,
+    target_function_id BIGINT REFERENCES desctable(id) ON DELETE CASCADE,
+    similarity_score REAL NOT NULL,
+    confidence_score REAL,
     match_type VARCHAR(32),
-    verified BOOLEAN DEFAULT FALSE,
-    verification_notes TEXT
+    computed_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(source_function_id, target_function_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_match_log_source ON similarity_match_log(source_id_desc);
-CREATE INDEX IF NOT EXISTS idx_match_log_target ON similarity_match_log(target_id_desc);
+CREATE INDEX IF NOT EXISTS idx_sim_matrix_source ON function_similarity_matrix(source_function_id);
+CREATE INDEX IF NOT EXISTS idx_sim_matrix_target ON function_similarity_matrix(target_function_id);
+CREATE INDEX IF NOT EXISTS idx_sim_matrix_score ON function_similarity_matrix(similarity_score DESC);
 
-COMMENT ON TABLE similarity_match_log IS 'Audit trail for similarity matching and documentation propagation';
-COMMENT ON COLUMN similarity_match_log.match_type IS 'identity (>=0.90), similar (>=0.70), or weak (>=0.50)';
-COMMENT ON COLUMN similarity_match_log.propagated_fields IS 'Array of field names that were propagated';
+-- Function analysis (expected by Step1)
+CREATE TABLE IF NOT EXISTS function_analysis (
+    id BIGSERIAL PRIMARY KEY,
+    function_id BIGINT REFERENCES desctable(id) ON DELETE CASCADE,
+    executable_id INTEGER REFERENCES exetable(id) ON DELETE CASCADE,
+    complexity_score INTEGER,
+    instruction_count INTEGER,
+    basic_block_count INTEGER,
+    cyclomatic_complexity INTEGER,
+    analyzed_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(function_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_func_analysis_function ON function_analysis(function_id);
+CREATE INDEX IF NOT EXISTS idx_func_analysis_executable ON function_analysis(executable_id);
+
+-- Function tags (lightweight tagging system)
+CREATE TABLE IF NOT EXISTS function_tags (
+    function_id BIGINT REFERENCES desctable(id) ON DELETE CASCADE,
+    executable_id INTEGER REFERENCES exetable(id) ON DELETE CASCADE,
+    tag_category VARCHAR(64),
+    tag_value VARCHAR(128),
+    confidence REAL DEFAULT 1.0,
+    auto_generated BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (function_id, tag_category, tag_value)
+);
+
+CREATE INDEX IF NOT EXISTS idx_func_tags_function ON function_tags(function_id);
+CREATE INDEX IF NOT EXISTS idx_func_tags_category ON function_tags(tag_category);
 
 -- ============================================================================
--- Create helper views
+-- STEP 3: Create tables for import/export analysis (Step3e requirements)
 -- ============================================================================
 
--- View: Functions with documentation status
-CREATE OR REPLACE VIEW v_function_doc_status AS
-SELECT 
-    d.id,
+-- API imports
+CREATE TABLE IF NOT EXISTS api_imports (
+    id BIGSERIAL PRIMARY KEY,
+    executable_id INTEGER REFERENCES exetable(id) ON DELETE CASCADE,
+    dll_name VARCHAR(128),
+    function_name VARCHAR(256),
+    ordinal_number INTEGER,
+    is_delayed BOOLEAN DEFAULT FALSE,
+    analyzed_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(executable_id, dll_name, function_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_imports_executable ON api_imports(executable_id);
+CREATE INDEX IF NOT EXISTS idx_api_imports_dll ON api_imports(dll_name);
+
+-- API exports
+CREATE TABLE IF NOT EXISTS api_exports (
+    id BIGSERIAL PRIMARY KEY,
+    executable_id INTEGER REFERENCES exetable(id) ON DELETE CASCADE,
+    function_name VARCHAR(256),
+    ordinal_number INTEGER,
+    rva_address BIGINT,
+    is_forwarded BOOLEAN DEFAULT FALSE,
+    analyzed_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(executable_id, function_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_exports_executable ON api_exports(executable_id);
+CREATE INDEX IF NOT EXISTS idx_api_exports_function ON api_exports(function_name);
+
+-- Function API usage (links functions to imports/exports)
+CREATE TABLE IF NOT EXISTS function_api_usage (
+    id BIGSERIAL PRIMARY KEY,
+    function_id BIGINT REFERENCES desctable(id) ON DELETE CASCADE,
+    api_import_id BIGINT REFERENCES api_imports(id) ON DELETE CASCADE,
+    usage_type VARCHAR(32) DEFAULT 'call',
+    reference_count INTEGER DEFAULT 1,
+    analyzed_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(function_id, api_import_id, usage_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_usage_function ON function_api_usage(function_id);
+CREATE INDEX IF NOT EXISTS idx_api_usage_import ON function_api_usage(api_import_id);
+
+-- ============================================================================
+-- STEP 4: Create tables for cross-reference analysis (Step3c requirements)
+-- ============================================================================
+
+-- Function calls
+CREATE TABLE IF NOT EXISTS function_calls (
+    id BIGSERIAL PRIMARY KEY,
+    caller_function_id BIGINT REFERENCES desctable(id) ON DELETE CASCADE,
+    callee_function_id BIGINT REFERENCES desctable(id) ON DELETE CASCADE,
+    call_type VARCHAR(32) DEFAULT 'direct',
+    call_count INTEGER DEFAULT 1,
+    analyzed_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(caller_function_id, callee_function_id, call_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_func_calls_caller ON function_calls(caller_function_id);
+CREATE INDEX IF NOT EXISTS idx_func_calls_callee ON function_calls(callee_function_id);
+
+-- Data references
+CREATE TABLE IF NOT EXISTS data_references (
+    id BIGSERIAL PRIMARY KEY,
+    function_id BIGINT REFERENCES desctable(id) ON DELETE CASCADE,
+    data_address BIGINT,
+    reference_type VARCHAR(32),
+    access_type VARCHAR(16),
+    reference_count INTEGER DEFAULT 1,
+    analyzed_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(function_id, data_address, reference_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_data_refs_function ON data_references(function_id);
+CREATE INDEX IF NOT EXISTS idx_data_refs_address ON data_references(data_address);
+
+-- Call graph metrics
+CREATE TABLE IF NOT EXISTS call_graph_metrics (
+    id BIGSERIAL PRIMARY KEY,
+    function_id BIGINT REFERENCES desctable(id) ON DELETE CASCADE,
+    incoming_calls INTEGER DEFAULT 0,
+    outgoing_calls INTEGER DEFAULT 0,
+    unique_callers INTEGER DEFAULT 0,
+    unique_callees INTEGER DEFAULT 0,
+    is_leaf BOOLEAN DEFAULT FALSE,
+    is_entry_point BOOLEAN DEFAULT FALSE,
+    computed_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(function_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_call_metrics_function ON call_graph_metrics(function_id);
+
+-- ============================================================================
+-- STEP 5: Create tables for string analysis (Step3b requirements)
+-- ============================================================================
+
+-- String references
+CREATE TABLE IF NOT EXISTS string_references (
+    id BIGSERIAL PRIMARY KEY,
+    executable_id INTEGER REFERENCES exetable(id) ON DELETE CASCADE,
+    string_address BIGINT,
+    string_content TEXT,
+    string_length INTEGER,
+    encoding_type VARCHAR(16) DEFAULT 'ascii',
+    analyzed_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(executable_id, string_address)
+);
+
+CREATE INDEX IF NOT EXISTS idx_string_refs_executable ON string_references(executable_id);
+CREATE INDEX IF NOT EXISTS idx_string_refs_content ON string_references USING gin(to_tsvector('english', string_content));
+
+-- Function string references (links functions to strings)
+CREATE TABLE IF NOT EXISTS function_string_refs (
+    id BIGSERIAL PRIMARY KEY,
+    function_id BIGINT REFERENCES desctable(id) ON DELETE CASCADE,
+    string_ref_id BIGINT REFERENCES string_references(id) ON DELETE CASCADE,
+    usage_type VARCHAR(32) DEFAULT 'reference',
+    reference_count INTEGER DEFAULT 1,
+    analyzed_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(function_id, string_ref_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_func_string_refs_function ON function_string_refs(function_id);
+CREATE INDEX IF NOT EXISTS idx_func_string_refs_string ON function_string_refs(string_ref_id);
+
+-- ============================================================================
+-- STEP 6: Create comments table for Step3a
+-- ============================================================================
+
+-- Core comments (simplified from the script's complex requirement)
+CREATE TABLE IF NOT EXISTS core_comment (
+    id BIGSERIAL PRIMARY KEY,
+    entity_type VARCHAR(32) NOT NULL,  -- 'function', 'executable', etc.
+    entity_id BIGINT NOT NULL,         -- References desctable.id, exetable.id, etc.
+    entity_name VARCHAR(256),          -- For display purposes
+    content TEXT NOT NULL,
+    content_html TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    is_deleted BOOLEAN DEFAULT FALSE,
+    parent_id BIGINT REFERENCES core_comment(id) ON DELETE CASCADE,
+    user_id INTEGER  -- Simple user reference
+);
+
+CREATE INDEX IF NOT EXISTS idx_core_comment_entity ON core_comment(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_core_comment_user ON core_comment(user_id);
+
+-- Simple user table for comments
+CREATE TABLE IF NOT EXISTS auth_user (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(150) UNIQUE NOT NULL,
+    first_name VARCHAR(30),
+    last_name VARCHAR(150),
+    email VARCHAR(254),
+    password VARCHAR(128),
+    is_superuser BOOLEAN DEFAULT FALSE,
+    is_staff BOOLEAN DEFAULT FALSE,
+    is_active BOOLEAN DEFAULT TRUE,
+    date_joined TIMESTAMP DEFAULT NOW()
+);
+
+-- Insert default user for comments
+INSERT INTO auth_user (username, first_name, last_name, email, is_active, is_staff)
+VALUES ('ghidra_script', 'Ghidra', 'Script', 'script@localhost', TRUE, FALSE)
+ON CONFLICT (username) DO NOTHING;
+
+-- ============================================================================
+-- STEP 7: Single-Match Cross-Version System (Primary Version Focus)
+-- ============================================================================
+
+-- Primary version function equivalence (ONE record per function in primary version)
+CREATE TABLE IF NOT EXISTS function_equivalence (
+    id BIGSERIAL PRIMARY KEY,
+
+    -- Primary version function (center of web table)
+    primary_function_id BIGINT REFERENCES desctable(id) ON DELETE CASCADE,
+    primary_version VARCHAR(16) NOT NULL,
+    binary_name VARCHAR(128) NOT NULL,
+    canonical_name VARCHAR(256) NOT NULL,
+
+    -- Metadata
+    created_at TIMESTAMP DEFAULT NOW(),
+    last_analyzed TIMESTAMP DEFAULT NOW(),
+
+    -- Constraints to prevent database bloat
+    UNIQUE(primary_function_id),
+    UNIQUE(binary_name, primary_version) -- Only one primary version per binary
+);
+
+-- Single best matches (EXACTLY one match per version per primary function)
+CREATE TABLE IF NOT EXISTS function_version_matches (
+    id BIGSERIAL PRIMARY KEY,
+
+    -- Links back to primary function
+    equivalence_id BIGINT REFERENCES function_equivalence(id) ON DELETE CASCADE,
+
+    -- Target version and function (the match)
+    target_function_id BIGINT REFERENCES desctable(id) ON DELETE CASCADE,
+    target_version VARCHAR(16) NOT NULL,
+
+    -- Similarity data for color coding
+    similarity_score REAL NOT NULL CHECK (similarity_score BETWEEN 0.0 AND 1.0),
+    confidence_level VARCHAR(16) NOT NULL CHECK (confidence_level IN ('exact', 'high', 'medium', 'low')),
+
+    -- Analysis metadata
+    match_method VARCHAR(32) DEFAULT 'similarity_analysis',
+    analyzed_at TIMESTAMP DEFAULT NOW(),
+
+    -- CRITICAL: Exactly one match per version per primary function
+    UNIQUE(equivalence_id, target_version),
+    -- Prevent target function from matching multiple primary functions
+    UNIQUE(target_function_id)
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_equiv_primary_function ON function_equivalence(primary_function_id);
+CREATE INDEX IF NOT EXISTS idx_equiv_binary_name ON function_equivalence(binary_name);
+CREATE INDEX IF NOT EXISTS idx_equiv_primary_version ON function_equivalence(primary_version);
+
+CREATE INDEX IF NOT EXISTS idx_matches_equivalence ON function_version_matches(equivalence_id);
+CREATE INDEX IF NOT EXISTS idx_matches_target_version ON function_version_matches(target_version);
+CREATE INDEX IF NOT EXISTS idx_matches_similarity ON function_version_matches(similarity_score DESC);
+
+-- Auto-calculate confidence level from similarity score
+CREATE OR REPLACE FUNCTION calculate_confidence_level(score REAL)
+RETURNS VARCHAR(16) AS $$
+BEGIN
+    RETURN CASE
+        WHEN score >= 0.98 THEN 'exact'
+        WHEN score >= 0.90 THEN 'high'
+        WHEN score >= 0.70 THEN 'medium'
+        ELSE 'low'
+    END;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to auto-set confidence level
+CREATE OR REPLACE FUNCTION update_confidence_level()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.confidence_level = calculate_confidence_level(NEW.similarity_score);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_update_confidence_level ON function_version_matches;
+CREATE TRIGGER trigger_update_confidence_level
+    BEFORE INSERT OR UPDATE ON function_version_matches
+    FOR EACH ROW
+    EXECUTE FUNCTION update_confidence_level();
+
+-- ============================================================================
+-- STEP 8: Create compatibility views for script expectations
+-- ============================================================================
+
+-- Ensure scripts can find functions with proper joins
+CREATE OR REPLACE VIEW v_enhanced_functions AS
+SELECT
+    d.id as function_id,
     d.name_func,
-    e.name_exec,
-    e.game_version,
+    d.addr,
+    d.flags,
     d.return_type,
     d.calling_convention,
-    d.completeness_score,
-    d.doc_source,
-    CASE WHEN d.plate_summary IS NOT NULL THEN TRUE ELSE FALSE END AS has_plate_comment,
-    (SELECT COUNT(*) FROM func_parameters p WHERE p.id_desc = d.id) AS param_count,
-    (SELECT COUNT(*) FROM func_comments c WHERE c.id_desc = d.id) AS comment_count,
-    (SELECT array_agg(tag_name) FROM func_tags t WHERE t.id_desc = d.id) AS tags
+    d.plate_comment,
+    e.id as executable_id,
+    e.name_exec,
+    e.md5,
+    e.game_version,
+    ed.architecture,
+    ed.name_compiler,
+    ed.repository,
+    ed.path
 FROM desctable d
-JOIN exetable e ON d.id_exe = e.id;
+JOIN exetable e ON d.id_exe = e.id
+LEFT JOIN exetable_denormalized ed ON e.id = ed.id;
 
-COMMENT ON VIEW v_function_doc_status IS 'Summary view of function documentation status';
+COMMENT ON VIEW v_enhanced_functions IS 'Complete function view combining authentic BSim with extensions';
 
--- View: Version equivalence with function names filled in
-CREATE OR REPLACE VIEW v_version_equivalence_names AS
-SELECT 
-    ve.id,
-    ve.canonical_name,
-    ve.binary_name,
-    (SELECT name_func FROM desctable WHERE id = ve.v1_00) AS name_1_00,
-    (SELECT name_func FROM desctable WHERE id = ve.v1_07) AS name_1_07,
-    (SELECT name_func FROM desctable WHERE id = ve.v1_09d) AS name_1_09d,
-    (SELECT name_func FROM desctable WHERE id = ve.v1_10) AS name_1_10,
-    (SELECT name_func FROM desctable WHERE id = ve.v1_13c) AS name_1_13c,
-    (SELECT name_func FROM desctable WHERE id = ve.v1_13d) AS name_1_13d,
-    (SELECT name_func FROM desctable WHERE id = ve.v1_14d) AS name_1_14d
-FROM version_equivalence ve;
+-- Web-optimized cross-version table (your exact requirement)
+CREATE OR REPLACE VIEW v_cross_version_web_table AS
+SELECT
+    fe.canonical_name,
+    fe.binary_name,
+    fe.primary_version,
 
-COMMENT ON VIEW v_version_equivalence_names IS 'Version equivalence with resolved function names (subset of versions)';
+    -- Primary function (center column of web table)
+    jsonb_build_object(
+        'name', primary_d.name_func,
+        'id', fe.primary_function_id,
+        'addr', primary_d.addr,
+        'confidence', 'primary'
+    ) as primary_function,
+
+    -- All version matches as JSONB for easy web consumption
+    jsonb_object_agg(
+        fvm.target_version,
+        jsonb_build_object(
+            'name', target_d.name_func,
+            'id', fvm.target_function_id,
+            'addr', target_d.addr,
+            'similarity', fvm.similarity_score,
+            'confidence', fvm.confidence_level,
+            'css_class', CASE
+                WHEN fvm.confidence_level = 'exact' THEN 'exact-match'
+                WHEN fvm.confidence_level = 'high' THEN 'high-confidence'
+                WHEN fvm.confidence_level = 'medium' THEN 'medium-confidence'
+                ELSE 'low-confidence'
+            END
+        )
+    ) FILTER (WHERE fvm.target_function_id IS NOT NULL) as version_matches
+
+FROM function_equivalence fe
+JOIN desctable primary_d ON fe.primary_function_id = primary_d.id
+LEFT JOIN function_version_matches fvm ON fe.id = fvm.equivalence_id
+LEFT JOIN desctable target_d ON fvm.target_function_id = target_d.id
+GROUP BY fe.id, fe.canonical_name, fe.binary_name, fe.primary_version,
+         primary_d.name_func, fe.primary_function_id, primary_d.addr;
+
+COMMENT ON VIEW v_cross_version_web_table IS 'Web-ready cross-version table with primary version focus and color-coding data';
 
 COMMIT;
 
 -- ============================================================================
--- Verification queries
+-- Verification
 -- ============================================================================
 
--- Check all new columns exist
-SELECT 'desctable extensions' AS check_type, 
-       COUNT(*) AS column_count 
-FROM information_schema.columns 
-WHERE table_name = 'desctable' 
-  AND column_name IN ('return_type', 'calling_convention', 'namespace', 
-                      'plate_summary', 'plate_algorithm', 'plate_parameters', 
-                      'plate_returns', 'completeness_score', 'doc_source',
-                      'propagated_from', 'documented_at', 'id_equivalence');
+-- Verify all required tables exist for the scripts
+SELECT 'Schema Extension Complete' as status,
+    (SELECT COUNT(*) FROM information_schema.tables
+     WHERE table_schema = 'public'
+     AND table_name IN (
+         'function_analysis', 'enhanced_signatures', 'function_similarity_matrix',
+         'function_parameters', 'function_signatures', 'api_imports', 'api_exports',
+         'function_api_usage', 'function_calls', 'data_references', 'call_graph_metrics',
+         'string_references', 'function_string_refs', 'core_comment', 'auth_user',
+         'function_equivalence', 'function_version_matches'
+     )) as required_tables_created;
 
--- Check new tables exist
-SELECT 'new tables' AS check_type,
-       table_name 
-FROM information_schema.tables 
-WHERE table_schema = 'public' 
-  AND table_name IN ('func_parameters', 'func_local_variables', 'func_comments',
-                     'func_tags', 'version_equivalence', 'ordinal_mappings',
-                     'data_types', 'similarity_match_log');
-
--- Show table summary
-SELECT 
-    'Schema extension complete' AS status,
-    (SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'desctable') AS desctable_columns,
-    (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public') AS total_tables;
+SELECT 'Extension Columns Added' as status,
+    (SELECT COUNT(*) FROM information_schema.columns
+     WHERE table_name = 'desctable'
+     AND column_name IN ('return_type', 'calling_convention', 'plate_comment', 'enhanced_signature')) as desc_extensions,
+    (SELECT COUNT(*) FROM information_schema.columns
+     WHERE table_name = 'exetable'
+     AND column_name IN ('game_version', 'is_reference')) as exe_extensions;

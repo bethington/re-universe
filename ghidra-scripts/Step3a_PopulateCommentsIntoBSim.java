@@ -40,7 +40,7 @@ import java.util.*;
 
 public class Step3a_PopulateCommentsIntoBSim extends GhidraScript {
 
-    private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
+    private static final String DEFAULT_DB_URL = "jdbc:postgresql://localhost:5432/bsim";
     private static final String DEFAULT_DB_USER = "ben";
     private static final String DEFAULT_DB_PASS = "goodyx12";
 
@@ -344,7 +344,7 @@ public class Step3a_PopulateCommentsIntoBSim extends GhidraScript {
                         processedCount, function.getName()));
                 }
 
-                if (hasComments(program, function)) {
+                if (hasComments(program, function) || hasStringReferences(program, function)) {
                     // Get BSim function ID
                     funcIdStmt.setString(1, function.getName());
                     funcIdStmt.setInt(2, executableId);
@@ -355,6 +355,9 @@ public class Step3a_PopulateCommentsIntoBSim extends GhidraScript {
 
                         // Extract and insert all comment types
                         commentCount += insertFunctionComments(commentStmt, program, function, functionId, userId);
+
+                        // EFFICIENCY ENHANCEMENT: Also process string references while we have the function
+                        processStringReferencesForFunction(conn, program, function, functionId, executableId);
                     }
                     rs.close();
                 }
@@ -450,5 +453,98 @@ public class Step3a_PopulateCommentsIntoBSim extends GhidraScript {
             .replace("'", "&#39;")
             .replace("\n", "<br>")
             .replace("\t", "&nbsp;&nbsp;&nbsp;&nbsp;");
+    }
+
+    /**
+     * Check if function has string references for efficiency enhancement
+     */
+    private boolean hasStringReferences(Program program, Function function) {
+        try {
+            Listing listing = program.getListing();
+            AddressSetView functionBody = function.getBody();
+
+            InstructionIterator instructions = listing.getInstructions(functionBody, true);
+            while (instructions.hasNext()) {
+                Instruction instruction = instructions.next();
+                for (int i = 0; i < instruction.getNumOperands(); i++) {
+                    Reference[] refs = instruction.getOperandReferences(i);
+                    for (Reference ref : refs) {
+                        if (ref.getReferenceType().isData()) {
+                            Data data = listing.getDataAt(ref.getToAddress());
+                            if (data != null && data.hasStringValue()) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Ignore errors in string detection
+        }
+        return false;
+    }
+
+    /**
+     * Process string references for a function during comment processing for efficiency
+     */
+    private void processStringReferencesForFunction(Connection conn, Program program,
+                                                   Function function, long functionId, int executableId) {
+        try {
+            Listing listing = program.getListing();
+            AddressSetView functionBody = function.getBody();
+
+            String stringInsertSql = """
+                INSERT INTO string_references (function_id, executable_id, string_value, string_length, address, reference_type)
+                VALUES (?, ?, ?, ?, ?, 'data_reference')
+                ON CONFLICT (function_id, executable_id, address) DO NOTHING
+                """;
+
+            String funcStringInsertSql = """
+                INSERT INTO function_string_refs (function_id, executable_id, string_id, usage_context, reference_count)
+                VALUES (?, ?, ?, 'direct_reference', 1)
+                ON CONFLICT (function_id, executable_id, string_id)
+                DO UPDATE SET reference_count = function_string_refs.reference_count + 1
+                """;
+
+            try (PreparedStatement stringStmt = conn.prepareStatement(stringInsertSql);
+                 PreparedStatement funcStringStmt = conn.prepareStatement(funcStringInsertSql)) {
+
+                InstructionIterator instructions = listing.getInstructions(functionBody, true);
+                while (instructions.hasNext()) {
+                    Instruction instruction = instructions.next();
+                    for (int i = 0; i < instruction.getNumOperands(); i++) {
+                        Reference[] refs = instruction.getOperandReferences(i);
+                        for (Reference ref : refs) {
+                            if (ref.getReferenceType().isData()) {
+                                Data data = listing.getDataAt(ref.getToAddress());
+                                if (data != null && data.hasStringValue()) {
+                                    String stringValue = data.getDefaultValueRepresentation();
+                                    if (stringValue != null && stringValue.length() > 2) {
+                                        // Clean the string value
+                                        stringValue = stringValue.substring(1, stringValue.length() - 1); // Remove quotes
+
+                                        // Insert string reference
+                                        stringStmt.setLong(1, functionId);
+                                        stringStmt.setInt(2, executableId);
+                                        stringStmt.setString(3, stringValue);
+                                        stringStmt.setInt(4, stringValue.length());
+                                        stringStmt.setLong(5, ref.getToAddress().getOffset());
+                                        stringStmt.executeUpdate();
+
+                                        // Link function to string
+                                        funcStringStmt.setLong(1, functionId);
+                                        funcStringStmt.setInt(2, executableId);
+                                        funcStringStmt.setLong(3, ref.getToAddress().getOffset()); // Use address as string_id
+                                        funcStringStmt.executeUpdate();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            println("Note: Could not store string references for " + function.getName() + ": " + e.getMessage());
+        }
     }
 }

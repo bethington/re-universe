@@ -22,7 +22,7 @@
 //
 // TECHNICAL DETAILS:
 // - Compatible with Ghidra 11.4.2 - No BSim client dependencies required
-// - Uses direct PostgreSQL connectivity to remote database (10.0.0.30:5432)
+// - Uses direct PostgreSQL connectivity to remote database (localhost:5432)
 // - Implements enhanced signature algorithms for improved accuracy
 //
 // WORKFLOW POSITION: Requires Step1 completion, enables Step3-5 operations
@@ -44,7 +44,7 @@ import java.util.regex.*;
 
 public class Step2_GenerateBSimSignatures extends GhidraScript {
 
-    private static final String DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
+    private static final String DB_URL = "jdbc:postgresql://localhost:5432/bsim";
     private static final String DB_USER = "ben";
     private static final String DB_PASS = "goodyx12";
 

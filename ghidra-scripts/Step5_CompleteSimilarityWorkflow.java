@@ -24,7 +24,7 @@
 // - Supports both standard and exception binary formats
 //
 // ENTERPRISE FEATURES:
-// - Remote database connectivity (10.0.0.30:5432) for scaled deployment
+// - Remote database connectivity (localhost:5432) for scaled deployment
 // - Parallel processing capabilities for large binary collections
 // - Comprehensive logging and error handling
 // - Configurable analysis parameters and thresholds
@@ -47,7 +47,7 @@ import java.util.*;
 
 public class Step5_CompleteSimilarityWorkflow extends GhidraScript {
 
-    private static final String DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
+    private static final String DB_URL = "jdbc:postgresql://localhost:5432/bsim";
     private static final String DB_USER = "ben";
     private static final String DB_PASS = "goodyx12";
     private static final double MIN_SIMILARITY = 0.75;
@@ -658,34 +658,32 @@ public class Step5_CompleteSimilarityWorkflow extends GhidraScript {
         println("Refreshing cross-version relationships...");
 
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
-            // First try to create the unique index if it doesn't exist (required for CONCURRENTLY refresh)
+            // Try calling the refresh function for single-match cross-version system
             try (Statement stmt = conn.createStatement()) {
-                stmt.execute("""
-                    CREATE UNIQUE INDEX IF NOT EXISTS cross_version_functions_unique_idx 
-                    ON cross_version_functions (source_function_id, target_function_id)
-                    """);
-            } catch (SQLException e) {
-                // Index may already exist or view doesn't exist, continue
-            }
-
-            // Try calling the refresh function
-            try (Statement stmt = conn.createStatement()) {
-                stmt.execute("SELECT refresh_cross_version_data()");
+                stmt.execute("SELECT refresh_cross_version_matrix()");
                 println("Cross-version relationships updated successfully");
             } catch (SQLException e) {
-                // If concurrent refresh fails, try non-concurrent refresh directly
-                if (e.getMessage().contains("concurrently")) {
-                    println("Concurrent refresh failed, trying direct refresh...");
-                    try (Statement stmt = conn.createStatement()) {
-                        stmt.execute("REFRESH MATERIALIZED VIEW cross_version_functions");
-                        println("Cross-version relationships updated successfully (non-concurrent)");
-                    } catch (SQLException e2) {
-                        // View may not exist yet, that's okay
-                        println("Note: cross_version_functions view not available: " + e2.getMessage());
+                println("Note: refresh_cross_version_matrix() not available: " + e.getMessage());
+
+                // Fallback: directly refresh any materialized views that exist
+                try (Statement stmt2 = conn.createStatement()) {
+                    ResultSet rs = stmt2.executeQuery("""
+                        SELECT matviewname FROM pg_matviews
+                        WHERE schemaname = 'public'
+                        AND matviewname LIKE '%cross_version%'
+                        """);
+
+                    while (rs.next()) {
+                        String viewName = rs.getString("matviewname");
+                        try (Statement refreshStmt = conn.createStatement()) {
+                            refreshStmt.execute("REFRESH MATERIALIZED VIEW " + viewName);
+                            println("Refreshed materialized view: " + viewName);
+                        } catch (SQLException refreshError) {
+                            println("Note: Could not refresh " + viewName + ": " + refreshError.getMessage());
+                        }
                     }
-                } else {
-                    // Function may not exist, that's okay for basic workflow
-                    println("Note: refresh_cross_version_data() not available: " + e.getMessage());
+                } catch (SQLException e2) {
+                    println("Note: Could not query for materialized views: " + e2.getMessage());
                 }
             }
         }

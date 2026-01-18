@@ -46,7 +46,7 @@ import java.util.*;
 
 public class Step3e_PopulateImportExports extends GhidraScript {
 
-    private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
+    private static final String DEFAULT_DB_URL = "jdbc:postgresql://localhost:5432/bsim";
     private static final String DEFAULT_DB_USER = "ben";
     private static final String DEFAULT_DB_PASS = "goodyx12";
 

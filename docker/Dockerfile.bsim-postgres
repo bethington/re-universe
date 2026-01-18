@@ -37,4 +37,10 @@ COPY --from=builder /build/ghidra/Ghidra/Features/BSim/src/lshvector/lshvector--
 RUN ls -la /usr/lib/postgresql/15/lib/lshvector.so && \
     ls -la /usr/share/postgresql/15/extension/lshvector*
 
+# Copy BSim initialization scripts
+COPY bsim-init/ /docker-entrypoint-initdb.d/
+
+# Make init scripts executable
+RUN chmod +x /docker-entrypoint-initdb.d/*.sh
+
 # Default entrypoint from postgres image

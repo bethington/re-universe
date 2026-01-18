@@ -15,22 +15,42 @@ done
 
 echo "Configuring SSL settings..."
 
-# Configure PostgreSQL for SSL
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
-    -- Enable SSL
-    ALTER SYSTEM SET ssl = 'on';
+# Check if SSL certificates exist before enabling SSL
+if [[ -f "/var/lib/postgresql/data/server.crt" && -f "/var/lib/postgresql/data/server.key" ]]; then
+    echo "SSL certificates found, enabling SSL..."
+    # Configure PostgreSQL for SSL
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+        -- Enable SSL
+        ALTER SYSTEM SET ssl = 'on';
 
-    -- Set SSL certificate files
-    ALTER SYSTEM SET ssl_cert_file = '/var/lib/postgresql/data/server.crt';
-    ALTER SYSTEM SET ssl_key_file = '/var/lib/postgresql/data/server.key';
-    ALTER SYSTEM SET ssl_ca_file = '/var/lib/postgresql/data/ca.crt';
+        -- Set SSL certificate files
+        ALTER SYSTEM SET ssl_cert_file = '/var/lib/postgresql/data/server.crt';
+        ALTER SYSTEM SET ssl_key_file = '/var/lib/postgresql/data/server.key';
+        ALTER SYSTEM SET ssl_ca_file = '/var/lib/postgresql/data/ca.crt';
 
-    -- Set SSL cipher preferences (optional, for better security)
-    ALTER SYSTEM SET ssl_ciphers = 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384';
+        -- Set SSL cipher preferences (optional, for better security)
+        ALTER SYSTEM SET ssl_ciphers = 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384';
 
-    -- Reload configuration
-    SELECT pg_reload_conf();
+        -- Reload configuration
+        SELECT pg_reload_conf();
 EOSQL
+else
+    echo "SSL certificates not found, explicitly disabling SSL..."
+    # Explicitly disable SSL to prevent startup errors
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+        -- Explicitly disable SSL
+        ALTER SYSTEM SET ssl = 'off';
+
+        -- Clear any SSL certificate settings
+        ALTER SYSTEM RESET ssl_cert_file;
+        ALTER SYSTEM RESET ssl_key_file;
+        ALTER SYSTEM RESET ssl_ca_file;
+
+        -- Reload configuration
+        SELECT pg_reload_conf();
+EOSQL
+    echo "SSL has been explicitly disabled"
+fi
 
 echo "SSL configuration completed"
 echo "PostgreSQL is now configured with SSL support for BSim"
