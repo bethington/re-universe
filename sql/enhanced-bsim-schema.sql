@@ -313,3 +313,155 @@ COMMENT ON COLUMN exetable.version_family IS 'Game type/family (Classic, LoD, D2
 
 COMMENT ON FUNCTION refresh_cross_version_data() IS 'Refreshes materialized views and updates cross-version statistics';
 COMMENT ON FUNCTION populate_version_fields_from_filename() IS 'Populates version fields from filename patterns during import/migration';
+-- ============================================================================
+-- GHIDRA SCRIPTS COMPATIBILITY TABLES
+-- ============================================================================
+
+-- Function analysis table (required by Step1 script)
+CREATE TABLE IF NOT EXISTS function_analysis (
+    id BIGSERIAL PRIMARY KEY,
+    function_id BIGINT NOT NULL REFERENCES desctable(id) ON DELETE CASCADE,
+    executable_id BIGINT NOT NULL REFERENCES exetable(id) ON DELETE CASCADE,
+    function_name VARCHAR(512),
+    entry_address BIGINT,
+    instruction_count INTEGER,
+    basic_block_count INTEGER,
+    cyclomatic_complexity INTEGER,
+    calls_made INTEGER DEFAULT 0,
+    calls_received INTEGER DEFAULT 0,
+    has_loops BOOLEAN DEFAULT false,
+    has_recursion BOOLEAN DEFAULT false,
+    max_depth INTEGER,
+    stack_frame_size INTEGER,
+    calling_convention VARCHAR(64),
+    is_leaf_function BOOLEAN DEFAULT false,
+    is_library_function BOOLEAN DEFAULT false,
+    is_thunk BOOLEAN DEFAULT false,
+    confidence_score DOUBLE PRECISION,
+    analysis_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(function_id, executable_id)
+);
+
+-- Function tags table (required by Step1 script)
+CREATE TABLE IF NOT EXISTS function_tags (
+    id BIGSERIAL PRIMARY KEY,
+    function_id BIGINT NOT NULL REFERENCES desctable(id) ON DELETE CASCADE,
+    executable_id BIGINT NOT NULL REFERENCES exetable(id) ON DELETE CASCADE,
+    tag_category VARCHAR(128) NOT NULL,
+    tag_value VARCHAR(256) NOT NULL,
+    confidence DOUBLE PRECISION DEFAULT 1.0,
+    auto_generated BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(function_id, executable_id, tag_category, tag_value)
+);
+
+-- String references table (required by Step3b script)
+CREATE TABLE IF NOT EXISTS string_references (
+    id BIGSERIAL PRIMARY KEY,
+    function_id BIGINT NOT NULL REFERENCES desctable(id) ON DELETE CASCADE,
+    string_value TEXT NOT NULL,
+    reference_address BIGINT,
+    reference_type VARCHAR(32) DEFAULT 'direct',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Cross references table (required by Step3c script)
+CREATE TABLE IF NOT EXISTS cross_references (
+    id BIGSERIAL PRIMARY KEY,
+    from_function_id BIGINT NOT NULL REFERENCES desctable(id) ON DELETE CASCADE,
+    to_function_id BIGINT REFERENCES desctable(id) ON DELETE CASCADE,
+    reference_type VARCHAR(32) NOT NULL, -- 'call', 'jump', 'data_ref', etc.
+    from_address BIGINT NOT NULL,
+    to_address BIGINT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Import/Export mappings table (required by Step3e script)
+CREATE TABLE IF NOT EXISTS import_export_mappings (
+    id BIGSERIAL PRIMARY KEY,
+    executable_id BIGINT NOT NULL REFERENCES exetable(id) ON DELETE CASCADE,
+    function_id BIGINT REFERENCES desctable(id) ON DELETE SET NULL,
+    symbol_name VARCHAR(512) NOT NULL,
+    symbol_type VARCHAR(16) NOT NULL, -- 'import' or 'export'
+    ordinal INTEGER,
+    library_name VARCHAR(256),
+    address_offset BIGINT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Cross version function mappings table (required by Step5 script)
+CREATE TABLE IF NOT EXISTS cross_version_function_mappings (
+    id BIGSERIAL PRIMARY KEY,
+    cross_version_id BIGINT NOT NULL REFERENCES cross_version_function_groups(id) ON DELETE CASCADE,
+    function_id BIGINT NOT NULL REFERENCES desctable(id) ON DELETE CASCADE,
+    executable_id BIGINT NOT NULL REFERENCES exetable(id) ON DELETE CASCADE,
+    version_key VARCHAR(32) NOT NULL,
+    address_offset BIGINT,
+    confidence DOUBLE PRECISION DEFAULT 1.0,
+    UNIQUE(cross_version_id, function_id)
+);
+
+-- ============================================================================
+-- PERFORMANCE INDEXES FOR GHIDRA SCRIPTS TABLES
+-- ============================================================================
+
+-- Function analysis indexes
+CREATE INDEX IF NOT EXISTS idx_function_analysis_function_id ON function_analysis(function_id);
+CREATE INDEX IF NOT EXISTS idx_function_analysis_executable_id ON function_analysis(executable_id);
+CREATE INDEX IF NOT EXISTS idx_function_analysis_complexity ON function_analysis(cyclomatic_complexity);
+
+-- Function tags indexes
+CREATE INDEX IF NOT EXISTS idx_function_tags_function_id ON function_tags(function_id);
+CREATE INDEX IF NOT EXISTS idx_function_tags_executable_id ON function_tags(executable_id);
+CREATE INDEX IF NOT EXISTS idx_function_tags_category ON function_tags(tag_category);
+CREATE INDEX IF NOT EXISTS idx_function_tags_value ON function_tags(tag_value);
+
+-- String references indexes
+CREATE INDEX IF NOT EXISTS idx_string_references_function_id ON string_references(function_id);
+CREATE INDEX IF NOT EXISTS idx_string_references_value ON string_references(string_value);
+
+-- Cross references indexes
+CREATE INDEX IF NOT EXISTS idx_cross_references_from ON cross_references(from_function_id);
+CREATE INDEX IF NOT EXISTS idx_cross_references_to ON cross_references(to_function_id);
+CREATE INDEX IF NOT EXISTS idx_cross_references_type ON cross_references(reference_type);
+
+-- Import/export mappings indexes
+CREATE INDEX IF NOT EXISTS idx_import_export_executable_id ON import_export_mappings(executable_id);
+CREATE INDEX IF NOT EXISTS idx_import_export_function_id ON import_export_mappings(function_id);
+CREATE INDEX IF NOT EXISTS idx_import_export_symbol_name ON import_export_mappings(symbol_name);
+CREATE INDEX IF NOT EXISTS idx_import_export_type ON import_export_mappings(symbol_type);
+
+-- Cross version function mappings indexes
+CREATE INDEX IF NOT EXISTS idx_cross_version_mappings_cv_id ON cross_version_function_mappings(cross_version_id);
+CREATE INDEX IF NOT EXISTS idx_cross_version_mappings_func_id ON cross_version_function_mappings(function_id);
+CREATE INDEX IF NOT EXISTS idx_cross_version_mappings_version ON cross_version_function_mappings(version_key);
+
+-- ============================================================================
+-- TABLE COMMENTS FOR GHIDRA SCRIPTS TABLES
+-- ============================================================================
+
+COMMENT ON TABLE function_analysis IS 'Detailed function analysis data from Ghidra scripts';
+COMMENT ON TABLE function_tags IS 'Function tags from Ghidra analysis (script-compatible format)';
+COMMENT ON TABLE string_references IS 'String references from Step3b analysis';
+COMMENT ON TABLE cross_references IS 'Function cross-references from Step3c analysis';
+COMMENT ON TABLE import_export_mappings IS 'Import/export symbol mappings from Step3e';
+COMMENT ON TABLE cross_version_function_mappings IS 'Version-specific function mappings for Step5';
+
+-- ============================================================================
+-- PERMISSIONS FOR GHIDRA SCRIPTS TABLES
+-- ============================================================================
+
+GRANT ALL PRIVILEGES ON function_analysis TO ben;
+GRANT ALL PRIVILEGES ON function_tags TO ben;
+GRANT ALL PRIVILEGES ON string_references TO ben;
+GRANT ALL PRIVILEGES ON cross_references TO ben;
+GRANT ALL PRIVILEGES ON import_export_mappings TO ben;
+GRANT ALL PRIVILEGES ON cross_version_function_mappings TO ben;
+
+GRANT USAGE, SELECT ON SEQUENCE function_analysis_id_seq TO ben;
+GRANT USAGE, SELECT ON SEQUENCE function_tags_id_seq TO ben;
+GRANT USAGE, SELECT ON SEQUENCE string_references_id_seq TO ben;
+GRANT USAGE, SELECT ON SEQUENCE cross_references_id_seq TO ben;
+GRANT USAGE, SELECT ON SEQUENCE import_export_mappings_id_seq TO ben;
+GRANT USAGE, SELECT ON SEQUENCE cross_version_function_mappings_id_seq TO ben;
+
