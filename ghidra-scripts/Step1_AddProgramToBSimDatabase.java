@@ -47,7 +47,7 @@ import java.util.regex.*;
 public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
     // Default BSim database configuration (updated for authentic schema)
-    private static final String DEFAULT_DB_URL = "jdbc:postgresql://localhost:5432/bsim";
+    private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
     private static final String DEFAULT_DB_USER = "ben";
     private static final String DEFAULT_DB_PASS = "goodyx12";
 
@@ -667,6 +667,10 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 if (!verifyExecutableExists(conn, executableId)) {
                     throw new SQLException("Executable ID " + executableId + " was not properly committed to database");
                 }
+
+                // Step 1b: Store API imports and exports (once per executable)
+                storeApiImports(conn, executableId, program);
+                storeApiExports(conn, executableId, program);
             } catch (Exception e) {
                 try {
                     if (!conn.getAutoCommit()) {
@@ -1023,14 +1027,26 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                         // EFFICIENCY ENHANCEMENT: Populate additional tables during initial processing
                         // This reduces the need for later scripts to re-process the same functions
 
-                        // Store function signatures (normally done in Step3d)
+                        // Store function signatures
                         storeFunctionSignatureWithId(conn, function, functionId, executableId, program);
 
-                        // Store basic cross-references (normally done in Step3c)
+                        // Store function parameters (individual param metadata)
+                        storeFunctionParametersWithId(conn, function, functionId);
+
+                        // Store function call relationships
                         storeFunctionCallsWithId(conn, function, functionId, executableId, program);
 
-                        // Store API usage if function uses imports/exports (normally done in Step3e)
+                        // Store data references (global data access patterns)
+                        storeDataReferencesWithId(conn, function, functionId, program);
+
+                        // Store API usage (imports/exports)
                         storeApiUsageWithId(conn, function, functionId, executableId, program);
+
+                        // Store string references
+                        storeStringReferencesWithId(conn, function, functionId, executableId, program);
+
+                        // Store call graph metrics (computed leaf/entry point status)
+                        storeCallGraphMetricsWithId(conn, function, functionId, program);
                     }
 
                 } catch (SQLException e) {
@@ -1895,6 +1911,133 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
     }
 
     /**
+     * Store API imports (DLL dependencies) for an executable.
+     * Called once per executable, not per function.
+     */
+    private void storeApiImports(Connection conn, int executableId, Program program) {
+        String sql = "INSERT INTO api_imports " +
+            "(executable_id, dll_name, function_name, ordinal_number, is_delayed) " +
+            "VALUES (?, ?, ?, ?, ?) " +
+            "ON CONFLICT (executable_id, dll_name, function_name) DO NOTHING";
+
+        try {
+            ghidra.program.model.listing.FunctionManager funcMgr = program.getFunctionManager();
+            ghidra.program.model.symbol.ExternalManager extMgr = program.getExternalManager();
+            
+            int importCount = 0;
+            
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                // Iterate through external libraries
+                for (String libraryName : extMgr.getExternalLibraryNames()) {
+                    // Get all external locations from this library
+                    ghidra.program.model.symbol.ExternalLocationIterator extLocs = 
+                        extMgr.getExternalLocations(libraryName);
+                    
+                    while (extLocs.hasNext()) {
+                        ghidra.program.model.symbol.ExternalLocation extLoc = extLocs.next();
+                        String funcName = extLoc.getLabel();
+                        
+                        if (funcName != null && !funcName.isEmpty()) {
+                            pstmt.setInt(1, executableId);
+                            pstmt.setString(2, libraryName);
+                            pstmt.setString(3, funcName);
+                            // Ordinal - try to extract from original imported name if numeric
+                            int ordinal = -1;
+                            if (extLoc.getOriginalImportedName() != null) {
+                                try {
+                                    String origName = extLoc.getOriginalImportedName();
+                                    if (origName.startsWith("Ordinal_")) {
+                                        ordinal = Integer.parseInt(origName.substring(8));
+                                    }
+                                } catch (Exception e) {
+                                    // Not an ordinal import
+                                }
+                            }
+                            if (ordinal >= 0) {
+                                pstmt.setInt(4, ordinal);
+                            } else {
+                                pstmt.setNull(4, java.sql.Types.INTEGER);
+                            }
+                            pstmt.setBoolean(5, false);  // TODO: detect delayed imports
+                            pstmt.addBatch();
+                            importCount++;
+                            
+                            if (importCount % 100 == 0) {
+                                pstmt.executeBatch();
+                            }
+                        }
+                    }
+                }
+                pstmt.executeBatch();
+            }
+            
+            if (importCount > 0) {
+                println("Stored " + importCount + " API imports");
+            }
+        } catch (SQLException e) {
+            if (!e.getMessage().contains("duplicate key")) {
+                println("Note: Could not store API imports: " + e.getMessage());
+            }
+        } catch (Exception e) {
+            println("Note: Error extracting API imports: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Store API exports for an executable.
+     * Called once per executable, not per function.
+     */
+    private void storeApiExports(Connection conn, int executableId, Program program) {
+        String sql = "INSERT INTO api_exports " +
+            "(executable_id, function_name, ordinal_number, rva_address, is_forwarded) " +
+            "VALUES (?, ?, ?, ?, ?) " +
+            "ON CONFLICT (executable_id, function_name) DO NOTHING";
+
+        try {
+            ghidra.program.model.symbol.SymbolTable symTable = program.getSymbolTable();
+            ghidra.program.model.address.AddressIterator entryPoints = 
+                symTable.getExternalEntryPointIterator();
+            
+            int exportCount = 0;
+            
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                while (entryPoints.hasNext()) {
+                    ghidra.program.model.address.Address entryPoint = entryPoints.next();
+                    ghidra.program.model.symbol.Symbol[] symbols = symTable.getSymbols(entryPoint);
+                    
+                    for (ghidra.program.model.symbol.Symbol sym : symbols) {
+                        String exportName = sym.getName();
+                        if (exportName != null && !exportName.isEmpty()) {
+                            pstmt.setInt(1, executableId);
+                            pstmt.setString(2, exportName);
+                            pstmt.setNull(3, java.sql.Types.INTEGER);  // ordinal
+                            pstmt.setLong(4, entryPoint.getOffset());
+                            pstmt.setBoolean(5, false);  // TODO: detect forwarded exports
+                            pstmt.addBatch();
+                            exportCount++;
+                            
+                            if (exportCount % 100 == 0) {
+                                pstmt.executeBatch();
+                            }
+                        }
+                    }
+                }
+                pstmt.executeBatch();
+            }
+            
+            if (exportCount > 0) {
+                println("Stored " + exportCount + " API exports");
+            }
+        } catch (SQLException e) {
+            if (!e.getMessage().contains("duplicate key")) {
+                println("Note: Could not store API exports: " + e.getMessage());
+            }
+        } catch (Exception e) {
+            println("Note: Error extracting API exports: " + e.getMessage());
+        }
+    }
+
+    /**
      * Store function signature during Step1 for efficiency
      */
     private void storeFunctionSignatureWithId(Connection conn, Function function, int functionId,
@@ -2001,6 +2144,124 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
     }
 
     /**
+     * Store string references.
+     * Uses the proper two-table schema:
+     * - string_references: catalog of unique strings per executable
+     * - function_string_refs: junction table linking functions to strings
+     */
+    private void storeStringReferencesWithId(Connection conn, Function function, int functionId,
+                                            int executableId, Program program) {
+        // SQL for string catalog (one entry per unique string address per executable)
+        String insertStringSql = """
+            INSERT INTO string_references 
+            (executable_id, string_address, string_content, string_length, encoding_type)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (executable_id, string_address) DO NOTHING
+            """;
+
+        // SQL to get string reference ID after insert
+        String getStringIdSql = """
+            SELECT id FROM string_references 
+            WHERE executable_id = ? AND string_address = ?
+            """;
+
+        // SQL to link function to string
+        String linkFunctionSql = """
+            INSERT INTO function_string_refs 
+            (function_id, string_ref_id, usage_type, reference_count)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (function_id, string_ref_id) DO UPDATE SET
+            reference_count = function_string_refs.reference_count + EXCLUDED.reference_count
+            """;
+
+        try {
+            ghidra.program.model.address.AddressSetView body = function.getBody();
+            ghidra.program.model.listing.Listing listing = program.getListing();
+            ghidra.program.model.symbol.ReferenceManager refManager = program.getReferenceManager();
+
+            // Collect string references with counts
+            java.util.Map<Long, Object[]> stringRefs = new java.util.HashMap<>();
+
+            ghidra.program.model.listing.InstructionIterator instructions = listing.getInstructions(body, true);
+            while (instructions.hasNext()) {
+                ghidra.program.model.listing.Instruction instr = instructions.next();
+
+                ghidra.program.model.symbol.Reference[] refs = refManager.getReferencesFrom(instr.getAddress());
+                for (ghidra.program.model.symbol.Reference ref : refs) {
+                    if (ref.isMemoryReference()) {
+                        ghidra.program.model.address.Address toAddr = ref.getToAddress();
+                        ghidra.program.model.listing.Data data = listing.getDataAt(toAddr);
+
+                        if (data != null && data.hasStringValue()) {
+                            String strValue = data.getDefaultValueRepresentation();
+                            if (strValue != null && strValue.length() > 1 && strValue.length() < 2000) {
+                                long stringAddr = toAddr.getOffset();
+                                Object[] existing = stringRefs.get(stringAddr);
+                                if (existing == null) {
+                                    // [content, length, encoding, refCount]
+                                    String encoding = strValue.startsWith("u\"") ? "unicode" : "ascii";
+                                    stringRefs.put(stringAddr, new Object[]{strValue, strValue.length(), encoding, 1});
+                                } else {
+                                    existing[3] = (Integer)existing[3] + 1;  // increment count
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (stringRefs.isEmpty()) {
+                return;
+            }
+
+            // Insert strings and link to function
+            try (PreparedStatement insertStmt = conn.prepareStatement(insertStringSql);
+                 PreparedStatement getIdStmt = conn.prepareStatement(getStringIdSql);
+                 PreparedStatement linkStmt = conn.prepareStatement(linkFunctionSql)) {
+
+                for (java.util.Map.Entry<Long, Object[]> entry : stringRefs.entrySet()) {
+                    long stringAddr = entry.getKey();
+                    Object[] data = entry.getValue();
+                    String content = (String) data[0];
+                    int length = (Integer) data[1];
+                    String encoding = (String) data[2];
+                    int refCount = (Integer) data[3];
+
+                    // Insert into string catalog
+                    insertStmt.setInt(1, executableId);
+                    insertStmt.setLong(2, stringAddr);
+                    insertStmt.setString(3, content);
+                    insertStmt.setInt(4, length);
+                    insertStmt.setString(5, encoding);
+                    insertStmt.executeUpdate();
+
+                    // Get the string reference ID
+                    getIdStmt.setInt(1, executableId);
+                    getIdStmt.setLong(2, stringAddr);
+                    ResultSet rs = getIdStmt.executeQuery();
+                    if (rs.next()) {
+                        long stringRefId = rs.getLong("id");
+
+                        // Link function to string
+                        linkStmt.setInt(1, functionId);
+                        linkStmt.setLong(2, stringRefId);
+                        linkStmt.setString(3, "reference");
+                        linkStmt.setInt(4, refCount);
+                        linkStmt.executeUpdate();
+                    }
+                }
+            }
+
+        } catch (SQLException e) {
+            if (!e.getMessage().contains("duplicate key")) {
+                // Silent failure for non-critical table
+            }
+        } catch (Exception e) {
+            // Don't fail for non-SQL errors
+        }
+    }
+
+    /**
      * Extract function parameter types as string
      */
     private String getFunctionParameterTypes(Function function) {
@@ -2030,6 +2291,178 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             return "void";
         } catch (Exception e) {
             return "unknown";
+        }
+    }
+
+    /**
+     * Store function parameters in the function_parameters table.
+     * Captures ordinal, name, type, and storage location for each parameter.
+     */
+    private void storeFunctionParametersWithId(Connection conn, Function function, int functionId) {
+        String sql = "INSERT INTO function_parameters " +
+            "(function_id, ordinal, param_name, param_type, storage_location) " +
+            "VALUES (?, ?, ?, ?, ?) " +
+            "ON CONFLICT (function_id, ordinal) DO UPDATE SET " +
+            "param_name = EXCLUDED.param_name, param_type = EXCLUDED.param_type, " +
+            "storage_location = EXCLUDED.storage_location";
+
+        try {
+            Parameter[] params = function.getParameters();
+            if (params == null || params.length == 0) {
+                return;
+            }
+
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                for (int i = 0; i < params.length; i++) {
+                    Parameter param = params[i];
+                    pstmt.setInt(1, functionId);
+                    pstmt.setInt(2, i);  // ordinal
+                    pstmt.setString(3, param.getName());
+                    pstmt.setString(4, param.getDataType() != null ? param.getDataType().getName() : "unknown");
+                    pstmt.setString(5, param.getVariableStorage() != null ? 
+                        param.getVariableStorage().toString() : "unknown");
+                    pstmt.addBatch();
+                }
+                pstmt.executeBatch();
+            }
+        } catch (SQLException e) {
+            if (!e.getMessage().contains("duplicate key")) {
+                // Silent failure for non-critical table
+            }
+        } catch (Exception e) {
+            // Don't fail for parameter extraction issues
+        }
+    }
+
+    /**
+     * Store data references (references to global data, not code) in data_references table.
+     * Captures what global variables/data a function accesses.
+     */
+    private void storeDataReferencesWithId(Connection conn, Function function, int functionId, Program program) {
+        String sql = "INSERT INTO data_references " +
+            "(function_id, data_address, reference_type, access_type, reference_count) " +
+            "VALUES (?, ?, ?, ?, ?) " +
+            "ON CONFLICT (function_id, data_address, reference_type) DO UPDATE SET " +
+            "reference_count = data_references.reference_count + EXCLUDED.reference_count";
+
+        try {
+            ghidra.program.model.address.AddressSetView body = function.getBody();
+            ghidra.program.model.symbol.ReferenceManager refMgr = program.getReferenceManager();
+            ghidra.program.model.listing.Listing listing = program.getListing();
+
+            // Track data references with counts
+            java.util.Map<String, int[]> dataRefs = new java.util.HashMap<>();
+
+            for (ghidra.program.model.address.Address addr : body.getAddresses(true)) {
+                ghidra.program.model.symbol.Reference[] refs = refMgr.getReferencesFrom(addr);
+                for (ghidra.program.model.symbol.Reference ref : refs) {
+                    ghidra.program.model.address.Address toAddr = ref.getToAddress();
+                    
+                    // Only interested in data references, not code
+                    ghidra.program.model.listing.Data data = listing.getDataAt(toAddr);
+                    if (data != null) {
+                        String key = toAddr.getOffset() + "|" + ref.getReferenceType().getName();
+                        int[] counts = dataRefs.computeIfAbsent(key, k -> new int[]{0});
+                        counts[0]++;
+                    }
+                }
+            }
+
+            if (dataRefs.isEmpty()) {
+                return;
+            }
+
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                for (java.util.Map.Entry<String, int[]> entry : dataRefs.entrySet()) {
+                    String[] parts = entry.getKey().split("\\|");
+                    long dataAddr = Long.parseLong(parts[0]);
+                    String refType = parts[1];
+
+                    pstmt.setInt(1, functionId);
+                    pstmt.setLong(2, dataAddr);
+                    pstmt.setString(3, refType);
+                    pstmt.setString(4, refType.contains("READ") ? "read" : 
+                                      (refType.contains("WRITE") ? "write" : "access"));
+                    pstmt.setInt(5, entry.getValue()[0]);
+                    pstmt.addBatch();
+                }
+                pstmt.executeBatch();
+            }
+        } catch (SQLException e) {
+            if (!e.getMessage().contains("duplicate key")) {
+                // Silent failure for non-critical table
+            }
+        } catch (Exception e) {
+            // Don't fail for reference extraction issues
+        }
+    }
+
+    /**
+     * Store call graph metrics (incoming/outgoing calls, leaf/entry detection).
+     * Computes structural information about function's position in call graph.
+     */
+    private void storeCallGraphMetricsWithId(Connection conn, Function function, int functionId, Program program) {
+        String sql = "INSERT INTO call_graph_metrics " +
+            "(function_id, incoming_calls, outgoing_calls, unique_callers, unique_callees, is_leaf, is_entry_point) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?) " +
+            "ON CONFLICT (function_id) DO UPDATE SET " +
+            "incoming_calls = EXCLUDED.incoming_calls, outgoing_calls = EXCLUDED.outgoing_calls, " +
+            "unique_callers = EXCLUDED.unique_callers, unique_callees = EXCLUDED.unique_callees, " +
+            "is_leaf = EXCLUDED.is_leaf, is_entry_point = EXCLUDED.is_entry_point, " +
+            "computed_at = NOW()";
+
+        try {
+            // Get calling functions (who calls this function)
+            java.util.Set<ghidra.program.model.address.Address> callers = 
+                new java.util.HashSet<>();
+            ghidra.program.model.symbol.Reference[] incomingRefs = 
+                program.getReferenceManager().getReferencesTo(function.getEntryPoint());
+            int incomingCount = 0;
+            for (ghidra.program.model.symbol.Reference ref : incomingRefs) {
+                if (ref.getReferenceType().isCall()) {
+                    incomingCount++;
+                    callers.add(ref.getFromAddress());
+                }
+            }
+
+            // Get called functions (functions this one calls)
+            java.util.Set<ghidra.program.model.address.Address> callees = 
+                new java.util.HashSet<>();
+            int outgoingCount = 0;
+            ghidra.program.model.address.AddressSetView body = function.getBody();
+            for (ghidra.program.model.address.Address addr : body.getAddresses(true)) {
+                ghidra.program.model.symbol.Reference[] refs = 
+                    program.getReferenceManager().getReferencesFrom(addr);
+                for (ghidra.program.model.symbol.Reference ref : refs) {
+                    if (ref.getReferenceType().isCall()) {
+                        outgoingCount++;
+                        callees.add(ref.getToAddress());
+                    }
+                }
+            }
+
+            // Determine leaf and entry point status
+            boolean isLeaf = callees.isEmpty();
+            boolean isEntryPoint = function.isExternal() || 
+                program.getSymbolTable().getExternalEntryPointIterator()
+                    .hasNext() && incomingCount == 0;
+
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setInt(1, functionId);
+                pstmt.setInt(2, incomingCount);
+                pstmt.setInt(3, outgoingCount);
+                pstmt.setInt(4, callers.size());
+                pstmt.setInt(5, callees.size());
+                pstmt.setBoolean(6, isLeaf);
+                pstmt.setBoolean(7, isEntryPoint);
+                pstmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            if (!e.getMessage().contains("duplicate key")) {
+                // Silent failure for non-critical table
+            }
+        } catch (Exception e) {
+            // Don't fail for metric computation issues
         }
     }
 }

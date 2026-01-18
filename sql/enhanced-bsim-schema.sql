@@ -366,7 +366,7 @@ CREATE TABLE IF NOT EXISTS function_tags (
     UNIQUE(function_id, executable_id, tag_category, tag_value)
 );
 
--- String references table (required by Step3b script)
+-- String references table (populated by Step1)
 CREATE TABLE IF NOT EXISTS string_references (
     id BIGSERIAL PRIMARY KEY,
     function_id BIGINT NOT NULL REFERENCES desctable(id) ON DELETE CASCADE,
@@ -376,7 +376,7 @@ CREATE TABLE IF NOT EXISTS string_references (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Cross references table (required by Step3c script)
+-- Cross references table (populated by Step1)
 CREATE TABLE IF NOT EXISTS cross_references (
     id BIGSERIAL PRIMARY KEY,
     from_function_id BIGINT NOT NULL REFERENCES desctable(id) ON DELETE CASCADE,
@@ -387,7 +387,7 @@ CREATE TABLE IF NOT EXISTS cross_references (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Import/Export mappings table (required by Step3e script)
+-- Import/Export mappings table (populated by Step1)
 CREATE TABLE IF NOT EXISTS import_export_mappings (
     id BIGSERIAL PRIMARY KEY,
     executable_id BIGINT NOT NULL REFERENCES exetable(id) ON DELETE CASCADE,
@@ -453,9 +453,9 @@ CREATE INDEX IF NOT EXISTS idx_cross_version_mappings_version ON cross_version_f
 
 COMMENT ON TABLE function_analysis IS 'Detailed function analysis data from Ghidra scripts';
 COMMENT ON TABLE function_tags IS 'Function tags from Ghidra analysis (script-compatible format)';
-COMMENT ON TABLE string_references IS 'String references from Step3b analysis';
-COMMENT ON TABLE cross_references IS 'Function cross-references from Step3c analysis';
-COMMENT ON TABLE import_export_mappings IS 'Import/export symbol mappings from Step3e';
+COMMENT ON TABLE string_references IS 'String references populated by Step1';
+COMMENT ON TABLE cross_references IS 'Function cross-references populated by Step1';
+COMMENT ON TABLE import_export_mappings IS 'Import/export symbol mappings populated by Step1';
 COMMENT ON TABLE cross_version_function_mappings IS 'Version-specific function mappings for Step5';
 
 -- ============================================================================
