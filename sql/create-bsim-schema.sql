@@ -29,41 +29,34 @@ INSERT INTO keyvaluetable (key, value, val) VALUES
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, val = EXCLUDED.val;
 
 -- Create official Ghidra BSim exetable (executable table)
+-- Cleaned up to remove duplicate fields, using BSim originals + API-compatible fields
 CREATE TABLE IF NOT EXISTS exetable (
     id BIGSERIAL PRIMARY KEY,
     md5 VARCHAR(32) UNIQUE NOT NULL,
-    name_exec VARCHAR(1024),
-    arch VARCHAR(64),
-    name_compiler VARCHAR(128),
-    version_compiler VARCHAR(128),
+    name_exec VARCHAR(1024),              -- BSim original, used by API
+    architecture VARCHAR(64),             -- Used by API (was duplicate, now primary)
+    name_compiler VARCHAR(128),           -- BSim original
+    version_compiler VARCHAR(128),        -- BSim original
     name_category VARCHAR(256),
     date_create TIMESTAMP,
-    repo VARCHAR(512),
-    repository VARCHAR(512),  -- Ghidra BSim may use "repository" instead of "repo"
+    repo VARCHAR(512),                    -- BSim original
     path VARCHAR(2048),
     description TEXT,
-    ingest_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    architecture VARCHAR(64),  -- Required for Ghidra compatibility
-    compiler_name VARCHAR(128),  -- Alternative column name Ghidra may use
-    compiler_version VARCHAR(128),  -- Alternative column name Ghidra may use
-    executable_name VARCHAR(1024)  -- Alternative column name Ghidra may use
+    ingest_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create BSim executable table (enhanced for large scale) - for backwards compatibility
+-- Cleaned up to match primary exetable schema without duplicates
 CREATE TABLE IF NOT EXISTS executable (
     id BIGSERIAL PRIMARY KEY,
     md5 VARCHAR(32) UNIQUE NOT NULL,
-    name_exec VARCHAR(1024),
-    arch VARCHAR(64),
-    architecture VARCHAR(64),  -- Ghidra BSim expects this column name
-    name_compiler VARCHAR(128),
-    compiler_name VARCHAR(128),  -- Alternative column name Ghidra may use
-    version_compiler VARCHAR(128),
-    compiler_version VARCHAR(128),  -- Alternative column name Ghidra may use
-    executable_name VARCHAR(1024),  -- Alternative column name Ghidra may use
+    name_exec VARCHAR(1024),              -- BSim original, used by API
+    architecture VARCHAR(64),             -- Used by API (primary field)
+    name_compiler VARCHAR(128),           -- BSim original
+    version_compiler VARCHAR(128),        -- BSim original
     name_category VARCHAR(256),
     date_create TIMESTAMP,
-    repo VARCHAR(512),
+    repo VARCHAR(512),                    -- BSim original
     path VARCHAR(2048),
     description TEXT,
     ingest_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
