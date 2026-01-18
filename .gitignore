@@ -59,20 +59,6 @@ ssl/
 bsim-init-backup/
 credential-backups/
 
-# Development and testing artifacts
-CREATE-LARGE-BSIM.md
-FINAL-BSIM-COMMANDS.md
-SSL-CONNECTION.md
-WINDOWS-BSIM-CREATION.md
-create-large-bsim.sh
-install-lsh.sh
-large_32.xml
-populate_idflookup.sql
-populate_idflookup_fixed.sql
-populate_weights.sql
-ssl-entrypoint.sh
-bsim-local
-
 # Security and Credentials
 .env.production
 credential-backups/
