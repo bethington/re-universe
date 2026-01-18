@@ -20,6 +20,17 @@ CREATE INDEX IF NOT EXISTS idx_exetable_version_family ON exetable(version_famil
 CREATE INDEX IF NOT EXISTS idx_exetable_version_combo ON exetable(version_family, game_version);
 
 -- ============================================================================
+-- UNIQUE CONSTRAINTS FOR ON CONFLICT SUPPORT IN GHIDRA SCRIPTS
+-- ============================================================================
+
+-- Add unique constraint on exetable.name_exec for ON CONFLICT (name_exec) support
+ALTER TABLE exetable ADD CONSTRAINT IF NOT EXISTS exetable_name_exec_key UNIQUE (name_exec);
+
+-- Add unique constraint on desctable(id_exe, addr) for ON CONFLICT (id_exe, addr) support
+-- This ensures each address within an executable can only have one function
+ALTER TABLE desctable ADD CONSTRAINT IF NOT EXISTS desctable_exe_addr_key UNIQUE (id_exe, addr);
+
+-- ============================================================================
 -- ENHANCED SIGNATURES TABLE FOR BSIM LSH VECTORS
 -- ============================================================================
 
