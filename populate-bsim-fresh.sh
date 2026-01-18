@@ -95,20 +95,8 @@ run_ghidra_script "Step1_AddProgramToBSimDatabase.java" "Step 1: Adding programs
 # Step 2: Generate BSim Signatures
 run_ghidra_script "Step2_GenerateBSimSignatures.java" "Step 2: Generating BSim signatures"
 
-# Step 3a: Populate Comments
-run_ghidra_script "Step3a_PopulateCommentsIntoBSim.java" "Step 3a: Populating comments into BSim"
-
-# Step 3b: Populate String References
-run_ghidra_script "Step3b_PopulateStringReferences.java" "Step 3b: Populating string references"
-
-# Step 3c: Populate Cross References
-run_ghidra_script "Step3c_PopulateCrossReferences.java" "Step 3c: Populating cross references"
-
-# Step 3d: Populate Function Signatures
-run_ghidra_script "Step3d_PopulateFunctionSignatures.java" "Step 3d: Populating function signatures"
-
-# Step 3e: Populate Import/Exports
-run_ghidra_script "Step3e_PopulateImportExports.java" "Step 3e: Populating import/exports"
+# Step 3: Populate Comments (optional - for syncing analyst comments)
+run_ghidra_script "Step3_PopulateCommentsIntoBSim.java" "Step 3: Populating comments into BSim"
 
 # Step 4: Generate Function Similarity Matrix
 run_ghidra_script "Step4_GenerateFunctionSimilarityMatrix.java" "Step 4: Generating function similarity matrix"

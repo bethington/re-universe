@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS function_parameters (
 
 CREATE INDEX IF NOT EXISTS idx_func_params_function ON function_parameters(function_id);
 
--- Function signatures (expected by Step3d)
+-- Function signatures (populated by Step1)
 CREATE TABLE IF NOT EXISTS function_signatures (
     id BIGSERIAL PRIMARY KEY,
     function_id BIGINT REFERENCES desctable(id) ON DELETE CASCADE,
@@ -127,7 +127,7 @@ CREATE INDEX IF NOT EXISTS idx_func_tags_function ON function_tags(function_id);
 CREATE INDEX IF NOT EXISTS idx_func_tags_category ON function_tags(tag_category);
 
 -- ============================================================================
--- STEP 3: Create tables for import/export analysis (Step3e requirements)
+-- STEP 3: Create tables for import/export analysis (populated by Step1)
 -- ============================================================================
 
 -- API imports
@@ -175,7 +175,7 @@ CREATE INDEX IF NOT EXISTS idx_api_usage_function ON function_api_usage(function
 CREATE INDEX IF NOT EXISTS idx_api_usage_import ON function_api_usage(api_import_id);
 
 -- ============================================================================
--- STEP 4: Create tables for cross-reference analysis (Step3c requirements)
+-- STEP 4: Create tables for cross-reference analysis (populated by Step1)
 -- ============================================================================
 
 -- Function calls
@@ -224,7 +224,7 @@ CREATE TABLE IF NOT EXISTS call_graph_metrics (
 CREATE INDEX IF NOT EXISTS idx_call_metrics_function ON call_graph_metrics(function_id);
 
 -- ============================================================================
--- STEP 5: Create tables for string analysis (Step3b requirements)
+-- STEP 5: Create tables for string analysis (populated by Step1)
 -- ============================================================================
 
 -- String references

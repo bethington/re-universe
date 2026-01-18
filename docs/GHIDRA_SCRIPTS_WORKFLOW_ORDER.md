@@ -24,32 +24,11 @@
 
 ## 📊 **Optional Enrichment Steps (Step 3)**
 
-Run any or all of these scripts to add supplementary data:
-
-### **Step 3a: Comments** 🔧 **OPTIONAL**
-**Script**: `Step3a_PopulateCommentsIntoBSim.java`
-- **Purpose**: Extract and populate function comments
-- **Menu**: `Tools.BSim.Step3a - Populate Comments (Optional)`
-
-### **Step 3b: String References** 🔧 **OPTIONAL**
-**Script**: `Step3b_PopulateStringReferences.java`
-- **Purpose**: Populate string reference data for analysis
-- **Menu**: `Tools.BSim.Step3b - Populate String References (Optional)`
-
-### **Step 3c: Cross References** 🔧 **OPTIONAL**
-**Script**: `Step3c_PopulateCrossReferences.java`
-- **Purpose**: Populate cross-reference data for enhanced analysis
-- **Menu**: `Tools.BSim.Step3c - Populate Cross References (Optional)`
-
-### **Step 3d: Function Signatures** 🔧 **OPTIONAL**
-**Script**: `Step3d_PopulateFunctionSignatures.java`
-- **Purpose**: Populate detailed function signature data
-- **Menu**: `Tools.BSim.Step3d - Populate Function Signatures (Optional)`
-
-### **Step 3e: Import/Export Tables** 🔧 **OPTIONAL**
-**Script**: `Step3e_PopulateImportExports.java`
-- **Purpose**: Populate import/export table data
-- **Menu**: `Tools.BSim.Step3e - Populate Import/Export Tables (Optional)`
+### **Step 3: Comments** 🔧 **OPTIONAL**
+**Script**: `Step3_PopulateCommentsIntoBSim.java`
+- **Purpose**: Sync analyst-created comments to BSim database
+- **Menu**: `Tools.BSim.Step3 - Populate Comments (Optional)`
+- **Note**: String references, cross-references, signatures, and import/exports are now automatically populated during Step1
 
 ---
 
@@ -86,9 +65,9 @@ Run any or all of these scripts to add supplementary data:
 5. **Step 4**: Generate similarity matrix
 
 ### **🔬 Complete Analysis (Full Featured)**
-1. **Step 1**: Add programs to database
+1. **Step 1**: Add programs to database (includes strings, cross-refs, signatures, imports/exports)
 2. **Step 2**: Generate signatures
-3. **Step 3a-3e**: All optional enrichment scripts
+3. **Step 3**: Populate comments *(optional - for syncing analyst comments)*
 4. **Step 4**: Generate similarity matrix
 5. **Step 5**: Complete automated workflow
 
@@ -100,9 +79,9 @@ Run any or all of these scripts to add supplementary data:
 ## 🎯 **Step Dependencies**
 
 ```
-Step 1 (Required) → Step 2 (Required) → Step 3a-3e (Optional) → Step 4 (Required)
-                                                              ↓
-                                           Step 5 (Automated - Runs All)
+Step 1 (Required) → Step 2 (Required) → Step 3 (Optional) → Step 4 (Required)
+                                                           ↓
+                                          Step 5 (Automated - Runs All)
 ```
 
 ---
@@ -114,11 +93,7 @@ In Ghidra, the scripts appear in this logical order:
 Tools.BSim.
 ├── Step1 - Add Program to Database
 ├── Step2 - Generate Enhanced Signatures
-├── Step3a - Populate Comments (Optional)
-├── Step3b - Populate String References (Optional)
-├── Step3c - Populate Cross References (Optional)
-├── Step3d - Populate Function Signatures (Optional)
-├── Step3e - Populate Import/Export Tables (Optional)
+├── Step3 - Populate Comments (Optional)
 ├── Step4 - Generate Similarity Matrix
 └── Step5 - Complete Similarity Workflow
 ```
