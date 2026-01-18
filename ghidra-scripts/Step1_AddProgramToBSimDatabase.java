@@ -614,7 +614,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             "Cancel"
         );
 
-        int choice;
+        String choice;
         try {
             choice = askChoice("Processing Mode", message, choices, "Add Missing (Recommended)");
         } catch (CancelledException e) {
@@ -622,22 +622,18 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             return ProcessingMode.CANCELLED;
         }
 
-        switch (choice) {
-            case 0:
-                println("Selected: Update All mode");
-                return ProcessingMode.UPDATE_ALL;
-            case 1:
-                println("Selected: Add Missing mode");
-                return ProcessingMode.ADD_MISSING;
-            case 2:
-                println("Selected: Ask Individual mode");
-                return ProcessingMode.ASK_INDIVIDUAL;
-            case 3:
-                println("Operation cancelled");
-                return ProcessingMode.CANCELLED;
-            default:
-                println("Operation cancelled");
-                return ProcessingMode.CANCELLED;
+        if ("Update All".equals(choice)) {
+            println("Selected: Update All mode");
+            return ProcessingMode.UPDATE_ALL;
+        } else if ("Add Missing (Recommended)".equals(choice)) {
+            println("Selected: Add Missing mode");
+            return ProcessingMode.ADD_MISSING;
+        } else if ("Ask Individual".equals(choice)) {
+            println("Selected: Ask Individual mode");
+            return ProcessingMode.ASK_INDIVIDUAL;
+        } else {
+            println("Operation cancelled");
+            return ProcessingMode.CANCELLED;
         }
     }
 
@@ -660,10 +656,25 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             try {
                 conn.setAutoCommit(false);
                 executableId = getOrCreateExecutableUnified(conn, programName, programPath, versionInfo);
-                conn.commit();
+                // Only commit if we haven't already committed in the fallback path
+                if (!conn.getAutoCommit()) {
+                    conn.commit();
+                }
                 println("Executable ID: " + executableId);
+                
+                // Verify the executable actually exists in the database after commit
+                conn.setAutoCommit(true);  // Reset for verification query
+                if (!verifyExecutableExists(conn, executableId)) {
+                    throw new SQLException("Executable ID " + executableId + " was not properly committed to database");
+                }
             } catch (Exception e) {
-                conn.rollback();
+                try {
+                    if (!conn.getAutoCommit()) {
+                        conn.rollback();
+                    }
+                } catch (SQLException rollbackEx) {
+                    println("Warning: Rollback failed: " + rollbackEx.getMessage());
+                }
                 printerr("Error creating executable entry: " + e.getMessage());
                 throw e;
             }
@@ -714,15 +725,22 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 int existingId = rs.getInt("id");
                 println("Executable already exists in database with ID: " + existingId);
 
-                // Update version info using unified schema function
+                // Update version info using unified schema function (with savepoint protection)
                 try {
-                    String updateSql = "SELECT populate_version_fields_from_filename()";
-                    try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
-                        updateStmt.executeQuery();
-                        println("  Updated version fields using unified system");
+                    java.sql.Savepoint savepoint = conn.setSavepoint("before_update_version");
+                    try {
+                        String updateSql = "SELECT populate_version_fields_from_filename()";
+                        try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
+                            updateStmt.executeQuery();
+                            println("  Updated version fields using unified system");
+                        }
+                        conn.releaseSavepoint(savepoint);
+                    } catch (SQLException updateEx) {
+                        conn.rollback(savepoint);
+                        println("  Note: Could not update version fields (function may not exist)");
                     }
-                } catch (SQLException e) {
-                    println("  Note: Could not update version fields (function may not exist)");
+                } catch (SQLException savepointEx) {
+                    println("  Note: Savepoint not available for version update");
                 }
 
                 // Handle based on processing mode
@@ -751,8 +769,11 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         }
 
         // Create new executable record with unified version system
+        // Use ON CONFLICT for idempotent insert (requires unique constraint on name_exec)
         String insertSql = "INSERT INTO exetable (name_exec, md5, architecture, ingest_date, game_version) " +
-            "VALUES (?, ?, ?, NOW(), ?) RETURNING id";
+            "VALUES (?, ?, ?, NOW(), ?) " +
+            "ON CONFLICT (name_exec) DO UPDATE SET md5 = EXCLUDED.md5, ingest_date = NOW() " +
+            "RETURNING id";
 
         try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
             stmt.setString(1, unifiedName);
@@ -766,26 +787,49 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 println("Created new executable record with ID: " + newId);
                 println("  " + versionInfo.getDisplayInfo());
 
-                // Trigger version field population
+                // Trigger version field population using SAVEPOINT so failure doesn't abort transaction
                 try {
-                    String populateSql = "SELECT populate_version_fields_from_filename()";
-                    try (PreparedStatement populateStmt = conn.prepareStatement(populateSql)) {
-                        populateStmt.executeQuery();
-                        println("  Version fields populated using unified schema");
+                    // Create a savepoint so if the populate function fails, we can recover
+                    java.sql.Savepoint savepoint = conn.setSavepoint("before_populate");
+                    try {
+                        String populateSql = "SELECT populate_version_fields_from_filename()";
+                        try (PreparedStatement populateStmt = conn.prepareStatement(populateSql)) {
+                            populateStmt.executeQuery();
+                            println("  Version fields populated using unified schema");
+                        }
+                        // Release savepoint on success
+                        conn.releaseSavepoint(savepoint);
+                    } catch (SQLException popEx) {
+                        // Rollback to savepoint (NOT full rollback) to recover transaction
+                        conn.rollback(savepoint);
+                        println("  Note: Version field population function not available");
                     }
-                } catch (SQLException e) {
-                    println("  Note: Version field population function not available");
+                } catch (SQLException savepointEx) {
+                    // Savepoint itself failed - just log and continue
+                    println("  Note: Could not use savepoint for version population");
                 }
 
                 return newId;
             }
         } catch (SQLException e) {
-            // Fall back to basic insert without version field
-            println("  Note: Using basic insert (unified version schema not available)");
+            // In PostgreSQL, after an error the transaction is in "aborted" state
+            // We need to rollback before we can do anything else
+            println("  Note: Unified insert failed, rolling back to try basic insert");
             println("  Original error: " + e.getMessage());
+            
+            try {
+                conn.rollback();  // Clear the aborted transaction state
+            } catch (SQLException rollbackError) {
+                println("  Warning: Rollback failed: " + rollbackError.getMessage());
+            }
+
+            // Fall back to basic insert without version field
+            println("  Attempting basic insert (unified version schema not available)");
 
             String basicInsertSql = "INSERT INTO exetable (name_exec, md5, architecture, ingest_date) " +
-                "VALUES (?, ?, ?, NOW()) RETURNING id";
+                "VALUES (?, ?, ?, NOW()) " +
+                "ON CONFLICT (name_exec) DO UPDATE SET md5 = EXCLUDED.md5, ingest_date = NOW() " +
+                "RETURNING id";
             try (PreparedStatement stmt = conn.prepareStatement(basicInsertSql)) {
                 stmt.setString(1, unifiedName);
                 stmt.setString(2, generateMD5(unifiedName));
@@ -796,6 +840,9 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 if (rs.next()) {
                     int newId = rs.getInt("id");
                     println("Created new executable record with ID: " + newId);
+                    // Commit immediately since we rolled back earlier
+                    conn.commit();
+                    conn.setAutoCommit(true);  // Signal to caller that we've committed
                     return newId;
                 }
             } catch (SQLException basicInsertError) {
@@ -838,8 +885,17 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
      * Try insert with normalized name as last resort
      */
     private int tryInsertWithNormalizedName(Connection conn, String normalizedName) throws SQLException {
+        // Rollback any aborted transaction first
+        try {
+            conn.rollback();
+        } catch (SQLException e) {
+            println("  Warning: Rollback failed before normalized insert: " + e.getMessage());
+        }
+        
         String basicInsertSql = "INSERT INTO exetable (name_exec, md5, architecture, ingest_date) " +
-            "VALUES (?, ?, ?, NOW()) RETURNING id";
+            "VALUES (?, ?, ?, NOW()) " +
+            "ON CONFLICT (name_exec) DO UPDATE SET md5 = EXCLUDED.md5, ingest_date = NOW() " +
+            "RETURNING id";
 
         try (PreparedStatement stmt = conn.prepareStatement(basicInsertSql)) {
             stmt.setString(1, normalizedName);
@@ -851,11 +907,35 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             if (rs.next()) {
                 int newId = rs.getInt("id");
                 println("Created executable record with normalized name, ID: " + newId);
+                conn.commit();
+                conn.setAutoCommit(true);  // Signal to caller that we've committed
                 return newId;
             }
         }
 
         throw new SQLException("Failed to create executable record even with normalized name");
+    }
+
+    /**
+     * Verify that an executable ID actually exists in the database
+     */
+    private boolean verifyExecutableExists(Connection conn, int executableId) {
+        String sql = "SELECT id FROM exetable WHERE id = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, executableId);
+            ResultSet rs = stmt.executeQuery();
+            boolean exists = rs.next();
+            rs.close();
+            if (exists) {
+                println("  Verified executable ID " + executableId + " exists in database");
+            } else {
+                printerr("  ERROR: Executable ID " + executableId + " NOT FOUND in database!");
+            }
+            return exists;
+        } catch (SQLException e) {
+            printerr("  Error verifying executable: " + e.getMessage());
+            return false;
+        }
     }
 
     /**
@@ -873,11 +953,30 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         int addedCount = 0;
         int skippedCount = 0;
 
-        String checkSql = "SELECT id FROM desctable WHERE name_func = ? AND id_exe = ? AND addr = ?";
+        // Use INSERT ... ON CONFLICT for idempotent operations
+        // Note: Requires unique constraint on (id_exe, addr) - if not present, falls back to check-then-insert
+        String upsertSql = "INSERT INTO desctable (name_func, id_exe, id_signature, flags, addr) " +
+            "VALUES (?, ?, ?, ?, ?) " +
+            "ON CONFLICT (id_exe, addr) DO UPDATE SET name_func = EXCLUDED.name_func, id_signature = EXCLUDED.id_signature " +
+            "RETURNING id";
+        
+        // Fallback for databases without the unique constraint
+        String checkSql = "SELECT id FROM desctable WHERE id_exe = ? AND addr = ?";
         String insertSql = "INSERT INTO desctable (name_func, id_exe, id_signature, flags, addr) VALUES (?, ?, ?, ?, ?) RETURNING id";
+        
+        boolean useUpsert = true;  // Try upsert first
+        PreparedStatement workingStmt = null;
+
+        try {
+            // Test if upsert works (constraint exists)
+            workingStmt = conn.prepareStatement(upsertSql);
+        } catch (SQLException e) {
+            println("  Note: Using check-then-insert pattern (unique constraint not available)");
+            useUpsert = false;
+        }
 
         try (PreparedStatement checkStmt = conn.prepareStatement(checkSql);
-             PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
+             PreparedStatement insertStmt = useUpsert ? conn.prepareStatement(upsertSql) : conn.prepareStatement(insertSql)) {
 
             while (functions.hasNext() && !monitor.isCancelled()) {
                 Function function = functions.next();
@@ -889,29 +988,53 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 }
 
                 try {
-                    // Check if function already exists
-                    checkStmt.setString(1, function.getName());
-                    checkStmt.setInt(2, executableId);
-                    checkStmt.setLong(3, function.getEntryPoint().getOffset());
-                    ResultSet rs = checkStmt.executeQuery();
+                    int functionId = -1;
+                    boolean isNew = false;
+                    
+                    if (useUpsert) {
+                        // Use upsert - always insert/update in one atomic operation
+                        insertStmt.setString(1, function.getName());
+                        insertStmt.setInt(2, executableId);
+                        insertStmt.setLong(3, generateSignatureId(function));
+                        insertStmt.setInt(4, 0);
+                        insertStmt.setLong(5, function.getEntryPoint().getOffset());
 
-                    if (rs.next()) {
-                        skippedCount++;
+                        ResultSet insertRs = insertStmt.executeQuery();
+                        if (insertRs.next()) {
+                            functionId = insertRs.getInt("id");
+                            isNew = true;  // Upsert always processes
+                        }
+                        insertRs.close();
+                    } else {
+                        // Check-then-insert pattern (less safe but works without constraint)
+                        checkStmt.setInt(1, executableId);
+                        checkStmt.setLong(2, function.getEntryPoint().getOffset());
+                        ResultSet rs = checkStmt.executeQuery();
+
+                        if (rs.next()) {
+                            functionId = rs.getInt("id");
+                            skippedCount++;
+                            rs.close();
+                            continue;  // Already exists
+                        }
                         rs.close();
-                        continue;
+
+                        // Insert new function
+                        insertStmt.setString(1, function.getName());
+                        insertStmt.setInt(2, executableId);
+                        insertStmt.setLong(3, generateSignatureId(function));
+                        insertStmt.setInt(4, 0);
+                        insertStmt.setLong(5, function.getEntryPoint().getOffset());
+
+                        ResultSet insertRs = insertStmt.executeQuery();
+                        if (insertRs.next()) {
+                            functionId = insertRs.getInt("id");
+                            isNew = true;
+                        }
+                        insertRs.close();
                     }
-                    rs.close();
-
-                    // Add function to database
-                    insertStmt.setString(1, function.getName());
-                    insertStmt.setInt(2, executableId);
-                    insertStmt.setLong(3, generateSignatureId(function));
-                    insertStmt.setInt(4, 0);
-                    insertStmt.setLong(5, function.getEntryPoint().getOffset());
-
-                    ResultSet insertRs = insertStmt.executeQuery();
-                    if (insertRs.next()) {
-                        int functionId = insertRs.getInt("id");
+                    
+                    if (functionId > 0 && isNew) {
                         addedCount++;
 
                         // Apply comprehensive function tagging and analysis
@@ -923,7 +1046,6 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                         // Store function tags with known function ID
                         storeFunctionTagsWithId(conn, function, functionId, executableId);
                     }
-                    insertRs.close();
 
                 } catch (SQLException e) {
                     if (!e.getMessage().contains("duplicate key")) {
