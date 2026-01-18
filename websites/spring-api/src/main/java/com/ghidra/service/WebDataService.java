@@ -351,10 +351,24 @@ public class WebDataService {
                 return funcData;
             });
 
-            // Add address for this version
+            // Add address for this version - handle duplicates by appending suffix
             @SuppressWarnings("unchecked")
             Map<String, String> addresses = (Map<String, String>) functionsMap.get(funcName).get("addresses");
-            addresses.put(versionKey, "0x" + String.format("%08x", addr).toUpperCase());
+            String formattedAddr = "0x" + String.format("%08x", addr).toUpperCase();
+
+            // If this version already has an address for this function, create a unique variant
+            if (addresses.containsKey(versionKey)) {
+                // This is a duplicate function name in the same version - create unique entry
+                String uniqueFuncName = funcName + "_" + formattedAddr;
+                Map<String, Object> uniqueFuncData = new LinkedHashMap<>();
+                uniqueFuncData.put("name", uniqueFuncName);
+                uniqueFuncData.put("category", categorizeFunctionName(funcName));
+                uniqueFuncData.put("addresses", new LinkedHashMap<String, String>());
+                functionsMap.put(uniqueFuncName, uniqueFuncData);
+                ((Map<String, String>) uniqueFuncData.get("addresses")).put(versionKey, formattedAddr);
+            } else {
+                addresses.put(versionKey, formattedAddr);
+            }
         }
 
         // Build response
