@@ -185,7 +185,7 @@
 
         /* Panel 1: Version Navigator */
         .panel-versions {
-            width: 140px;
+            width: 70px;
             flex-shrink: 0;
         }
 
@@ -271,7 +271,8 @@
         .version-badge {
             font-size: 0.7rem;
             font-weight: 600;
-            flex: 1;
+            width: 100%;
+            text-align: center;
         }
 
         .version-badge.classic {
@@ -322,7 +323,9 @@
 
         /* Panel 2: Files */
         .panel-files {
-            width: auto;
+            flex: 0 1 auto;
+            min-width: 200px;
+            max-width: none;
         }
 
         .files-toolbar {
@@ -406,8 +409,10 @@
 
         .files-table {
             display: grid;
-            grid-template-columns: auto auto auto auto auto;
+            grid-template-columns: auto 1fr auto;
             position: relative;
+            width: 100%;
+            min-width: 200px;
         }
 
         .table-header {
@@ -435,7 +440,7 @@
         .category-header {
             grid-column: 1 / -1;
             display: grid;
-            grid-template-columns: subgrid;
+            grid-template-columns: auto auto 1fr auto;
             position: sticky;
             top: 0;
             background-color: var(--bg-medium);
@@ -447,6 +452,30 @@
             align-items: center;
             gap: 0.6rem;
             z-index: 10;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .category-header:hover {
+            background-color: var(--bg-light);
+        }
+
+        .category-toggle {
+            font-size: 0.8rem;
+            transition: transform 0.2s ease;
+            color: var(--text-muted);
+        }
+
+        .category-header.collapsed .category-toggle {
+            transform: rotate(-90deg);
+        }
+
+        .category-files {
+            display: contents;
+        }
+
+        .category-files.collapsed {
+            display: none;
         }
 
         .category-header .category-dot {
@@ -472,7 +501,7 @@
         .file-row {
             grid-column: 1 / -1;
             display: grid;
-            grid-template-columns: subgrid;
+            grid-template-columns: auto 1fr auto;
             align-items: center;
             padding: 0.4rem 0.6rem;
             border-bottom: 1px solid var(--border-dark);
@@ -1980,6 +2009,18 @@
             .panel-compare {
                 width: 350px;
             }
+
+            /* Prevent toolbar wrapping on medium screens */
+            .files-toolbar {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+            }
+
+            .category-filters {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                min-width: 0;
+            }
         }
 
         @media (max-width: 900px) {
@@ -1991,6 +2032,43 @@
             .compare-columns-header,
             .compare-row {
                 grid-template-columns: 1fr 80px 1fr 24px;
+            }
+
+            /* Force no wrapping on smaller screens */
+            .files-toolbar {
+                flex-wrap: nowrap;
+                padding: 0.3rem 0.5rem;
+                gap: 0.3rem;
+            }
+
+            .category-filters {
+                flex-wrap: nowrap;
+                gap: 0.15rem;
+                min-width: 0;
+                flex-shrink: 1;
+            }
+
+            .category-btn {
+                padding: 0.15rem 0.3rem;
+                font-size: 0.55rem;
+                white-space: nowrap;
+                flex-shrink: 0;
+                min-width: auto;
+            }
+
+            /* Hide full text on very small screens to save space */
+            .category-btn .full-text {
+                display: none;
+            }
+
+            .category-btn .short-text {
+                display: inline;
+            }
+
+            .group-btn {
+                padding: 0.15rem 0.3rem;
+                font-size: 0.55rem;
+                flex-shrink: 0;
             }
         }
 
@@ -2635,7 +2713,7 @@
                     <div class="files-table" id="filesTable">
                         <div class="details-empty">
                             <div class="details-empty-icon">📂</div>
-                            <div class="details-empty-text">Select a version from the left panel to browse its files</div>
+                            <div class="details-empty-text">Select a version</div>
                         </div>
                     </div>
                 </div>
@@ -2699,13 +2777,14 @@
 
     <!-- API Data Loading -->
     <script>
-        // API Configuration
-        const API_BASE_URL = 'https://api.xebyte.com/api';
+        // API Configuration - Environment-based endpoint selection
+        const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:8081/api'  // Local development
+            : 'https://api.xebyte.com/api'; // Production deployment
 
         // Global data variables (previously loaded from static files)
         let FILE_CATEGORIES = {};
         let VERSIONS_DATA = [];
-        let FOLDERS_DATA = {};
         let FILE_HISTORY_DATA = {};
         let DIFFS_DATA = {};
         let EXPORTS_DATA = {};
@@ -2745,10 +2824,9 @@
 
                 // Load core data in parallel
                 console.log('Fetching data from API endpoints...');
-                const [categoriesRes, versionsRes, foldersRes, historyRes, diffsRes, exportsRes, textRes, functionsIndexRes] = await Promise.all([
+                const [categoriesRes, versionsRes, historyRes, diffsRes, exportsRes, textRes, functionsIndexRes] = await Promise.all([
                     fetch(`${API_BASE_URL}/categories`).catch(() => ({ ok: false, error: 'categories' })),
                     fetch(`${API_BASE_URL}/versions`).catch(() => ({ ok: false, error: 'versions' })),
-                    fetch(`${API_BASE_URL}/folders`).catch(() => ({ ok: false, error: 'folders' })),
                     fetch(`${API_BASE_URL}/file-history`).catch(() => ({ ok: false, error: 'file-history' })),
                     fetch(`${API_BASE_URL}/diffs`).catch(() => ({ ok: false, error: 'diffs' })),
                     fetch(`${API_BASE_URL}/exports`).catch(() => ({ ok: false, error: 'exports' })),
@@ -2776,7 +2854,6 @@
                         nocd_status: v.nocdStatus
                     }));
                 }
-                if (foldersRes.ok) FOLDERS_DATA = await foldersRes.json();
                 if (historyRes.ok) FILE_HISTORY_DATA = await historyRes.json();
                 if (diffsRes.ok) DIFFS_DATA = await diffsRes.json();
                 if (exportsRes.ok) EXPORTS_DATA = await exportsRes.json();
@@ -2786,7 +2863,6 @@
                 console.log('API Data loaded successfully!');
                 console.log('- Categories:', Object.keys(FILE_CATEGORIES).length);
                 console.log('- Versions:', VERSIONS_DATA.length);
-                console.log('- Folders:', Object.keys(FOLDERS_DATA).length);
                 console.log('- Functions:', Object.keys(FUNCTION_INDEX_V2.files || {}).length);
 
                 hideLoadingToast();
@@ -2959,6 +3035,7 @@
         let selectedVersion = null;
         let selectedFile = null;
         let isGrouped = true;
+        let collapsedCategories = {}; // Track which categories are collapsed
 
         // Version filters: Pre-Refactor (1.00-1.03), Post-Refactor (1.04+), LoD (all)
         const versionFilters = {
@@ -3747,7 +3824,7 @@
         async function loadVersionsOnly() {
             try {
                 console.log('Loading versions only...');
-                const response = await fetch('https://api.xebyte.com/api/versions');
+                const response = await fetch(`${API_BASE_URL}/versions`);
                 if (!response.ok) throw new Error('Versions API failed');
 
                 const rawVersions = await response.json();
@@ -3831,8 +3908,7 @@
 
             // Refresh file details panel - reload function data for new group
             if (selectedFile) {
-                const folder = FOLDERS_DATA[selectedVersion];
-                const fileInfo = folder?.files?.[selectedFile];
+                const fileInfo = null; // File info now comes from binaries API
                 const baseName = selectedFile.split(' (')[0];
                 const history = FILE_HISTORY_DATA[baseName];
 
@@ -3890,16 +3966,34 @@
             }
 
             renderCategoryFilters();
-            if (selectedVersion && FOLDERS_DATA[selectedVersion]) {
-                renderFilesTable(FOLDERS_DATA[selectedVersion]);
-            }
+            // Note: Files are now rendered via renderBinariesTable() in selectVersion()
         }
 
         function toggleGrouping() {
             isGrouped = !isGrouped;
             document.getElementById('groupBtn').classList.toggle('active', isGrouped);
-            if (selectedVersion && FOLDERS_DATA[selectedVersion]) {
-                renderFilesTable(FOLDERS_DATA[selectedVersion]);
+            // Note: Files are now rendered via renderBinariesTable() in selectVersion()
+        }
+
+        function toggleCategory(categoryName) {
+            collapsedCategories[categoryName] = !collapsedCategories[categoryName];
+
+            // Update header appearance
+            const header = document.querySelector(`[data-category="${categoryName}"]`);
+            if (header) {
+                header.classList.toggle('collapsed', collapsedCategories[categoryName]);
+
+                // Update toggle arrow
+                const toggle = header.querySelector('.category-toggle');
+                if (toggle) {
+                    toggle.textContent = collapsedCategories[categoryName] ? '▶' : '▼';
+                }
+            }
+
+            // Update files visibility
+            const files = document.querySelector(`.category-files[data-category="${categoryName}"]`);
+            if (files) {
+                files.classList.toggle('collapsed', collapsedCategories[categoryName]);
             }
         }
 
@@ -3947,9 +4041,7 @@
                     <div class="version-item ${isSelected ? 'selected' : ''}"
                          onclick="selectVersion('${v.folder_name}')"
                          title="${v.game_type} ${v.version} - ${changeCount} of ${totalFiles} files changed">
-                        <span class="version-type ${typeClass}">${isClassic ? 'C' : 'L'}</span>
                         <span class="version-badge ${typeClass}">${v.version}</span>
-                        <span class="file-counts">${countsHtml}</span>
                     </div>
                 `;
             }).join('');
@@ -3975,7 +4067,7 @@
 
             try {
                 // Load binaries from API
-                const response = await fetch(`https://api.xebyte.com/api/binaries?gameType=${gameType}&version=${version}`);
+                const response = await fetch(`${API_BASE_URL}/binaries?gameType=${gameType}&version=${version}`);
                 if (!response.ok) {
                     console.error('Failed to fetch binaries:', response.status);
                     document.getElementById('filesTable').innerHTML = '<div class="details-empty">Failed to load binaries</div>';
@@ -4058,16 +4150,18 @@
 
                     // Category header with column headers
                     html += `
-                        <div class="category-header">
+                        <div class="category-header" onclick="toggleCategory('${category}')" data-category="${category}">
+                            <span class="category-toggle">▼</span>
                             <span class="category-dot" style="background-color: ${categoryInfo.color}"></span>
                             <span class="category-name">${category}</span>
-                            <span class="column-header version">Type</span>
                             <span class="column-header hash">Hash</span>
                         </div>
                     `;
 
                     // Files in this category
+                    html += `<div class="category-files" data-category="${category}">`;
                     html += categoryFiles.map(([filename, file]) => renderBinaryRow(filename, file)).join('');
+                    html += `</div>`;
                 });
 
                 container.innerHTML = html;
@@ -4077,7 +4171,6 @@
                     <div class="table-header">
                         <span></span>
                         <span>${fileCount} Files</span>
-                        <span>Type</span>
                         <span>Hash</span>
                     </div>
                 `;
@@ -4090,7 +4183,6 @@
         function renderBinaryRow(filename, file) {
             const categoryColor = CATEGORIES[file.category]?.color || getCategoryColor(file.category);
             const isSelected = selectedFile === filename;
-            const fileType = file.fileType || '—';
 
             // Hash display - last 4 characters with copy button
             const fullHash = file.md5 || '';
@@ -4099,12 +4191,15 @@
                 ? `<span class="hash-short" title="${fullHash}">${shortHash}</span><button class="hash-copy-btn" onclick="event.stopPropagation(); copyHash('${fullHash}')" title="Copy full hash">⧉</button>`
                 : `<span class="hash-short">—</span>`;
 
+            // Match renderFileRow structure but without displaying file type
+            const variantCount = 1; // Binaries typically don't have variants
+            const versionId = '—'; // No version info for binaries
+
             return `
                 <div class="file-row ${isSelected ? 'selected' : ''}"
                      onclick="selectFile('${filename.replace(/'/g, "\\'")}')">
                     <div class="category-indicator" style="background-color: ${categoryColor}"></div>
                     <span class="filename" title="${filename}">${filename}</span>
-                    <span class="version-id" title="${fileType}">${fileType}</span>
                     <div class="hash-cell">${hashCell}</div>
                 </div>
             `;
@@ -4163,19 +4258,20 @@
                     const categoryFiles = grouped[category].sort((a, b) => a[0].localeCompare(b[0]));
                     const categoryInfo = CATEGORIES[category] || { color: '#FFFFFF', short: '??' };
 
-                    // Category header with column headers for Vars, Version, and Hash
+                    // Category header with column headers
                     html += `
-                        <div class="category-header">
+                        <div class="category-header" onclick="toggleCategory('${category}')" data-category="${category}">
+                            <span class="category-toggle">▼</span>
                             <span class="category-dot" style="background-color: ${categoryInfo.color}"></span>
                             <span class="category-name">${category}</span>
-                            <span class="column-header vars">Vars</span>
-                            <span class="column-header version">Version</span>
                             <span class="column-header hash">Hash</span>
                         </div>
                     `;
 
                     // Files in this category
+                    html += `<div class="category-files" data-category="${category}">`;
                     html += categoryFiles.map(([filename, file]) => renderFileRow(filename, file)).join('');
+                    html += `</div>`;
                 });
 
                 container.innerHTML = html;
@@ -4185,8 +4281,6 @@
                     <div class="table-header">
                         <span></span>
                         <span>${fileCount} Files</span>
-                        <span>Vars</span>
-                        <span>Version</span>
                         <span>Hash</span>
                     </div>
                 `;
@@ -4220,17 +4314,13 @@
                      onclick="selectFile('${filename.replace(/'/g, "\\'")}')">
                     <div class="category-indicator" style="background-color: ${categoryColor}"></div>
                     <span class="filename" title="${filename}">${filename}</span>
-                    <span class="variants ${variantClass}" title="${variantCount} variant${variantCount !== 1 ? 's' : ''}">${variantCount}</span>
-                    <span class="version-id ${versionClass}" title="${versionId}">${versionId}</span>
                     <div class="hash-cell">${hashCell}</div>
                 </div>
             `;
         }
 
         function filterFiles() {
-            if (selectedVersion && FOLDERS_DATA[selectedVersion]) {
-                renderFilesTable(FOLDERS_DATA[selectedVersion]);
-            }
+            // Note: File filtering is now handled by renderBinariesTable() in selectVersion()
         }
 
         function selectFileByName(filename) {
@@ -4256,10 +4346,7 @@
             });
 
             // Get file info from current version
-            const folder = FOLDERS_DATA[selectedVersion];
-            console.log('FOLDERS_DATA keys:', Object.keys(FOLDERS_DATA || {}));
-            console.log('folder:', folder ? 'found' : 'null');
-            const fileInfo = folder?.files?.[filename];
+            const fileInfo = null; // File info now comes from binaries API
             console.log('fileInfo:', fileInfo ? 'found' : 'null');
 
             // Get file history
@@ -4338,6 +4425,90 @@
                 console.error('Failed to load function data:', err);
                 renderExportsTable(container, baseName, filename, fileInfo);
             });
+        }
+
+        function renderFunctionsTable(container, baseName, funcData, filename, fileInfo) {
+            // Extract function data from API response
+            const functions = funcData.functions || {};
+            const versions = funcData.versions || [];
+            const functionNames = Object.keys(functions).sort();
+
+            console.log('renderFunctionsTable: rendering', functionNames.length, 'functions across', versions.length, 'versions');
+
+            // Safely get the selected version
+            const currentVersion = selectedVersion ? selectedVersion.split('/')[1] : '';
+
+            // Build header row with version columns
+            const versionHeaders = versions.map(version => {
+                const shortVer = version.split('/')[1] || version;
+                return `<th class="sortable" data-sort-column="${version}">${shortVer}<span class="sort-indicator">⇅</span></th>`;
+            }).join('');
+
+            // Build table body with function rows
+            const functionRows = functionNames.map(funcName => {
+                const func = functions[funcName];
+                const category = func.category || 'Other';
+                const addresses = func.addresses || {};
+
+                const addressCells = versions.map(version => {
+                    const addr = addresses[version.split('/')[1] || version];
+                    return `<td class="addr-cell ${!addr ? 'missing' : ''}">${addr || '—'}</td>`;
+                }).join('');
+
+                return `<tr data-category="${category.toLowerCase()}">
+                    <td class="fn-name-cell" title="${funcName}">${funcName}</td>
+                    ${addressCells}
+                </tr>`;
+            }).join('');
+
+            const html = `
+                <div class="exports-container">
+                    <div class="exports-header">
+                        <div class="exports-header-title">${baseName} - Functions [${currentVersion}]</div>
+                        <div class="exports-header-info">${functionNames.length} functions in this version</div>
+                    </div>
+                    <div class="exports-controls">
+                        <input type="text" placeholder="Search name or address..." id="functionsSearch" class="search-input" />
+                        <div class="filter-buttons">
+                            <button class="filter-btn active" data-view="named">Named</button>
+                            <button class="filter-btn" data-view="rva">RVA</button>
+                            <button class="filter-btn" data-view="gaps">Gaps</button>
+                            <button class="filter-btn" data-view="copy">Copy</button>
+                            <button class="filter-btn" data-view="sig">Sig</button>
+                        </div>
+                        <select id="categoryFilter" class="category-filter" title="Filter by function category">
+                            <option value="all">All</option>
+                            <option value="Game">Game</option>
+                            <option value="CRT">CRT</option>
+                            <option value="Import">Import</option>
+                            <option value="EH">EH</option>
+                            <option value="Other">Other</option>
+                        </select>
+                        <div class="function-count">${functionNames.length}/${functionNames.length} (${functionNames.length})</div>
+                        <div class="legend">
+                            <span class="legend-item game">Game</span>
+                            <span class="legend-item crt">CRT</span>
+                            <span class="legend-item imp">IMP</span>
+                            <span class="legend-item eh">EH</span>
+                        </div>
+                    </div>
+                    <div class="exports-table-wrapper" id="functionsTableWrapper">
+                        <table class="exports-table" id="functionsTable">
+                            <thead>
+                                <tr>
+                                    <th class="fn-name-cell sortable sort-asc" data-sort-column="function">Function<span class="sort-indicator">▲</span></th>
+                                    ${versionHeaders}
+                                </tr>
+                            </thead>
+                            <tbody id="functionsTableBody">
+                                ${functionRows}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            container.innerHTML = html;
         }
 
         function renderExportsTable(container, baseName, filename, fileInfo) {
@@ -5063,12 +5234,20 @@
             // Filter functions to only those present in the selected version
             let funcKeys;
             if (selectedVersion) {
+                // Extract just the version part from "Classic/1.00" -> "1.00"
+                const versionKey = selectedVersion.split('/')[1] || selectedVersion;
+                console.log('renderFunctionsTable: selectedVersion =', selectedVersion);
+                console.log('renderFunctionsTable: versionKey =', versionKey);
+                console.log('renderFunctionsTable: funcData.versions =', funcData.versions);
+                console.log('renderFunctionsTable: sample function addresses =', Object.values(funcData.functions)[0]?.addresses);
+
                 funcKeys = Object.keys(funcData.functions).filter(key => {
                     const func = funcData.functions[key];
                     // Include ONLY if function has a confirmed address in selected version
                     // (not just a candidate - candidates don't mean the function exists there)
-                    return func.addresses && func.addresses[selectedVersion];
+                    return func.addresses && func.addresses[versionKey];
                 });
+                console.log('renderFunctionsTable: filtered funcKeys.length =', funcKeys.length);
             } else {
                 // If no version selected, show all functions
                 funcKeys = Object.keys(funcData.functions);
@@ -5543,30 +5722,59 @@
             setTimeout(() => toast.classList.remove('show'), 2000);
         }
 
-        function searchByHash() {
+        async function searchByHash() {
             const searchHash = document.getElementById('hashSearch').value.trim().toLowerCase();
+            console.log('searchByHash called with:', searchHash);
+            console.log('VERSIONS_DATA available:', !!VERSIONS_DATA, 'length:', VERSIONS_DATA?.length);
+            console.log('API_BASE_URL:', API_BASE_URL);
 
             if (!searchHash || searchHash.length < 4) {
                 showToast('Enter at least 4 characters');
                 return;
             }
 
-            // Search through all versions
-            for (const [folderName, folder] of Object.entries(FOLDERS_DATA)) {
-                for (const [filename, file] of Object.entries(folder.files)) {
-                    if (file.sha256 && file.sha256.toLowerCase().includes(searchHash)) {
-                        // Found it - select the version and file
-                        selectVersion(folderName);
-                        setTimeout(() => {
-                            selectFile(filename);
-                            showToast(`Found in ${folderName}`);
-                        }, 100);
-                        return;
+            // Search through all versions using binaries API
+            let found = false;
+
+            for (const version of VERSIONS_DATA) {
+                try {
+                    const folderName = version.folder_name || `${version.game_type}/${version.version}`;
+                    const [gameType, versionNum] = folderName.split('/');
+                    console.log(`Searching version: ${folderName} (${gameType}/${versionNum})`);
+
+                    // Fetch binaries for this version
+                    const response = await fetch(`${API_BASE_URL}/binaries?gameType=${gameType}&version=${versionNum}`);
+                    if (!response.ok) {
+                        console.log(`Failed to fetch binaries for ${folderName}: ${response.status}`);
+                        continue;
                     }
+
+                    const binaries = await response.json();
+                    console.log(`Got ${binaries.length} binaries for ${folderName}`);
+
+                    // Search through binaries for matching hash
+                    for (const binary of binaries) {
+                        if (binary.md5 && binary.md5.toLowerCase().includes(searchHash)) {
+                            console.log(`Found match: ${binary.fileName} with hash ${binary.md5}`);
+                            // Found it - select the version and file
+                            selectVersion(folderName);
+                            setTimeout(() => {
+                                selectFile(binary.fileName);
+                                showToast(`Found ${binary.fileName} in ${folderName}`);
+                            }, 100);
+                            found = true;
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    console.warn(`Error searching ${version.folder_name}:`, error);
+                    continue;
                 }
             }
 
-            showToast('Hash not found');
+            if (!found) {
+                showToast('Hash not found');
+            }
         }
 
         // ===========================================
