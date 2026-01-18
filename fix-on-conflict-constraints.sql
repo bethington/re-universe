@@ -1,20 +1,21 @@
 -- Fix ON CONFLICT constraint errors for Step1 script
 -- This adds the missing unique constraints that the Step1 script expects
+--
+-- Note: exetable.md5 is already UNIQUE in standard BSim schema
+-- The Step1 script uses ON CONFLICT (md5) for idempotent inserts
 
--- 1. Add unique constraint on exetable.name_exec for ON CONFLICT (name_exec)
---    First check if constraint already exists
+-- 1. Remove name_exec unique constraint if it exists (not standard BSim)
 DO $$
 BEGIN
-    IF NOT EXISTS (
+    IF EXISTS (
         SELECT 1 FROM information_schema.table_constraints
         WHERE constraint_name = 'exetable_name_exec_key'
         AND table_name = 'exetable'
     ) THEN
-        -- Add unique constraint on name_exec
-        ALTER TABLE exetable ADD CONSTRAINT exetable_name_exec_key UNIQUE (name_exec);
-        RAISE NOTICE 'Added unique constraint on exetable.name_exec';
+        ALTER TABLE exetable DROP CONSTRAINT exetable_name_exec_key;
+        RAISE NOTICE 'Removed non-standard name_exec unique constraint';
     ELSE
-        RAISE NOTICE 'Unique constraint on exetable.name_exec already exists';
+        RAISE NOTICE 'name_exec unique constraint does not exist (good - standard BSim)';
     END IF;
 END $$;
 
@@ -35,7 +36,7 @@ BEGIN
     END IF;
 END $$;
 
--- 3. Verify the constraints were added
+-- 3. Verify the constraints - show md5 unique constraint on exetable
 SELECT
     'exetable' as table_name,
     constraint_name,
@@ -43,7 +44,7 @@ SELECT
 FROM information_schema.table_constraints
 WHERE table_name = 'exetable'
     AND constraint_type = 'UNIQUE'
-    AND constraint_name LIKE '%name_exec%'
+    AND constraint_name LIKE '%md5%'
 
 UNION ALL
 

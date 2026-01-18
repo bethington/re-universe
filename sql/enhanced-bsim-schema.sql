@@ -23,8 +23,8 @@ CREATE INDEX IF NOT EXISTS idx_exetable_version_combo ON exetable(version_family
 -- UNIQUE CONSTRAINTS FOR ON CONFLICT SUPPORT IN GHIDRA SCRIPTS
 -- ============================================================================
 
--- Add unique constraint on exetable.name_exec for ON CONFLICT (name_exec) support
-ALTER TABLE exetable ADD CONSTRAINT IF NOT EXISTS exetable_name_exec_key UNIQUE (name_exec);
+-- Note: md5 is already UNIQUE in exetable (standard BSim behavior)
+-- ON CONFLICT (md5) is used in Ghidra scripts for idempotent inserts
 
 -- Add unique constraint on desctable(id_exe, addr) for ON CONFLICT (id_exe, addr) support
 -- This ensures each address within an executable can only have one function
