@@ -29,7 +29,9 @@ ALTER TABLE desctable ADD COLUMN IF NOT EXISTS enhanced_signature TEXT;
 
 -- Extend exetable (authentic BSim executable table) with version metadata
 -- game_version stores INTEGER version code (e.g., 1093 for 1.09d) - FK to game_versions.id
+ALTER TABLE exetable ADD COLUMN IF NOT EXISTS sha256 VARCHAR(64);
 ALTER TABLE exetable ADD COLUMN IF NOT EXISTS game_version INTEGER;
+ALTER TABLE exetable ADD COLUMN IF NOT EXISTS version_family VARCHAR(16);
 ALTER TABLE exetable ADD COLUMN IF NOT EXISTS is_reference BOOLEAN DEFAULT FALSE;
 
 -- ============================================================================
@@ -176,9 +178,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Indexes for lookup tables
+-- Indexes for lookup tables and exetable extensions
 CREATE INDEX IF NOT EXISTS idx_game_versions_family ON game_versions(version_family);
 CREATE INDEX IF NOT EXISTS idx_valid_executables_name ON valid_executables(name);
+CREATE INDEX IF NOT EXISTS idx_exetable_sha256 ON exetable(sha256);
+CREATE INDEX IF NOT EXISTS idx_exetable_game_version ON exetable(game_version);
 
 -- ============================================================================
 -- STEP 2: Create minimal support tables for data that doesn't fit in BSim core
