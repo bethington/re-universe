@@ -869,8 +869,8 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         }
 
         // Generate hashes from actual program
-        String md5Hash = generateMD5(currentProgram);
-        String sha256Hash = generateSHA256(currentProgram);
+        String md5Hash = generateMD5(program);
+        String sha256Hash = generateSHA256(program);
 
         // Create new executable record with SHA256 and integer version code
         // Use ON CONFLICT (md5) for idempotent insert (standard BSim behavior - md5 is unique)
