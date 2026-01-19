@@ -2154,8 +2154,8 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             fileName = fileName.substring(fileName.lastIndexOf("\\") + 1);
         }
 
-        // Normalize filename to remove spaces
-        fileName = fileName.replace(" ", "_");
+        // Preserve original filename as-is for data integrity
+        // Note: Original filenames maintained to match actual file system names
 
         // Strip any version prefix that might be in the filename
         // Pattern: 1.XX_FileName.ext or 1.XXx_FileName.ext
