@@ -51,14 +51,24 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
     private static final String DEFAULT_DB_USER = "ben";
     private static final String DEFAULT_DB_PASS = "goodyx12";
 
-    // Known valid Diablo 2 versions - only these versions are allowed
-    private static final String[] VALID_GAME_VERSIONS = {
-        "1.00", "1.01", "1.02", "1.03", "1.04", "1.04b", "1.04c",
-        "1.05", "1.05b", "1.06", "1.06b",
-        "1.07", "1.08", "1.09", "1.09b", "1.09d",
-        "1.10", "1.10s", "1.11", "1.11b", "1.12", "1.12a",
-        "1.13", "1.13c", "1.13d", "1.14", "1.14a", "1.14b", "1.14c", "1.14d"
-    };
+    // Version code mapping: version string -> numeric code
+    // Format: major*1000 + minor*10 + patch_letter_offset
+    private static final java.util.Map<String, Integer> VERSION_CODES = new java.util.HashMap<String, Integer>() {{
+        put("1.00",  1000); put("1.01",  1010); put("1.02",  1020); put("1.03",  1030);
+        put("1.04",  1040); put("1.04b", 1041); put("1.04c", 1042);
+        put("1.05",  1050); put("1.05b", 1051);
+        put("1.06",  1060); put("1.06b", 1061);
+        put("1.07",  1070); put("1.08",  1080);
+        put("1.09",  1090); put("1.09b", 1091); put("1.09d", 1093);
+        put("1.10",  1100); put("1.10s", 1101);
+        put("1.11",  1110); put("1.11b", 1111);
+        put("1.12",  1120); put("1.12a", 1121);
+        put("1.13",  1130); put("1.13c", 1132); put("1.13d", 1133);
+        put("1.14",  1140); put("1.14a", 1141); put("1.14b", 1142); put("1.14c", 1143); put("1.14d", 1144);
+    }};
+
+    // Known valid Diablo 2 versions (for validation display)
+    private static final String[] VALID_GAME_VERSIONS = VERSION_CODES.keySet().toArray(new String[0]);
 
     // Valid version families
     private static final String[] VALID_VERSION_FAMILIES = {"Classic", "LoD", "D2R"};
@@ -77,6 +87,9 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
     }
 
     private ProcessingMode processingMode = ProcessingMode.ASK_INDIVIDUAL;
+    
+    // Current version info for the program being processed (used by helper methods)
+    private UnifiedVersionInfo currentVersionInfo = null;
 
     // Helper class for unified version parsing
     private static class UnifiedVersionInfo {
@@ -278,16 +291,24 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         }
 
         /**
-         * Get the validated game version (returns null if invalid)
+         * Get the validated game version code (returns null if invalid)
+         */
+        public Integer getVersionCode() {
+            if (gameVersion == null || gameVersion.equals("Unknown")) return null;
+            // Handle mod versions - extract base version
+            String baseVersion = gameVersion.contains("-") ? gameVersion.split("-")[0] : gameVersion;
+            return VERSION_CODES.get(baseVersion);
+        }
+
+        /**
+         * Get the validated game version string (returns null if invalid)
          */
         public String getValidatedGameVersion() {
             if (gameVersion == null || gameVersion.equals("Unknown")) return null;
             // Handle mod versions - extract base version
             String baseVersion = gameVersion.contains("-") ? gameVersion.split("-")[0] : gameVersion;
-            for (String validVersion : VALID_GAME_VERSIONS) {
-                if (baseVersion.equals(validVersion)) {
-                    return baseVersion;  // Return just the base version for DB constraint
-                }
+            if (VERSION_CODES.containsKey(baseVersion)) {
+                return baseVersion;  // Return just the base version for DB constraint
             }
             return null;
         }
@@ -393,12 +414,14 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
         // Parse unified version information
         UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(programName, programPath);
+        currentVersionInfo = versionInfo;  // Store for helper methods
 
         println("Program: " + programName);
         println("Project Path: " + programPath);
         println("Version Info: " + versionInfo.getDisplayInfo());
         println("  - Family: " + versionInfo.familyType);
         println("  - Version: " + versionInfo.gameVersion);
+        println("  - Compiler: " + getCompilerForVersion(versionInfo));
         println("  - Detection: " + versionInfo.detectionMethod);
         println("Functions: " + currentProgram.getFunctionManager().getFunctionCount());
 
@@ -653,6 +676,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             String programName = program.getName();
             String programPath = file.getPathname();
             UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(programName, programPath);
+            currentVersionInfo = versionInfo;  // Store for helper methods
 
             addProgramToBSim(program, programName, programPath, versionInfo);
             println("  Added " + programName + " (" + versionInfo.getDisplayInfo() + ") to BSim database");
@@ -779,24 +803,39 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
     /**
      * Get or create executable record with unified version support
+     * Uses plain executable names (no version prefix) with integer version codes
      */
     private int getOrCreateExecutableUnified(Connection conn, String programName, String programPath, UnifiedVersionInfo versionInfo) throws SQLException {
 
-        // Generate unified executable name that matches database constraints
-        String unifiedName = generateUnifiedExecutableName(programName, versionInfo);
+        // Extract plain executable name (no version prefix)
+        String execName = extractExecutableName(programName);
+        
+        // Get version code (integer) and validated version string
+        Integer versionCode = versionInfo.getVersionCode();
+        String validatedGameVersion = versionInfo.getValidatedGameVersion();
+        String validatedVersionFamily = versionInfo.getValidatedVersionFamily();
 
-        // Check if executable already exists
-        String selectSql = "SELECT id FROM exetable WHERE name_exec = ?";
+        // Validate executable name against valid_executables table
+        if (!isValidExecutableName(conn, execName)) {
+            println("WARNING: Executable '" + execName + "' not in valid_executables table");
+            println("  Proceeding anyway - add to valid_executables if this is a known D2 binary");
+        }
+
+        // Check if executable already exists (by name + version combination)
+        String selectSql = "SELECT id FROM exetable WHERE name_exec = ? AND game_version = ?";
         try (PreparedStatement stmt = conn.prepareStatement(selectSql)) {
-            stmt.setString(1, unifiedName);
+            stmt.setString(1, execName);
+            if (versionCode != null) {
+                stmt.setInt(2, versionCode);
+            } else {
+                stmt.setNull(2, java.sql.Types.INTEGER);
+            }
             ResultSet rs = stmt.executeQuery();
 
             if (rs.next()) {
                 int existingId = rs.getInt("id");
                 println("Executable already exists in database with ID: " + existingId);
-
-                // No additional updates needed for authentic BSim schema
-                println("  Using existing executable with authentic BSim schema");
+                println("  name_exec: " + execName + ", game_version: " + versionCode);
 
                 // Handle based on processing mode
                 switch (processingMode) {
@@ -823,49 +862,51 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             }
         }
 
-        // Get validated version info for database constraints
-        String validatedGameVersion = versionInfo.getValidatedGameVersion();
-        String validatedVersionFamily = versionInfo.getValidatedVersionFamily();
-
-        if (validatedGameVersion == null) {
+        if (versionCode == null) {
             printerr("WARNING: Could not validate game version from: " + versionInfo.gameVersion);
             printerr("  Known versions: 1.00-1.06b (Classic), 1.07-1.14d (LoD)");
         }
 
-        // Create new executable record with authentic BSim schema using lookup table IDs
-        // Include game_version and version_family for version tracking
+        // Generate hashes from actual program
+        String md5Hash = generateMD5(currentProgram);
+        String sha256Hash = generateSHA256(currentProgram);
+
+        // Create new executable record with SHA256 and integer version code
         // Use ON CONFLICT (md5) for idempotent insert (standard BSim behavior - md5 is unique)
-        String insertSql = "INSERT INTO exetable (name_exec, md5, architecture, name_compiler, ingest_date, repository, path, game_version, version_family) " +
-            "VALUES (?, ?, get_or_create_arch_id(?), get_or_create_compiler_id(?), NOW(), get_or_create_repository_id(?), get_or_create_path_id(?), ?, ?) " +
-            "ON CONFLICT (md5) DO UPDATE SET name_exec = EXCLUDED.name_exec, ingest_date = NOW(), game_version = EXCLUDED.game_version, version_family = EXCLUDED.version_family " +
+        String insertSql = "INSERT INTO exetable (name_exec, md5, sha256, architecture, name_compiler, ingest_date, repository, path, game_version, version_family) " +
+            "VALUES (?, ?, ?, get_or_create_arch_id(?), get_or_create_compiler_id(?), NOW(), get_or_create_repository_id(?), get_or_create_path_id(?), ?, ?) " +
+            "ON CONFLICT (md5) DO UPDATE SET name_exec = EXCLUDED.name_exec, sha256 = EXCLUDED.sha256, ingest_date = NOW(), game_version = EXCLUDED.game_version, version_family = EXCLUDED.version_family " +
             "RETURNING id";
 
         try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
-            stmt.setString(1, unifiedName);
-            stmt.setString(2, generateMD5(unifiedName));
-            stmt.setString(3, getArchitectureString());
-            stmt.setString(4, getCompilerString());
-            stmt.setString(5, getRepositoryString());
-            stmt.setString(6, getPathString());
-            // Set game_version (can be null if validation failed)
-            if (validatedGameVersion != null) {
-                stmt.setString(7, validatedGameVersion);
+            stmt.setString(1, execName);
+            stmt.setString(2, md5Hash);
+            stmt.setString(3, sha256Hash);
+            stmt.setString(4, getArchitectureString());
+            stmt.setString(5, getCompilerString());
+            stmt.setString(6, getRepositoryString());
+            stmt.setString(7, getPathString());
+            // Set game_version as integer version code
+            if (versionCode != null) {
+                stmt.setInt(8, versionCode);
             } else {
-                stmt.setNull(7, java.sql.Types.VARCHAR);
+                stmt.setNull(8, java.sql.Types.INTEGER);
             }
             // Set version_family
             if (validatedVersionFamily != null) {
-                stmt.setString(8, validatedVersionFamily);
+                stmt.setString(9, validatedVersionFamily);
             } else {
-                stmt.setNull(8, java.sql.Types.VARCHAR);
+                stmt.setNull(9, java.sql.Types.VARCHAR);
             }
 
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
                 int newId = rs.getInt("id");
                 println("Created new executable record with ID: " + newId);
-                println("  " + versionInfo.getDisplayInfo());
-                println("  game_version: " + (validatedGameVersion != null ? validatedGameVersion : "NULL"));
+                println("  name_exec: " + execName);
+                println("  md5: " + md5Hash);
+                println("  sha256: " + sha256Hash.substring(0, 16) + "...");
+                println("  game_version: " + (versionCode != null ? versionCode + " (" + validatedGameVersion + ")" : "NULL"));
                 println("  version_family: " + (validatedVersionFamily != null ? validatedVersionFamily : "NULL"));
 
                 return newId;
@@ -873,7 +914,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         } catch (SQLException e) {
             // In PostgreSQL, after an error the transaction is in "aborted" state
             // We need to rollback before we can do anything else
-            println("  Note: Unified insert failed, rolling back to try basic insert");
+            println("  Note: Insert failed, rolling back to try basic insert");
             println("  Original error: " + e.getMessage());
             
             try {
@@ -882,34 +923,35 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 println("  Warning: Rollback failed: " + rollbackError.getMessage());
             }
 
-            // Fall back to basic insert with authentic BSim schema (lookup table IDs)
-            println("  Attempting basic insert with authentic BSim schema");
+            // Fall back to basic insert
+            println("  Attempting basic insert with integer version code");
 
-            String basicInsertSql = "INSERT INTO exetable (name_exec, md5, architecture, name_compiler, ingest_date, repository, path, game_version, version_family) " +
-                "VALUES (?, ?, get_or_create_arch_id(?), get_or_create_compiler_id(?), NOW(), get_or_create_repository_id(?), get_or_create_path_id(?), ?, ?) " +
-                "ON CONFLICT (md5) DO UPDATE SET name_exec = EXCLUDED.name_exec, ingest_date = NOW(), game_version = EXCLUDED.game_version, version_family = EXCLUDED.version_family " +
+            String basicInsertSql = "INSERT INTO exetable (name_exec, md5, sha256, architecture, name_compiler, ingest_date, repository, path, game_version, version_family) " +
+                "VALUES (?, ?, ?, get_or_create_arch_id(?), get_or_create_compiler_id(?), NOW(), get_or_create_repository_id(?), get_or_create_path_id(?), ?, ?) " +
+                "ON CONFLICT (md5) DO UPDATE SET name_exec = EXCLUDED.name_exec, sha256 = EXCLUDED.sha256, ingest_date = NOW(), game_version = EXCLUDED.game_version, version_family = EXCLUDED.version_family " +
                 "RETURNING id";
             try (PreparedStatement stmt = conn.prepareStatement(basicInsertSql)) {
-                stmt.setString(1, unifiedName);
-                stmt.setString(2, generateMD5(unifiedName));
-                stmt.setString(3, getArchitectureString());
-                stmt.setString(4, getCompilerString());
-                stmt.setString(5, getRepositoryString());
-                stmt.setString(6, getPathString());
-                // Set game_version (can be null if validation failed)
-                if (validatedGameVersion != null) {
-                    stmt.setString(7, validatedGameVersion);
+                stmt.setString(1, execName);
+                stmt.setString(2, md5Hash);
+                stmt.setString(3, sha256Hash);
+                stmt.setString(4, getArchitectureString());
+                stmt.setString(5, getCompilerString());
+                stmt.setString(6, getRepositoryString());
+                stmt.setString(7, getPathString());
+                // Set game_version as integer version code
+                if (versionCode != null) {
+                    stmt.setInt(8, versionCode);
                 } else {
-                    stmt.setNull(7, java.sql.Types.VARCHAR);
+                    stmt.setNull(8, java.sql.Types.INTEGER);
                 }
                 // Set version_family
                 if (validatedVersionFamily != null) {
-                    stmt.setString(8, validatedVersionFamily);
+                    stmt.setString(9, validatedVersionFamily);
                 } else {
-                    stmt.setNull(8, java.sql.Types.VARCHAR);
+                    stmt.setNull(9, java.sql.Types.VARCHAR);
                 }
 
-                println("  Attempting basic insert with name: " + unifiedName);
+                println("  Attempting basic insert with name: " + execName);
                 ResultSet rs = stmt.executeQuery();
                 if (rs.next()) {
                     int newId = rs.getInt("id");
@@ -920,12 +962,12 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                     return newId;
                 }
             } catch (SQLException basicInsertError) {
-                printerr("Error in basic insert for '" + unifiedName + "': " + basicInsertError.getMessage());
+                printerr("Error in basic insert for '" + execName + "': " + basicInsertError.getMessage());
 
                 // Check if it's a constraint violation and try to work around it
                 if (basicInsertError.getMessage().contains("proper_executable_naming")) {
                     println("  Constraint violation detected. Trying with normalized filename...");
-                    String normalizedName = normalizeExecutableName(unifiedName);
+                    String normalizedName = normalizeExecutableName(execName);
                     return tryInsertWithNormalizedName(conn, normalizedName);
                 }
                 throw basicInsertError;
@@ -966,18 +1008,23 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             println("  Warning: Rollback failed before normalized insert: " + e.getMessage());
         }
         
-        String basicInsertSql = "INSERT INTO exetable (name_exec, md5, architecture, name_compiler, ingest_date, repository, path, game_version, version_family) " +
-            "VALUES (?, ?, get_or_create_arch_id(?), get_or_create_compiler_id(?), NOW(), get_or_create_repository_id(?), get_or_create_path_id(?), NULL, NULL) " +
-            "ON CONFLICT (md5) DO UPDATE SET name_exec = EXCLUDED.name_exec, ingest_date = NOW() " +
+        // Generate hashes from actual program
+        String md5Hash = generateMD5(currentProgram);
+        String sha256Hash = generateSHA256(currentProgram);
+        
+        String basicInsertSql = "INSERT INTO exetable (name_exec, md5, sha256, architecture, name_compiler, ingest_date, repository, path, game_version, version_family) " +
+            "VALUES (?, ?, ?, get_or_create_arch_id(?), get_or_create_compiler_id(?), NOW(), get_or_create_repository_id(?), get_or_create_path_id(?), NULL, NULL) " +
+            "ON CONFLICT (md5) DO UPDATE SET name_exec = EXCLUDED.name_exec, sha256 = EXCLUDED.sha256, ingest_date = NOW() " +
             "RETURNING id";
 
         try (PreparedStatement stmt = conn.prepareStatement(basicInsertSql)) {
             stmt.setString(1, normalizedName);
-            stmt.setString(2, generateMD5(normalizedName));
-            stmt.setString(3, getArchitectureString());
-            stmt.setString(4, getCompilerString());
-            stmt.setString(5, getRepositoryString());
-            stmt.setString(6, getPathString());
+            stmt.setString(2, md5Hash);
+            stmt.setString(3, sha256Hash);
+            stmt.setString(4, getArchitectureString());
+            stmt.setString(5, getCompilerString());
+            stmt.setString(6, getRepositoryString());
+            stmt.setString(7, getPathString());
             // Normalized names lose version info, so we set NULL for both
 
             println("  Attempting insert with normalized name: " + normalizedName);
@@ -1198,10 +1245,17 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
     }
 
     /**
-     * Generate MD5 hash for executable
+     * Generate MD5 hash for executable (from actual program bytes when available)
      */
-    private String generateMD5(String input) {
+    private String generateMD5(Program program) {
         try {
+            // Try to get actual executable MD5 from Ghidra
+            String execMD5 = program.getExecutableMD5();
+            if (execMD5 != null && !execMD5.isEmpty()) {
+                return execMD5.toLowerCase();
+            }
+            // Fallback: generate from program name + executable path
+            String input = program.getName() + "_" + program.getExecutablePath();
             java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
             byte[] hash = md.digest(input.getBytes());
             StringBuilder hexString = new StringBuilder();
@@ -1213,6 +1267,32 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             return hexString.toString();
         } catch (Exception e) {
             return "unknown_md5";
+        }
+    }
+
+    /**
+     * Generate SHA256 hash for executable (from actual program bytes when available)
+     */
+    private String generateSHA256(Program program) {
+        try {
+            // Try to get actual executable SHA256 from Ghidra
+            String execSHA256 = program.getExecutableSHA256();
+            if (execSHA256 != null && !execSHA256.isEmpty()) {
+                return execSHA256.toLowerCase();
+            }
+            // Fallback: generate from program name + executable path
+            String input = program.getName() + "_" + program.getExecutablePath();
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(input.getBytes());
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (Exception e) {
+            return "unknown_sha256";
         }
     }
 
@@ -1232,10 +1312,38 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
     /**
      * Get compiler as string for authentic BSim schema (for lookup table)
+     * Determines compiler based on game version - Diablo 2 used specific compilers per era
      */
     private String getCompilerString() {
-        // Try to detect compiler from program metadata or default to unknown
-        return "unknown";  // Can be enhanced with more sophisticated detection
+        return getCompilerForVersion(currentVersionInfo);
+    }
+
+    /**
+     * Determine the compiler used for a specific Diablo 2 version
+     * 
+     * Compiler history:
+     * - 1.00 - 1.09d: Visual C++ 6.0 (MSVC 6.0, released 1998)
+     * - 1.10 - 1.13d: Visual C++ 6.0 (same compiler maintained for compatibility)
+     * - 1.14 - 1.14d: Visual Studio 2015 (modern recompile for Windows 10 compatibility)
+     */
+    private String getCompilerForVersion(UnifiedVersionInfo versionInfo) {
+        if (versionInfo == null || versionInfo.gameVersion == null) {
+            return "unknown";
+        }
+        
+        Integer versionCode = versionInfo.getVersionCode();
+        if (versionCode == null) {
+            return "unknown";
+        }
+        
+        // 1.14+ = Visual Studio 2015 (Windows 10 recompile)
+        if (versionCode >= 1140) {
+            return "visualstudio:2015";
+        }
+        
+        // 1.00 - 1.13d = Visual C++ 6.0
+        // This covers the entire classic and LoD era before the 2016 update
+        return "visualstudio:vc6";
     }
 
     /**
@@ -1248,18 +1356,41 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
     /**
      * Get path as string for authentic BSim schema (for lookup table)
+     * Returns Ghidra project folder path like "/Classic/1.09d" or "/LoD/1.07"
      */
     private String getPathString() {
-        // Extract path from current program or use unknown
-        if (currentProgram != null && currentProgram.getExecutablePath() != null) {
-            String path = currentProgram.getExecutablePath();
-            if (path.contains("/") || path.contains("\\")) {
-                // Get directory portion
-                int lastSlash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
-                return path.substring(0, lastSlash);
-            }
+        return getPathForVersion(currentVersionInfo);
+    }
+
+    /**
+     * Construct Ghidra project folder path from version info
+     * Format: /{FamilyType}/{GameVersion}
+     * Examples: /Classic/1.00, /LoD/1.07, /LoD/1.09d
+     */
+    private String getPathForVersion(UnifiedVersionInfo versionInfo) {
+        if (versionInfo == null) {
+            return "/unknown";
         }
-        return "unknown";
+        
+        String family = versionInfo.familyType;
+        String version = versionInfo.gameVersion;
+        
+        // Normalize family type
+        if (family == null || family.equals("Unified") || family.equals("Unknown")) {
+            family = "unknown";
+        }
+        
+        // Normalize version
+        if (version == null || version.equals("Unknown")) {
+            version = "unknown";
+        }
+        
+        // Handle mod versions (e.g., "1.13c-PD2" -> use base version)
+        if (version.contains("-")) {
+            version = version.split("-")[0];
+        }
+        
+        return "/" + family + "/" + version;
     }
 
     /**
@@ -1985,9 +2116,10 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
     }
 
     /**
-     * Generate unified executable name that matches database constraint patterns
+     * Extract plain executable name (no version prefix)
+     * Version is stored separately in game_version field
      */
-    private String generateUnifiedExecutableName(String programName, UnifiedVersionInfo versionInfo) {
+    private String extractExecutableName(String programName) {
         // Extract just the filename without any path
         String fileName = programName;
         if (fileName.contains("/")) {
@@ -1997,17 +2129,53 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             fileName = fileName.substring(fileName.lastIndexOf("\\") + 1);
         }
 
-        // Normalize filename to remove spaces and special characters
+        // Normalize filename to remove spaces
         fileName = fileName.replace(" ", "_");
 
-        // Handle special cases for Game.exe and Diablo II.exe
-        if (fileName.equals("Game.exe") || fileName.equals("Diablo_II.exe")) {
-            // Use pattern: (Classic|LoD)_1.[version]_Diablo_II.exe
-            return String.format("%s_%s_Diablo_II.exe", versionInfo.familyType, versionInfo.gameVersion);
+        // Strip any version prefix that might be in the filename
+        // Pattern: 1.XX_FileName.ext or 1.XXx_FileName.ext
+        java.util.regex.Pattern versionPrefixPattern = 
+            java.util.regex.Pattern.compile("^1\\.[0-9]+[a-z]?_(.+)$");
+        java.util.regex.Matcher matcher = versionPrefixPattern.matcher(fileName);
+        if (matcher.matches()) {
+            fileName = matcher.group(1);
         }
 
-        // For all other executables, use pattern: 1.[version]_[FileName].dll/exe
-        return String.format("%s_%s", versionInfo.gameVersion, fileName);
+        // Also handle Classic_1.XX_ and LoD_1.XX_ prefixes
+        java.util.regex.Pattern familyPrefixPattern = 
+            java.util.regex.Pattern.compile("^(Classic|LoD)_1\\.[0-9]+[a-z]?_(.+)$");
+        java.util.regex.Matcher familyMatcher = familyPrefixPattern.matcher(fileName);
+        if (familyMatcher.matches()) {
+            fileName = familyMatcher.group(2);
+        }
+
+        return fileName;
+    }
+
+    /**
+     * Validate executable name against the valid_executables table
+     */
+    private boolean isValidExecutableName(Connection conn, String execName) {
+        try {
+            String sql = "SELECT 1 FROM valid_executables WHERE name = ?";
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, execName);
+                ResultSet rs = stmt.executeQuery();
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            // If table doesn't exist, allow any executable
+            println("Note: valid_executables table not found, skipping validation");
+            return true;
+        }
+    }
+
+    /**
+     * @deprecated Use extractExecutableName instead
+     */
+    @Deprecated
+    private String generateUnifiedExecutableName(String programName, UnifiedVersionInfo versionInfo) {
+        return extractExecutableName(programName);
     }
 
     /**

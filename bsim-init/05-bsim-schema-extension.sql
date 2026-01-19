@@ -14,6 +14,107 @@
 BEGIN;
 
 -- ============================================================================
+-- STEP 0: Create version and executable enumeration tables
+-- ============================================================================
+
+-- Game versions table with numeric codes
+-- Format: major*1000 + minor*10 + patch_letter_offset
+CREATE TABLE IF NOT EXISTS game_versions (
+    id SERIAL PRIMARY KEY,
+    version_string VARCHAR(10) NOT NULL UNIQUE,
+    version_code INTEGER NOT NULL UNIQUE,
+    version_family VARCHAR(10) NOT NULL,
+    release_order INTEGER NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Insert all known Diablo 2 versions
+INSERT INTO game_versions (version_string, version_code, version_family, release_order, description) VALUES
+    ('1.00',  1000, 'Classic', 1,  'Original release'),
+    ('1.01',  1010, 'Classic', 2,  'First patch'),
+    ('1.02',  1020, 'Classic', 3,  'Bug fixes'),
+    ('1.03',  1030, 'Classic', 4,  'Balance changes'),
+    ('1.04',  1040, 'Classic', 5,  'Major update'),
+    ('1.04b', 1041, 'Classic', 6,  'Bug fix patch'),
+    ('1.04c', 1042, 'Classic', 7,  'Bug fix patch'),
+    ('1.05',  1050, 'Classic', 8,  'Pre-LoD update'),
+    ('1.05b', 1051, 'Classic', 9,  'Bug fix patch'),
+    ('1.06',  1060, 'Classic', 10, 'Final Classic-era patch'),
+    ('1.06b', 1061, 'Classic', 11, 'Bug fix patch'),
+    ('1.07',  1070, 'LoD', 12, 'Lord of Destruction release'),
+    ('1.08',  1080, 'LoD', 13, 'LoD patch'),
+    ('1.09',  1090, 'LoD', 14, 'Major LoD update'),
+    ('1.09b', 1091, 'LoD', 15, 'Bug fix patch'),
+    ('1.09d', 1093, 'LoD', 16, 'Bug fix patch'),
+    ('1.10',  1100, 'LoD', 17, 'Synergies patch'),
+    ('1.10s', 1101, 'LoD', 18, 'Beta/test version'),
+    ('1.11',  1110, 'LoD', 19, 'Uber content'),
+    ('1.11b', 1111, 'LoD', 20, 'Bug fix patch'),
+    ('1.12',  1120, 'LoD', 21, 'No-CD patch'),
+    ('1.12a', 1121, 'LoD', 22, 'Bug fix patch'),
+    ('1.13',  1130, 'LoD', 23, 'Respec patch'),
+    ('1.13c', 1132, 'LoD', 24, 'Bug fix patch'),
+    ('1.13d', 1133, 'LoD', 25, 'Final 1.13 patch'),
+    ('1.14',  1140, 'LoD', 26, 'Windows 10 compatibility'),
+    ('1.14a', 1141, 'LoD', 27, 'Bug fix patch'),
+    ('1.14b', 1142, 'LoD', 28, 'Bug fix patch'),
+    ('1.14c', 1143, 'LoD', 29, 'Bug fix patch'),
+    ('1.14d', 1144, 'LoD', 30, 'Final legacy patch')
+ON CONFLICT (version_string) DO NOTHING;
+
+-- Valid executables table - known D2 binaries
+CREATE TABLE IF NOT EXISTS valid_executables (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(64) NOT NULL UNIQUE,
+    exe_type VARCHAR(16) NOT NULL,
+    description TEXT,
+    is_core BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+INSERT INTO valid_executables (name, exe_type, description, is_core) VALUES
+    ('Game.exe',       'exe', 'Main game executable', TRUE),
+    ('Diablo II.exe',  'exe', 'Alternative main executable', TRUE),
+    ('D2Client.dll',   'dll', 'Client-side game logic', TRUE),
+    ('D2Common.dll',   'dll', 'Common game utilities', TRUE),
+    ('D2Game.dll',     'dll', 'Game server logic', TRUE),
+    ('D2Lang.dll',     'dll', 'Language/localization', TRUE),
+    ('D2Launch.dll',   'dll', 'Launcher functionality', TRUE),
+    ('D2MCPClient.dll','dll', 'Battle.net MCP client', TRUE),
+    ('D2Net.dll',      'dll', 'Network functionality', TRUE),
+    ('D2Sound.dll',    'dll', 'Sound/audio system', TRUE),
+    ('D2Win.dll',      'dll', 'Windows integration', TRUE),
+    ('D2CMP.dll',      'dll', 'Compression utilities', TRUE),
+    ('D2Multi.dll',    'dll', 'Multiplayer functionality', TRUE),
+    ('D2DDraw.dll',    'dll', 'DirectDraw renderer', TRUE),
+    ('D2Direct3D.dll', 'dll', 'Direct3D renderer', TRUE),
+    ('D2Glide.dll',    'dll', 'Glide renderer', TRUE),
+    ('D2gfx.dll',      'dll', 'Graphics utilities', TRUE),
+    ('Fog.dll',        'dll', 'Memory/utility library', TRUE),
+    ('Storm.dll',      'dll', 'MPQ archive handling', TRUE),
+    ('Bnclient.dll',   'dll', 'Battle.net client', TRUE),
+    ('ijl11.dll',      'dll', 'Intel JPEG library', FALSE),
+    ('SmackW32.dll',   'dll', 'Smacker video playback', FALSE)
+ON CONFLICT (name) DO NOTHING;
+
+-- Helper function: Get version code from string
+CREATE OR REPLACE FUNCTION get_version_code(version_str TEXT)
+RETURNS INTEGER AS $$
+BEGIN
+    RETURN (SELECT version_code FROM game_versions WHERE version_string = version_str);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Helper function: Validate executable name
+CREATE OR REPLACE FUNCTION is_valid_executable(exe_name TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (SELECT 1 FROM valid_executables WHERE name = exe_name);
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================================
 -- STEP 1: Extend authentic BSim tables with minimal additions
 -- ============================================================================
 
@@ -28,8 +129,17 @@ ALTER TABLE desctable ADD COLUMN IF NOT EXISTS documented_at TIMESTAMP;
 ALTER TABLE desctable ADD COLUMN IF NOT EXISTS enhanced_signature TEXT;
 
 -- Extend exetable (authentic BSim executable table) with version metadata
-ALTER TABLE exetable ADD COLUMN IF NOT EXISTS game_version VARCHAR(16);
+-- game_version is INTEGER version code (e.g., 1093 for 1.09d)
+-- Format: major*1000 + minor*10 + patch_letter_offset
+ALTER TABLE exetable ADD COLUMN IF NOT EXISTS game_version INTEGER;
+ALTER TABLE exetable ADD COLUMN IF NOT EXISTS version_family VARCHAR(16);
+ALTER TABLE exetable ADD COLUMN IF NOT EXISTS sha256 TEXT;
 ALTER TABLE exetable ADD COLUMN IF NOT EXISTS is_reference BOOLEAN DEFAULT FALSE;
+
+-- Create index on game_version for efficient version-based queries
+CREATE INDEX IF NOT EXISTS idx_exetable_game_version ON exetable(game_version);
+CREATE INDEX IF NOT EXISTS idx_exetable_version_family ON exetable(version_family);
+CREATE INDEX IF NOT EXISTS idx_exetable_sha256 ON exetable(sha256);
 
 -- ============================================================================
 -- STEP 2: Create minimal support tables for data that doesn't fit in BSim core
