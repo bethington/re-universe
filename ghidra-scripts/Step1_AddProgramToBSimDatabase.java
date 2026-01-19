@@ -746,7 +746,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             int executableId;
             try {
                 conn.setAutoCommit(false);
-                executableId = getOrCreateExecutableUnified(conn, programName, programPath, versionInfo);
+                executableId = getOrCreateExecutableUnified(conn, program, programName, programPath, versionInfo);
                 // Only commit if we haven't already committed in the fallback path
                 if (!conn.getAutoCommit()) {
                     conn.commit();
@@ -806,7 +806,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
      * Get or create executable record with unified version support
      * Uses plain executable names (no version prefix) with integer version codes
      */
-    private int getOrCreateExecutableUnified(Connection conn, String programName, String programPath, UnifiedVersionInfo versionInfo) throws SQLException {
+    private int getOrCreateExecutableUnified(Connection conn, Program program, String programName, String programPath, UnifiedVersionInfo versionInfo) throws SQLException {
 
         // Extract plain executable name (no version prefix)
         String execName = extractExecutableName(programName);
