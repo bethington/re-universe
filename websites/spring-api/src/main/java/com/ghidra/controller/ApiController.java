@@ -37,10 +37,13 @@ public class ApiController {
     public ResponseEntity<List<BinaryData>> getBinaries(
             @RequestParam String gameType,
             @RequestParam String version) {
+        System.out.println("DEBUG CONTROLLER: getBinaries called with gameType=" + gameType + ", version=" + version);
         try {
             List<BinaryData> binaries = webDataService.getBinariesForVersion(gameType, version);
+            System.out.println("DEBUG CONTROLLER: Service returned " + binaries.size() + " binaries");
             return ResponseEntity.ok(binaries);
         } catch (Exception e) {
+            System.out.println("DEBUG CONTROLLER: Exception occurred: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.internalServerError().build();
         }

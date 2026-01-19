@@ -2841,17 +2841,20 @@
                 if (versionsRes.ok) {
                     const rawVersions = await versionsRes.json();
                     console.log('Raw versions data:', rawVersions.length, 'items');
-                    // Transform camelCase API response to snake_case for compatibility
+                    // Transform game_versions table response for compatibility
                     VERSIONS_DATA = rawVersions.map(v => ({
-                        folder_name: v.folderName,
-                        game_type: v.gameType,
-                        version: v.version,
-                        file_count: v.fileCount,
-                        change_count: v.changeCount,
-                        is_lod: v.isLod,
-                        raw_pe_version: v.rawPeVersion,
-                        total_size_readable: v.totalSizeReadable,
-                        nocd_status: v.nocdStatus
+                        folder_name: `${v.versionFamily}/${v.versionString}`,
+                        game_type: v.versionFamily,
+                        version: v.versionString,
+                        file_count: 0, // Will be populated from binaries API
+                        change_count: 0, // Will be populated from binaries API
+                        is_lod: v.versionFamily === 'LoD',
+                        raw_pe_version: v.versionString,
+                        total_size_readable: 'Unknown',
+                        nocd_status: 'unknown',
+                        description: v.description,
+                        created_at: v.createdAt,
+                        id: v.id
                     }));
                 }
                 if (historyRes.ok) FILE_HISTORY_DATA = await historyRes.json();
@@ -3831,15 +3834,18 @@
                 console.log('Got versions:', rawVersions.length);
 
                 VERSIONS_DATA = rawVersions.map(v => ({
-                    folder_name: v.folderName,
-                    game_type: v.gameType,
-                    version: v.version,
-                    file_count: v.fileCount,
-                    change_count: v.changeCount,
-                    is_lod: v.isLod,
-                    raw_pe_version: v.rawPeVersion,
-                    total_size_readable: v.totalSizeReadable,
-                    nocd_status: v.nocdStatus
+                    folder_name: `${v.versionFamily}/${v.versionString}`,
+                    game_type: v.versionFamily,
+                    version: v.versionString,
+                    file_count: 0, // Will be populated from binaries API
+                    change_count: 0, // Will be populated from binaries API
+                    is_lod: v.versionFamily === 'LoD',
+                    raw_pe_version: v.versionString,
+                    total_size_readable: 'Unknown',
+                    nocd_status: 'unknown',
+                    description: v.description,
+                    created_at: v.createdAt,
+                    id: v.id
                 }));
 
                 console.log('Transformed VERSIONS_DATA:', VERSIONS_DATA.length);
@@ -4008,6 +4014,7 @@
             // Sort by version number
             versions.sort((a, b) => {
                 const parseVer = (v) => {
+                    if (!v || !v.version) return [0, 0, '', 999];
                     const match = v.version.match(/^(\d+)\.(\d+)([a-z])?(?:\s*Beta\s*(\d+))?$/i);
                     if (!match) return [0, 0, '', 999];
                     return [
@@ -4184,8 +4191,8 @@
             const categoryColor = CATEGORIES[file.category]?.color || getCategoryColor(file.category);
             const isSelected = selectedFile === filename;
 
-            // Hash display - last 4 characters with copy button
-            const fullHash = file.md5 || '';
+            // Hash display - last 4 characters with copy button (use SHA256)
+            const fullHash = file.sha256 || '';
             const shortHash = fullHash ? fullHash.slice(-4) : '—';
             const hashCell = fullHash
                 ? `<span class="hash-short" title="${fullHash}">${shortHash}</span><button class="hash-copy-btn" onclick="event.stopPropagation(); copyHash('${fullHash}')" title="Copy full hash">⧉</button>`
@@ -5752,10 +5759,13 @@
                     const binaries = await response.json();
                     console.log(`Got ${binaries.length} binaries for ${folderName}`);
 
-                    // Search through binaries for matching hash
+                    // Search through binaries for matching hash (SHA256 or MD5)
                     for (const binary of binaries) {
-                        if (binary.md5 && binary.md5.toLowerCase().includes(searchHash)) {
-                            console.log(`Found match: ${binary.fileName} with hash ${binary.md5}`);
+                        const sha256Match = binary.sha256 && binary.sha256.toLowerCase().includes(searchHash);
+                        const md5Match = binary.md5 && binary.md5.toLowerCase().includes(searchHash);
+                        if (sha256Match || md5Match) {
+                            const hashUsed = sha256Match ? binary.sha256 : binary.md5;
+                            console.log(`Found match: ${binary.fileName} with hash ${hashUsed}`);
                             // Found it - select the version and file
                             selectVersion(folderName);
                             setTimeout(() => {

@@ -24,58 +24,34 @@ public class WebDataService {
 
     @Cacheable(value = "versions", key = "'all'")
     public List<VersionData> getVersions() {
-        // Use a SQL query that groups executables by parsed version info
+        // Query game_versions table directly - return exactly what's in the table
         String sql = """
             SELECT
-                CASE
-                    WHEN name_exec LIKE 'LoD_%' THEN 'LoD'
-                    WHEN name_exec LIKE 'Classic_%' THEN 'Classic'
-                    WHEN name_exec ~ '^1\\.[0-9]+[a-z]?_' THEN 'Classic'
-                    ELSE 'Unknown'
-                END AS game_type,
-                CASE
-                    WHEN name_exec ~ '^(Classic|LoD)_([0-9]+\\.[0-9]+[a-z]?)_' THEN
-                        substring(name_exec, '_(\\d+\\.\\d+[a-z]?)_')
-                    WHEN name_exec ~ '^(1\\.[0-9]+[a-z]?)_' THEN
-                        substring(name_exec, '^(\\d+\\.\\d+[a-z]?)_')
-                    ELSE 'Unknown'
-                END AS version,
-                COUNT(*) as file_count
-            FROM exetable
-            WHERE name_exec IS NOT NULL
-            GROUP BY game_type, version
-            ORDER BY game_type, version
+                id,
+                version_string,
+                version_family,
+                description,
+                created_at
+            FROM game_versions
+            ORDER BY id
         """;
 
         List<Map<String, Object>> results = jdbcTemplate.queryForList(sql);
         List<VersionData> versions = new ArrayList<>();
 
         for (Map<String, Object> row : results) {
-            String gameType = (String) row.get("game_type");
-            String version = (String) row.get("version");
-            Long fileCountLong = (Long) row.get("file_count");
-            int fileCount = fileCountLong.intValue();
-
-            // Determine if it's LoD
-            boolean isLod = "LoD".equals(gameType) ||
-                           (version != null && version.matches("1\\.(0[7-9]|1[0-9]).*"));
-
-            // Generate raw PE version
-            String rawPeVersion = convertVersionToPeFormat(version);
-
-            // Create folder name
-            String folderName = gameType + "/" + version;
+            Integer id = (Integer) row.get("id");
+            String versionString = (String) row.get("version_string");
+            String versionFamily = (String) row.get("version_family");
+            String description = (String) row.get("description");
+            java.sql.Timestamp createdAt = (java.sql.Timestamp) row.get("created_at");
 
             VersionData versionData = VersionData.builder()
-                .folderName(folderName)
-                .gameType(gameType)
-                .version(version)
-                .fileCount(fileCount)
-                .changeCount(fileCount)
-                .isLod(isLod)
-                .rawPeVersion(rawPeVersion)
-                .totalSizeReadable(null)
-                .nocdStatus(null)
+                .id(id)
+                .versionString(versionString)
+                .versionFamily(versionFamily)
+                .description(description)
+                .createdAt(createdAt != null ? createdAt.toInstant().atZone(java.time.ZoneId.systemDefault()) : null)
                 .build();
 
             versions.add(versionData);
@@ -86,25 +62,38 @@ public class WebDataService {
 
     @Cacheable(value = "binaries", key = "#gameType + '_' + #version")
     public List<BinaryData> getBinariesForVersion(String gameType, String version) {
+        System.out.println("DEBUG: getBinariesForVersion called with gameType=" + gameType + ", version=" + version);
+
         String sql = """
             SELECT
                 name_exec,
                 md5,
+                sha256,
                 architecture,
-                ingest_date
+                ingest_date,
+                game_version,
+                version_string,
+                version_family,
+                version_description
             FROM exetable_denormalized
-            WHERE name_exec LIKE ?
+            WHERE version_family = ? AND version_string = ?
             ORDER BY name_exec
         """;
 
-        // Match actual naming convention: "Classic_1.00_D2Game.dll" or "LoD_1.07_D2Game.dll"
-        String pattern = gameType + "_" + version + "_%";
-        List<Map<String, Object>> results = jdbcTemplate.queryForList(sql, pattern);
+        System.out.println("DEBUG: Executing SQL query with parameters: [" + gameType + ", " + version + "]");
+        List<Map<String, Object>> results = jdbcTemplate.queryForList(sql, gameType, version);
+        System.out.println("DEBUG: Query returned " + results.size() + " rows");
         List<BinaryData> binaries = new ArrayList<>();
 
         for (Map<String, Object> row : results) {
             String nameExec = (String) row.get("name_exec");
             String md5 = (String) row.get("md5");
+            String sha256 = (String) row.get("sha256");
+            Integer gameVersionId = (Integer) row.get("game_version");
+            String versionString = (String) row.get("version_string");
+            String versionFamily = (String) row.get("version_family");
+            String versionDescription = (String) row.get("version_description");
+
             Object archObj = row.get("architecture");
             Integer architecture = null;
             if (archObj instanceof String) {
@@ -137,12 +126,15 @@ public class WebDataService {
                 .fileName(fileName)
                 .fullName(nameExec)
                 .md5(md5)
+                .sha256(sha256)
                 .architecture(architecture)
                 .ingestDate(ingestDate)
-                .gameType(gameType)
-                .version(version)
+                .gameType(versionFamily)    // Use version_family from database
+                .version(versionString)     // Use version_string from database
                 .fileType(fileType)
                 .category(category)
+                .gameVersion(gameVersionId)
+                .versionDescription(versionDescription)
                 .build();
 
             binaries.add(binary);
