@@ -118,15 +118,9 @@ $$ LANGUAGE plpgsql;
 -- STEP 1: Extend authentic BSim tables with minimal additions
 -- ============================================================================
 
--- Extend desctable (authentic BSim function table) with documentation fields
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS return_type TEXT;
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS calling_convention VARCHAR(32);
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS namespace_path TEXT;
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS plate_comment TEXT;
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS doc_source VARCHAR(16) DEFAULT 'manual';
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS completeness_score REAL DEFAULT 0.0;
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS documented_at TIMESTAMP;
-ALTER TABLE desctable ADD COLUMN IF NOT EXISTS enhanced_signature TEXT;
+-- Note: desctable extensions removed per user request
+-- Custom fields for desctable have been removed to maintain pure BSim compatibility
+-- Enhanced functionality moved to separate extension tables (function_signatures, etc.)
 
 -- Extend exetable (authentic BSim executable table) with version metadata
 -- game_version is INTEGER version code (e.g., 1093 for 1.09d)
@@ -496,16 +490,16 @@ CREATE TRIGGER trigger_update_confidence_level
 -- STEP 8: Create compatibility views for script expectations
 -- ============================================================================
 
--- Ensure scripts can find functions with proper joins
+-- Ensure scripts can find functions with proper joins (desctable kept pure BSim)
 CREATE OR REPLACE VIEW v_enhanced_functions AS
 SELECT
     d.id as function_id,
     d.name_func,
     d.addr,
     d.flags,
-    d.return_type,
-    d.calling_convention,
-    d.plate_comment,
+    d.val,
+    fs.return_type,
+    fs.calling_convention,
     e.id as executable_id,
     e.name_exec,
     e.md5,
@@ -516,7 +510,8 @@ SELECT
     ed.path
 FROM desctable d
 JOIN exetable e ON d.id_exe = e.id
-LEFT JOIN exetable_denormalized ed ON e.id = ed.id;
+LEFT JOIN exetable_denormalized ed ON e.id = ed.id
+LEFT JOIN function_signatures fs ON d.id = fs.function_id;
 
 COMMENT ON VIEW v_enhanced_functions IS 'Complete function view combining authentic BSim with extensions';
 
@@ -581,9 +576,7 @@ SELECT 'Schema Extension Complete' as status,
      )) as required_tables_created;
 
 SELECT 'Extension Columns Added' as status,
-    (SELECT COUNT(*) FROM information_schema.columns
-     WHERE table_name = 'desctable'
-     AND column_name IN ('return_type', 'calling_convention', 'plate_comment', 'enhanced_signature')) as desc_extensions,
+    (SELECT 0) as desc_extensions_removed_per_request,
     (SELECT COUNT(*) FROM information_schema.columns
      WHERE table_name = 'exetable'
      AND column_name IN ('game_version', 'is_reference')) as exe_extensions;

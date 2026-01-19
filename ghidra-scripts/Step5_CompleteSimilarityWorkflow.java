@@ -309,12 +309,13 @@ public class Step5_CompleteSimilarityWorkflow extends GhidraScript {
 
         String insertSql = """
             INSERT INTO enhanced_signatures
-            (function_id, signature_vector, feature_count, signature_quality, instruction_count,
-             parameter_count, branch_count, call_count, mnemonic_pattern, control_flow_pattern)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (function_id, executable_id, signature_data, signature_hash, lsh_vector, confidence_score)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT (function_id) DO UPDATE SET
-                signature_vector = EXCLUDED.signature_vector,
-                signature_quality = EXCLUDED.signature_quality,
+                signature_data = EXCLUDED.signature_data,
+                signature_hash = EXCLUDED.signature_hash,
+                lsh_vector = EXCLUDED.lsh_vector,
+                confidence_score = EXCLUDED.confidence_score,
                 created_at = NOW()
             """;
 
@@ -350,16 +351,21 @@ public class Step5_CompleteSimilarityWorkflow extends GhidraScript {
                     // Generate signature
                     FunctionSignature signature = createEnhancedSignature(function);
                     if (signature != null) {
+                        // Build JSON signature data
+                        String signatureData = String.format("""
+                            {"instructionCount":%d,"parameterCount":%d,"branchCount":%d,"callCount":%d,
+                             "mnemonicPattern":"%s","controlFlowPattern":"%s","featureCount":%d}
+                            """,
+                            signature.instructionCount, signature.parameterCount, signature.branchCount,
+                            signature.callCount, signature.mnemonicPattern.replace("\"", "\\\""),
+                            signature.controlFlowPattern.replace("\"", "\\\""), signature.featureCount);
+
                         insertStmt.setLong(1, functionId);
-                        insertStmt.setBytes(2, signature.vectorData);
-                        insertStmt.setInt(3, signature.featureCount);
-                        insertStmt.setDouble(4, signature.quality);
-                        insertStmt.setInt(5, signature.instructionCount);
-                        insertStmt.setInt(6, signature.parameterCount);
-                        insertStmt.setInt(7, signature.branchCount);
-                        insertStmt.setInt(8, signature.callCount);
-                        insertStmt.setString(9, signature.mnemonicPattern);
-                        insertStmt.setString(10, signature.controlFlowPattern);
+                        insertStmt.setInt(2, executableId);
+                        insertStmt.setString(3, signatureData);
+                        insertStmt.setString(4, signature.mnemonicPattern); // Use as hash
+                        insertStmt.setBytes(5, signature.vectorData);
+                        insertStmt.setDouble(6, signature.quality);
 
                         insertStmt.executeUpdate();
                         signatureCount++;
@@ -542,10 +548,10 @@ public class Step5_CompleteSimilarityWorkflow extends GhidraScript {
                 d1.id as source_id, d1.name_func as source_name,
                 d2.id as target_id, d2.name_func as target_name,
                 e2.name_exec as target_exe,
-                es1.signature_vector as source_vector,
-                es2.signature_vector as target_vector,
-                es1.instruction_count as source_instr,
-                es2.instruction_count as target_instr
+                es1.lsh_vector as source_vector,
+                es2.lsh_vector as target_vector,
+                es1.signature_data as source_data,
+                es2.signature_data as target_data
             FROM enhanced_signatures es1
             JOIN desctable d1 ON es1.function_id = d1.id
             JOIN enhanced_signatures es2 ON es2.function_id != es1.function_id
@@ -553,8 +559,8 @@ public class Step5_CompleteSimilarityWorkflow extends GhidraScript {
             JOIN exetable e2 ON d2.id_exe = e2.id
             WHERE d1.id_exe = ?
             AND d2.id_exe != ?
-            AND es1.signature_quality > 0.5
-            AND es2.signature_quality > 0.5
+            AND es1.confidence_score > 0.5
+            AND es2.confidence_score > 0.5
             LIMIT ?
             """;
 
@@ -765,31 +771,8 @@ public class Step5_CompleteSimilarityWorkflow extends GhidraScript {
             stmt.execute(createTableSql);
         }
 
-        // Add signature_vector column if it doesn't exist (for tables that had lsh_vector)
-        String addColumnSql = """
-            ALTER TABLE enhanced_signatures 
-            ADD COLUMN IF NOT EXISTS signature_vector BYTEA
-            """;
-        try (Statement stmt = conn.createStatement()) {
-            stmt.execute(addColumnSql);
-        } catch (SQLException e) {
-            // Column may already exist, ignore
-        }
-
-        // Drop the old lsh_vector column constraint and column if it exists
-        // First make it nullable (in case it has NOT NULL constraint)
-        try (Statement stmt = conn.createStatement()) {
-            stmt.execute("ALTER TABLE enhanced_signatures ALTER COLUMN lsh_vector DROP NOT NULL");
-        } catch (SQLException e) {
-            // Column may not exist or constraint already dropped, ignore
-        }
-
-        // Drop the old lsh_vector column entirely since we use signature_vector now
-        try (Statement stmt = conn.createStatement()) {
-            stmt.execute("ALTER TABLE enhanced_signatures DROP COLUMN IF EXISTS lsh_vector");
-        } catch (SQLException e) {
-            // Column may not exist, ignore
-        }
+        // Schema uses lsh_vector - no changes needed
+        println("Using existing enhanced_signatures table with lsh_vector column");
     }
 
     // Helper class for function signatures

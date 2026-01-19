@@ -1180,8 +1180,8 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                         // Store function parameters (individual param metadata)
                         storeFunctionParametersWithId(conn, function, functionId);
 
-                        // Store function call relationships
-                        storeFunctionCallsWithId(conn, function, functionId, executableId, program);
+                        // Note: Function calls require second pass after all functions are loaded
+                        // storeFunctionCallsWithId(conn, function, functionId, executableId, program);
 
                         // Store data references (global data access patterns)
                         storeDataReferencesWithId(conn, function, functionId, program);
@@ -2318,18 +2318,17 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
             String insertSql = """
                 INSERT INTO function_signatures
-                (function_id, executable_id, parameter_types, return_type, parameter_count, calling_convention)
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT (function_id, executable_id) DO NOTHING
+                (function_id, signature_text, parameter_count, return_type, calling_convention)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT (function_id) DO NOTHING
                 """;
 
             try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
                 stmt.setInt(1, functionId);
-                stmt.setInt(2, executableId);
-                stmt.setString(3, parameterTypes);
+                stmt.setString(2, returnType + " " + function.getName() + "(" + parameterTypes + ")");
+                stmt.setInt(3, parameterCount);
                 stmt.setString(4, returnType);
-                stmt.setInt(5, parameterCount);
-                stmt.setString(6, function.getCallingConventionName());
+                stmt.setString(5, function.getCallingConventionName());
                 stmt.executeUpdate();
             }
 
@@ -2350,22 +2349,11 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
             if (calledFunctions.isEmpty()) return;
 
-            String insertSql = """
-                INSERT INTO function_calls (caller_function_id, caller_executable_id, callee_name, call_type, call_count)
-                VALUES (?, ?, ?, 'direct', 1)
-                ON CONFLICT (caller_function_id, caller_executable_id, callee_name)
-                DO UPDATE SET call_count = function_calls.call_count + 1
-                """;
-
-            try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
-                for (Function calledFunc : calledFunctions) {
-                    stmt.setInt(1, functionId);
-                    stmt.setInt(2, executableId);
-                    stmt.setString(3, calledFunc.getName());
-                    stmt.addBatch();
-                }
-                stmt.executeBatch();
-            }
+            // Function calls enhancement disabled - schema mismatch
+            // Script expects: (caller_function_id, caller_executable_id, callee_name)
+            // Deployed schema has: (caller_function_id, callee_function_id, call_type)
+            // Would require function ID lookup for callee functions
+            println("Skipping function calls enhancement - schema mismatch");
 
         } catch (SQLException e) {
             println("Note: Could not store calls for " + function.getName() + ": " + e.getMessage());

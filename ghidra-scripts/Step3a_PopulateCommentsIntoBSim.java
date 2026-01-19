@@ -494,15 +494,16 @@ public class Step3a_PopulateCommentsIntoBSim extends GhidraScript {
             AddressSetView functionBody = function.getBody();
 
             String stringInsertSql = """
-                INSERT INTO string_references (function_id, executable_id, string_value, string_length, address, reference_type)
-                VALUES (?, ?, ?, ?, ?, 'data_reference')
-                ON CONFLICT (function_id, executable_id, address) DO NOTHING
+                INSERT INTO string_references (executable_id, string_address, string_content, string_length, encoding_type)
+                VALUES (?, ?, ?, ?, 'UTF-8')
+                ON CONFLICT (executable_id, string_address) DO NOTHING
+                RETURNING id
                 """;
 
             String funcStringInsertSql = """
-                INSERT INTO function_string_refs (function_id, executable_id, string_id, usage_context, reference_count)
-                VALUES (?, ?, ?, 'direct_reference', 1)
-                ON CONFLICT (function_id, executable_id, string_id)
+                INSERT INTO function_string_refs (function_id, string_ref_id, usage_type, reference_count)
+                VALUES (?, ?, 'direct_reference', 1)
+                ON CONFLICT (function_id, string_ref_id)
                 DO UPDATE SET reference_count = function_string_refs.reference_count + 1
                 """;
 
@@ -523,19 +524,22 @@ public class Step3a_PopulateCommentsIntoBSim extends GhidraScript {
                                         // Clean the string value
                                         stringValue = stringValue.substring(1, stringValue.length() - 1); // Remove quotes
 
-                                        // Insert string reference
-                                        stringStmt.setLong(1, functionId);
-                                        stringStmt.setInt(2, executableId);
+                                        // Insert string reference and get ID
+                                        stringStmt.setInt(1, executableId);
+                                        stringStmt.setLong(2, ref.getToAddress().getOffset());
                                         stringStmt.setString(3, stringValue);
                                         stringStmt.setInt(4, stringValue.length());
-                                        stringStmt.setLong(5, ref.getToAddress().getOffset());
-                                        stringStmt.executeUpdate();
 
-                                        // Link function to string
-                                        funcStringStmt.setLong(1, functionId);
-                                        funcStringStmt.setInt(2, executableId);
-                                        funcStringStmt.setLong(3, ref.getToAddress().getOffset()); // Use address as string_id
-                                        funcStringStmt.executeUpdate();
+                                        try (ResultSet rs = stringStmt.executeQuery()) {
+                                            if (rs.next()) {
+                                                int stringRefId = rs.getInt("id");
+
+                                                // Link function to string
+                                                funcStringStmt.setLong(1, functionId);
+                                                funcStringStmt.setInt(2, stringRefId);
+                                                funcStringStmt.executeUpdate();
+                                            }
+                                        }
                                     }
                                 }
                             }

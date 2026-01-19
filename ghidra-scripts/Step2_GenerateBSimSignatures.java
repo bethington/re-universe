@@ -542,14 +542,12 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
         String insertSql;
         if (hasEnhancedTable) {
             insertSql = "INSERT INTO enhanced_signatures (function_id, executable_id, signature_hash, " +
-                "instruction_count, basic_block_count, call_count, signature_quality, feature_vector) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (function_id) DO UPDATE SET " +
+                "signature_data, lsh_vector, confidence_score) " +
+                "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (function_id) DO UPDATE SET " +
                 "signature_hash = EXCLUDED.signature_hash, " +
-                "instruction_count = EXCLUDED.instruction_count, " +
-                "basic_block_count = EXCLUDED.basic_block_count, " +
-                "call_count = EXCLUDED.call_count, " +
-                "signature_quality = EXCLUDED.signature_quality, " +
-                "feature_vector = EXCLUDED.feature_vector";
+                "signature_data = EXCLUDED.signature_data, " +
+                "lsh_vector = EXCLUDED.lsh_vector, " +
+                "confidence_score = EXCLUDED.confidence_score";
         } else {
             println("Enhanced signatures table not available - using basic signature storage");
             return;
@@ -575,14 +573,18 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
                     // Generate enhanced signature
                     FunctionSignature signature = generateFunctionSignature(function);
 
+                    // Create JSON signature data
+                    String signatureData = String.format(
+                        "{\"instructionCount\":%d,\"basicBlockCount\":%d,\"callCount\":%d,\"quality\":%.2f,\"featureVector\":\"%s\"}",
+                        signature.instructionCount, signature.basicBlockCount, signature.callCount,
+                        signature.quality, signature.featureVector);
+
                     stmt.setInt(1, functionId);
                     stmt.setInt(2, executableId);
                     stmt.setString(3, signature.hash);
-                    stmt.setInt(4, signature.instructionCount);
-                    stmt.setInt(5, signature.basicBlockCount);
-                    stmt.setInt(6, signature.callCount);
-                    stmt.setDouble(7, signature.quality);
-                    stmt.setString(8, signature.featureVector);
+                    stmt.setString(4, signatureData);
+                    stmt.setString(5, signature.featureVector);  // Use as LSH vector
+                    stmt.setDouble(6, signature.quality);
 
                     stmt.addBatch();
                     signatureCount++;
