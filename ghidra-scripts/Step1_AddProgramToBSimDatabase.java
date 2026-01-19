@@ -1457,7 +1457,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 ON CONFLICT (function_id, executable_id) DO UPDATE SET
                 instruction_count = EXCLUDED.instruction_count,
                 cyclomatic_complexity = EXCLUDED.cyclomatic_complexity,
-                analysis_timestamp = CURRENT_TIMESTAMP
+                analyzed_at = CURRENT_TIMESTAMP
             """;
 
             try (PreparedStatement stmt = conn.prepareStatement(insertAnalysisSql)) {
@@ -1572,7 +1572,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 ON CONFLICT (function_id, executable_id) DO UPDATE SET
                 instruction_count = EXCLUDED.instruction_count,
                 cyclomatic_complexity = EXCLUDED.cyclomatic_complexity,
-                analysis_timestamp = CURRENT_TIMESTAMP
+                analyzed_at = CURRENT_TIMESTAMP
             """;
 
             try (PreparedStatement stmt = conn.prepareStatement(insertAnalysisSql)) {
