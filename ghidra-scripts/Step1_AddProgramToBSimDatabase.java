@@ -1079,15 +1079,16 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         int skippedCount = 0;
 
         // Use INSERT ... ON CONFLICT for idempotent operations
+        // Store plate comment in the 'val' field (standard BSim metadata field)
         // Note: Requires unique constraint on (id_exe, addr) - if not present, falls back to check-then-insert
-        String upsertSql = "INSERT INTO desctable (name_func, id_exe, id_signature, flags, addr) " +
-            "VALUES (?, ?, ?, ?, ?) " +
-            "ON CONFLICT (id_exe, addr) DO UPDATE SET name_func = EXCLUDED.name_func, id_signature = EXCLUDED.id_signature " +
+        String upsertSql = "INSERT INTO desctable (name_func, id_exe, id_signature, flags, addr, val) " +
+            "VALUES (?, ?, ?, ?, ?, ?) " +
+            "ON CONFLICT (id_exe, addr) DO UPDATE SET name_func = EXCLUDED.name_func, id_signature = EXCLUDED.id_signature, val = EXCLUDED.val " +
             "RETURNING id";
         
         // Fallback for databases without the unique constraint
         String checkSql = "SELECT id FROM desctable WHERE id_exe = ? AND addr = ?";
-        String insertSql = "INSERT INTO desctable (name_func, id_exe, id_signature, flags, addr) VALUES (?, ?, ?, ?, ?) RETURNING id";
+        String insertSql = "INSERT INTO desctable (name_func, id_exe, id_signature, flags, addr, val) VALUES (?, ?, ?, ?, ?, ?) RETURNING id";
         
         boolean useUpsert = true;  // Try upsert first
         PreparedStatement workingStmt = null;
@@ -1116,6 +1117,9 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                     int functionId = -1;
                     boolean isNew = false;
                     
+                    // Get plate comment for the val field
+                    String plateComment = getPlateComment(program, function);
+                    
                     if (useUpsert) {
                         // Use upsert - always insert/update in one atomic operation
                         insertStmt.setString(1, function.getName());
@@ -1123,6 +1127,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                         insertStmt.setLong(3, generateSignatureId(function));
                         insertStmt.setInt(4, 0);
                         insertStmt.setLong(5, function.getEntryPoint().getOffset());
+                        insertStmt.setString(6, plateComment);  // Store plate comment in val field
 
                         ResultSet insertRs = insertStmt.executeQuery();
                         if (insertRs.next()) {
@@ -1150,6 +1155,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                         insertStmt.setLong(3, generateSignatureId(function));
                         insertStmt.setInt(4, 0);
                         insertStmt.setLong(5, function.getEntryPoint().getOffset());
+                        insertStmt.setString(6, plateComment);  // Store plate comment in val field
 
                         ResultSet insertRs = insertStmt.executeQuery();
                         if (insertRs.next()) {
@@ -1391,6 +1397,24 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         }
         
         return "/" + family + "/" + version;
+    }
+
+    /**
+     * Get plate comment for a function (used for desctable.val field)
+     */
+    private String getPlateComment(Program program, Function function) {
+        try {
+            CodeUnit cu = program.getListing().getCodeUnitAt(function.getEntryPoint());
+            if (cu != null) {
+                String comment = cu.getComment(ghidra.program.model.listing.CommentType.PLATE);
+                if (comment != null && !comment.trim().isEmpty()) {
+                    return comment.trim();
+                }
+            }
+        } catch (Exception e) {
+            // Ignore - plate comment is optional
+        }
+        return null;  // NULL in database if no plate comment
     }
 
     /**
