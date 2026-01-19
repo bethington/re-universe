@@ -2671,10 +2671,11 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             // Get calling functions (who calls this function)
             java.util.Set<ghidra.program.model.address.Address> callers = 
                 new java.util.HashSet<>();
-            ghidra.program.model.symbol.Reference[] incomingRefs = 
+            ghidra.program.model.symbol.ReferenceIterator incomingRefs = 
                 program.getReferenceManager().getReferencesTo(function.getEntryPoint());
             int incomingCount = 0;
-            for (ghidra.program.model.symbol.Reference ref : incomingRefs) {
+            while (incomingRefs.hasNext()) {
+                ghidra.program.model.symbol.Reference ref = incomingRefs.next();
                 if (ref.getReferenceType().isCall()) {
                     incomingCount++;
                     callers.add(ref.getFromAddress());
