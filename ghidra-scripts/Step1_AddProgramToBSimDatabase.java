@@ -2343,21 +2343,16 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
      */
     private void storeFunctionCallsWithId(Connection conn, Function function, int functionId,
                                         int executableId, Program program) {
-        try {
-            // Get functions called by this function
-            Set<Function> calledFunctions = function.getCalledFunctions(null);
+        // Get functions called by this function
+        Set<Function> calledFunctions = function.getCalledFunctions(null);
 
-            if (calledFunctions.isEmpty()) return;
+        if (calledFunctions.isEmpty()) return;
 
-            // Function calls enhancement disabled - schema mismatch
-            // Script expects: (caller_function_id, caller_executable_id, callee_name)
-            // Deployed schema has: (caller_function_id, callee_function_id, call_type)
-            // Would require function ID lookup for callee functions
-            println("Skipping function calls enhancement - schema mismatch");
-
-        } catch (SQLException e) {
-            println("Note: Could not store calls for " + function.getName() + ": " + e.getMessage());
-        }
+        // Function calls enhancement disabled - schema mismatch
+        // Script expects: (caller_function_id, caller_executable_id, callee_name)
+        // Deployed schema has: (caller_function_id, callee_function_id, call_type)
+        // Would require function ID lookup for callee functions
+        // println("Skipping function calls enhancement - schema mismatch");
     }
 
     /**
@@ -2671,11 +2666,10 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             // Get calling functions (who calls this function)
             java.util.Set<ghidra.program.model.address.Address> callers = 
                 new java.util.HashSet<>();
-            ghidra.program.model.symbol.ReferenceIterator incomingRefs = 
+            ghidra.program.model.symbol.Reference[] incomingRefs = 
                 program.getReferenceManager().getReferencesTo(function.getEntryPoint());
             int incomingCount = 0;
-            while (incomingRefs.hasNext()) {
-                ghidra.program.model.symbol.Reference ref = incomingRefs.next();
+            for (ghidra.program.model.symbol.Reference ref : incomingRefs) {
                 if (ref.getReferenceType().isCall()) {
                     incomingCount++;
                     callers.add(ref.getFromAddress());
