@@ -92,32 +92,49 @@ CREATE TABLE IF NOT EXISTS valid_executables (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Insert known Diablo 2 executables and DLLs
+-- Insert known Diablo 2 files (executables, DLLs, MPQs, and data files)
 INSERT INTO valid_executables (name, exe_type, description, is_core) VALUES
     -- Core executables
-    ('Game.exe',       'exe', 'Main game executable', TRUE),
-    ('Diablo II.exe',  'exe', 'Alternative main executable', TRUE),
+    ('Game.exe',        'exe', 'Main game executable', TRUE),
+    ('Diablo II.exe',   'exe', 'Alternative main executable', TRUE),
+    ('D2VidTst.exe',    'exe', 'Video test utility', FALSE),
     -- Core DLLs
-    ('D2Client.dll',   'dll', 'Client-side game logic', TRUE),
-    ('D2Common.dll',   'dll', 'Common game utilities', TRUE),
-    ('D2Game.dll',     'dll', 'Game server logic', TRUE),
-    ('D2Lang.dll',     'dll', 'Language/localization', TRUE),
-    ('D2Launch.dll',   'dll', 'Launcher functionality', TRUE),
-    ('D2MCPClient.dll','dll', 'Battle.net MCP client', TRUE),
-    ('D2Net.dll',      'dll', 'Network functionality', TRUE),
-    ('D2Sound.dll',    'dll', 'Sound/audio system', TRUE),
-    ('D2Win.dll',      'dll', 'Windows integration', TRUE),
-    ('D2CMP.dll',      'dll', 'Compression utilities', TRUE),
-    ('D2Multi.dll',    'dll', 'Multiplayer functionality', TRUE),
-    ('D2DDraw.dll',    'dll', 'DirectDraw renderer', TRUE),
-    ('D2Direct3D.dll', 'dll', 'Direct3D renderer', TRUE),
-    ('D2Glide.dll',    'dll', 'Glide renderer', TRUE),
-    ('D2gfx.dll',      'dll', 'Graphics utilities', TRUE),
-    ('Fog.dll',        'dll', 'Memory/utility library', TRUE),
-    ('Storm.dll',      'dll', 'MPQ archive handling', TRUE),
-    ('Bnclient.dll',   'dll', 'Battle.net client', TRUE),
-    ('ijl11.dll',      'dll', 'Intel JPEG library', FALSE),
-    ('SmackW32.dll',   'dll', 'Smacker video playback', FALSE)
+    ('D2Client.dll',    'dll', 'Client-side game logic', TRUE),
+    ('D2Common.dll',    'dll', 'Common game utilities', TRUE),
+    ('D2Game.dll',      'dll', 'Game server logic', TRUE),
+    ('D2Lang.dll',      'dll', 'Language/localization', TRUE),
+    ('D2Launch.dll',    'dll', 'Launcher functionality', TRUE),
+    ('D2MCPClient.dll', 'dll', 'Battle.net MCP client', TRUE),
+    ('D2Net.dll',       'dll', 'Network functionality', TRUE),
+    ('D2Sound.dll',     'dll', 'Sound/audio system', TRUE),
+    ('D2Win.dll',       'dll', 'Windows integration', TRUE),
+    ('D2CMP.dll',       'dll', 'Compression utilities', TRUE),
+    ('D2Multi.dll',     'dll', 'Multiplayer functionality', TRUE),
+    ('D2DDraw.dll',     'dll', 'DirectDraw renderer', TRUE),
+    ('D2Direct3D.dll',  'dll', 'Direct3D renderer', TRUE),
+    ('D2Glide.dll',     'dll', 'Glide renderer', TRUE),
+    ('D2Gfx.dll',       'dll', 'Graphics utilities', TRUE),
+    ('D2Gdi.dll',       'dll', 'GDI renderer', TRUE),
+    ('Fog.dll',         'dll', 'Memory/utility library', TRUE),
+    ('Storm.dll',       'dll', 'MPQ archive handling', TRUE),
+    ('Bnclient.dll',    'dll', 'Battle.net client', TRUE),
+    ('Binkw32.dll',     'dll', 'Bink video playback', FALSE),
+    ('Ijl11.dll',       'dll', 'Intel JPEG library', FALSE),
+    ('SmackW32.dll',    'dll', 'Smacker video playback', FALSE),
+    -- MPQ archives
+    ('D2Char.mpq',      'mpq', 'Character data archive', TRUE),
+    ('D2Data.mpq',      'mpq', 'Game data archive', TRUE),
+    ('D2Exp.mpq',       'mpq', 'Expansion data archive', TRUE),
+    ('D2Music.mpq',     'mpq', 'Music archive', TRUE),
+    ('D2Sfx.mpq',       'mpq', 'Sound effects archive', TRUE),
+    ('D2Speech.mpq',    'mpq', 'Speech/voice archive', TRUE),
+    ('D2Video.mpq',     'mpq', 'Video archive', TRUE),
+    ('D2Xtalk.mpq',     'mpq', 'Expansion speech archive', TRUE),
+    ('D2Xvideo.mpq',    'mpq', 'Expansion video archive', TRUE),
+    ('Patch_D2.mpq',    'mpq', 'Patch data archive', TRUE),
+    -- Data files
+    ('D2.LNG',          'data', 'Language configuration', TRUE),
+    ('Patch.txt',       'data', 'Patch notes/info', FALSE)
 ON CONFLICT (name) DO NOTHING;
 
 -- Add FK constraint from exetable.game_version to game_versions.id
