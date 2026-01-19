@@ -266,7 +266,6 @@ CREATE TABLE IF NOT EXISTS function_analysis (
     is_thunk BOOLEAN DEFAULT FALSE,
     confidence_score REAL DEFAULT 1.0,
     complexity_score INTEGER,
-    analysis_timestamp TIMESTAMP DEFAULT NOW(),
     analyzed_at TIMESTAMP DEFAULT NOW(),
     UNIQUE(function_id, executable_id)
 );
