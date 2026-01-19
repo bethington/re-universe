@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS valid_executables (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Insert known Diablo 2 files (executables, DLLs, MPQs, and data files)
+-- Insert complete Diablo 2 file list (executables, DLLs, MPQs, and data files)
 INSERT INTO valid_executables (name, exe_type, description, is_core) VALUES
     -- Core executables
     ('Game.exe',        'exe', 'Main game executable', TRUE),
@@ -122,19 +122,19 @@ INSERT INTO valid_executables (name, exe_type, description, is_core) VALUES
     ('Ijl11.dll',       'dll', 'Intel JPEG library', FALSE),
     ('SmackW32.dll',    'dll', 'Smacker video playback', FALSE),
     -- MPQ archives
+    ('D2Data.mpq',      'mpq', 'Core game data archive', TRUE),
     ('D2Char.mpq',      'mpq', 'Character data archive', TRUE),
-    ('D2Data.mpq',      'mpq', 'Game data archive', TRUE),
-    ('D2Exp.mpq',       'mpq', 'Expansion data archive', TRUE),
-    ('D2Music.mpq',     'mpq', 'Music archive', TRUE),
     ('D2Sfx.mpq',       'mpq', 'Sound effects archive', TRUE),
-    ('D2Speech.mpq',    'mpq', 'Speech/voice archive', TRUE),
-    ('D2Video.mpq',     'mpq', 'Video archive', TRUE),
-    ('D2Xtalk.mpq',     'mpq', 'Expansion speech archive', TRUE),
-    ('D2Xvideo.mpq',    'mpq', 'Expansion video archive', TRUE),
-    ('Patch_D2.mpq',    'mpq', 'Patch data archive', TRUE),
-    -- Data files
-    ('D2.LNG',          'data', 'Language configuration', TRUE),
-    ('Patch.txt',       'data', 'Patch notes/info', FALSE)
+    ('D2Music.mpq',     'mpq', 'Music archive', TRUE),
+    ('D2Speech.mpq',    'mpq', 'Speech audio archive', TRUE),
+    ('D2Video.mpq',     'mpq', 'Video cutscenes archive', TRUE),
+    ('D2Exp.mpq',       'mpq', 'Expansion data archive', FALSE),
+    ('D2Xtalk.mpq',     'mpq', 'Expansion speech archive', FALSE),
+    ('D2Xvideo.mpq',    'mpq', 'Expansion video archive', FALSE),
+    ('Patch_D2.mpq',    'mpq', 'Patch data archive', FALSE),
+    -- Language and configuration files
+    ('D2.LNG',          'lng', 'Language configuration', TRUE),
+    ('Patch.txt',       'txt', 'Patch notes', FALSE)
 ON CONFLICT (name) DO NOTHING;
 
 -- Add FK constraint from exetable.game_version to game_versions.id
