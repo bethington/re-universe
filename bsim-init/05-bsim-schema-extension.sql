@@ -104,6 +104,7 @@ INSERT INTO valid_executables (name, exe_type, description, is_core) VALUES
     ('D2Client.dll',    'dll', 'Client-side game logic', TRUE),
     ('D2Common.dll',    'dll', 'Common game utilities', TRUE),
     ('D2Game.dll',      'dll', 'Game server logic', TRUE),
+    ('D2Server.dll',    'dll', 'Dedicated server logic', TRUE),
     ('D2Lang.dll',      'dll', 'Language/localization', TRUE),
     ('D2Launch.dll',    'dll', 'Launcher functionality', TRUE),
     ('D2MCPClient.dll', 'dll', 'Battle.net MCP client', TRUE),
