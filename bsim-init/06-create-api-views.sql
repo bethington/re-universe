@@ -20,8 +20,14 @@ SELECT
     d.name_func,
     d.addr,
     e.name_exec,
-    COALESCE(e.version_family, 'Unified') as family_type,
-    COALESCE(e.game_version::text, '0') as version,
+    CASE
+        WHEN gv.version_family IS NOT NULL THEN gv.version_family
+        WHEN e.name_exec ~ '^Classic_.*\.(exe|dll)$' THEN 'Classic'
+        WHEN e.name_exec ~ '^LoD_.*\.(exe|dll)$' THEN 'LoD'
+        WHEN e.name_exec IN ('Game.exe', 'Diablo_II.exe') THEN 'Classic'
+        ELSE 'Unified'
+    END as family_type,
+    COALESCE(gv.version_string, '0') as version,
     e.md5,
     d.id_signature,
     0 as cross_version_matches,  -- Default values for now
@@ -35,6 +41,7 @@ SELECT
     1 as feature_count
 FROM desctable d
 JOIN exetable e ON d.id_exe = e.id
+LEFT JOIN game_versions gv ON e.game_version = gv.id
 LEFT JOIN enhanced_signatures es ON d.id = es.function_id;
 
 -- =========================================================================
@@ -106,14 +113,21 @@ ORDER BY folder_name;
 CREATE OR REPLACE VIEW api_binaries AS
 SELECT
     e.name_exec as filename,
-    COALESCE(e.version_family, 'Unified') as game_type,
-    COALESCE(e.game_version::text, '0') as version,
+    CASE
+        WHEN gv.version_family IS NOT NULL THEN gv.version_family
+        WHEN e.name_exec ~ '^Classic_.*\.(exe|dll)$' THEN 'Classic'
+        WHEN e.name_exec ~ '^LoD_.*\.(exe|dll)$' THEN 'LoD'
+        WHEN e.name_exec IN ('Game.exe', 'Diablo_II.exe') THEN 'Classic'
+        ELSE 'Unified'
+    END as game_type,
+    COALESCE(gv.version_string, '0') as version,
     e.md5,
     a.val as architecture,
     CAST(EXTRACT(EPOCH FROM e.ingest_date) AS INTEGER) as timestamp,
     'binary' as type
 FROM exetable e
 LEFT JOIN archtable a ON e.architecture = a.id
+LEFT JOIN game_versions gv ON e.game_version = gv.id
 ORDER BY game_type, version, filename;
 
 -- API functions index view
