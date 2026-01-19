@@ -53,6 +53,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
     // Version code mapping: version string -> numeric code
     // Format: major*1000 + minor*10 + patch_letter_offset
+    // These values match game_versions.id in the database (FK: exetable.game_version -> game_versions.id)
     private static final java.util.Map<String, Integer> VERSION_CODES = new java.util.HashMap<String, Integer>() {{
         put("1.00",  1000); put("1.01",  1010); put("1.02",  1020); put("1.03",  1030);
         put("1.04",  1040); put("1.04b", 1041); put("1.04c", 1042);
