@@ -266,10 +266,11 @@ public class Step3a_PopulateCommentsIntoBSim extends GhidraScript {
         CodeUnit cu = program.getListing().getCodeUnitAt(func.getEntryPoint());
         if (cu == null) return false;
 
-        String plateComment = cu.getComment(CodeUnit.PLATE_COMMENT);
-        String preComment = cu.getComment(CodeUnit.PRE_COMMENT);
-        String postComment = cu.getComment(CodeUnit.POST_COMMENT);
-        String eolComment = cu.getComment(CodeUnit.EOL_COMMENT);
+        // Use new Ghidra 11.4+ CommentType API
+        String plateComment = cu.getComment(ghidra.program.model.listing.CommentType.PLATE);
+        String preComment = cu.getComment(ghidra.program.model.listing.CommentType.PRE);
+        String postComment = cu.getComment(ghidra.program.model.listing.CommentType.POST);
+        String eolComment = cu.getComment(ghidra.program.model.listing.CommentType.EOL);
 
         return (plateComment != null && !plateComment.trim().isEmpty()) ||
                (preComment != null && !preComment.trim().isEmpty()) ||
@@ -408,13 +409,17 @@ public class Step3a_PopulateCommentsIntoBSim extends GhidraScript {
 
         int insertedCount = 0;
 
-        // Insert different comment types
+        // Insert different comment types using Ghidra 11.4+ CommentType API
         String[] commentTypes = {"PLATE", "PRE", "POST", "EOL"};
-        int[] commentCodes = {CodeUnit.PLATE_COMMENT, CodeUnit.PRE_COMMENT,
-                              CodeUnit.POST_COMMENT, CodeUnit.EOL_COMMENT};
+        ghidra.program.model.listing.CommentType[] commentEnums = {
+            ghidra.program.model.listing.CommentType.PLATE,
+            ghidra.program.model.listing.CommentType.PRE,
+            ghidra.program.model.listing.CommentType.POST,
+            ghidra.program.model.listing.CommentType.EOL
+        };
 
         for (int i = 0; i < commentTypes.length; i++) {
-            String comment = cu.getComment(commentCodes[i]);
+            String comment = cu.getComment(commentEnums[i]);
             if (comment != null && !comment.trim().isEmpty()) {
 
                 // Clean and format comment
