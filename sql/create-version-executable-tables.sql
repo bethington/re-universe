@@ -12,50 +12,48 @@
 -- Example: 1.04b = 1000 + 40 + 1 = 1041
 
 CREATE TABLE IF NOT EXISTS game_versions (
-    id SERIAL PRIMARY KEY,
+    id INTEGER PRIMARY KEY,                       -- Version code: 1093 = 1.09d
     version_string VARCHAR(10) NOT NULL UNIQUE,  -- e.g., "1.09d"
-    version_code INTEGER NOT NULL UNIQUE,         -- e.g., 1093
     version_family VARCHAR(10) NOT NULL,          -- "Classic" or "LoD"
-    release_order INTEGER NOT NULL,               -- Order of release (for sorting)
     description TEXT,                             -- Optional description
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Insert all known Diablo 2 versions
-INSERT INTO game_versions (version_string, version_code, version_family, release_order, description) VALUES
+-- Insert all known Diablo 2 versions (id = version code for direct sorting)
+INSERT INTO game_versions (id, version_string, version_family, description) VALUES
     -- Classic era (1.00 - 1.06b)
-    ('1.00',  1000, 'Classic', 1,  'Original release'),
-    ('1.01',  1010, 'Classic', 2,  'First patch'),
-    ('1.02',  1020, 'Classic', 3,  'Bug fixes'),
-    ('1.03',  1030, 'Classic', 4,  'Balance changes'),
-    ('1.04',  1040, 'Classic', 5,  'Major update'),
-    ('1.04b', 1041, 'Classic', 6,  'Bug fix patch'),
-    ('1.04c', 1042, 'Classic', 7,  'Bug fix patch'),
-    ('1.05',  1050, 'Classic', 8,  'Pre-LoD update'),
-    ('1.05b', 1051, 'Classic', 9,  'Bug fix patch'),
-    ('1.06',  1060, 'Classic', 10, 'Final Classic-era patch'),
-    ('1.06b', 1061, 'Classic', 11, 'Bug fix patch'),
+    (1000, '1.00',  'Classic', 'Original release'),
+    (1010, '1.01',  'Classic', 'First patch'),
+    (1020, '1.02',  'Classic', 'Bug fixes'),
+    (1030, '1.03',  'Classic', 'Balance changes'),
+    (1040, '1.04',  'Classic', 'Major update'),
+    (1041, '1.04b', 'Classic', 'Bug fix patch'),
+    (1042, '1.04c', 'Classic', 'Bug fix patch'),
+    (1050, '1.05',  'Classic', 'Pre-LoD update'),
+    (1051, '1.05b', 'Classic', 'Bug fix patch'),
+    (1060, '1.06',  'Classic', 'Final Classic-era patch'),
+    (1061, '1.06b', 'Classic', 'Bug fix patch'),
     -- LoD era (1.07+)
-    ('1.07',  1070, 'LoD', 12, 'Lord of Destruction release'),
-    ('1.08',  1080, 'LoD', 13, 'LoD patch'),
-    ('1.09',  1090, 'LoD', 14, 'Major LoD update'),
-    ('1.09b', 1091, 'LoD', 15, 'Bug fix patch'),
-    ('1.09d', 1093, 'LoD', 16, 'Bug fix patch'),
-    ('1.10',  1100, 'LoD', 17, 'Synergies patch'),
-    ('1.10s', 1101, 'LoD', 18, 'Beta/test version'),
-    ('1.11',  1110, 'LoD', 19, 'Uber content'),
-    ('1.11b', 1111, 'LoD', 20, 'Bug fix patch'),
-    ('1.12',  1120, 'LoD', 21, 'No-CD patch'),
-    ('1.12a', 1121, 'LoD', 22, 'Bug fix patch'),
-    ('1.13',  1130, 'LoD', 23, 'Respec patch'),
-    ('1.13c', 1132, 'LoD', 24, 'Bug fix patch'),
-    ('1.13d', 1133, 'LoD', 25, 'Final 1.13 patch'),
-    ('1.14',  1140, 'LoD', 26, 'Windows 10 compatibility'),
-    ('1.14a', 1141, 'LoD', 27, 'Bug fix patch'),
-    ('1.14b', 1142, 'LoD', 28, 'Bug fix patch'),
-    ('1.14c', 1143, 'LoD', 29, 'Bug fix patch'),
-    ('1.14d', 1144, 'LoD', 30, 'Final legacy patch')
-ON CONFLICT (version_string) DO NOTHING;
+    (1070, '1.07',  'LoD', 'Lord of Destruction release'),
+    (1080, '1.08',  'LoD', 'LoD patch'),
+    (1090, '1.09',  'LoD', 'Major LoD update'),
+    (1091, '1.09b', 'LoD', 'Bug fix patch'),
+    (1093, '1.09d', 'LoD', 'Bug fix patch'),
+    (1100, '1.10',  'LoD', 'Synergies patch'),
+    (1101, '1.10s', 'LoD', 'Beta/test version'),
+    (1110, '1.11',  'LoD', 'Uber content'),
+    (1111, '1.11b', 'LoD', 'Bug fix patch'),
+    (1120, '1.12',  'LoD', 'No-CD patch'),
+    (1121, '1.12a', 'LoD', 'Bug fix patch'),
+    (1130, '1.13',  'LoD', 'Respec patch'),
+    (1132, '1.13c', 'LoD', 'Bug fix patch'),
+    (1133, '1.13d', 'LoD', 'Final 1.13 patch'),
+    (1140, '1.14',  'LoD', 'Windows 10 compatibility'),
+    (1141, '1.14a', 'LoD', 'Bug fix patch'),
+    (1142, '1.14b', 'LoD', 'Bug fix patch'),
+    (1143, '1.14c', 'LoD', 'Bug fix patch'),
+    (1144, '1.14d', 'LoD', 'Final legacy patch')
+ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================================
 -- VALID EXECUTABLES TABLE
@@ -139,9 +137,9 @@ BEGIN
         -- Create temporary column
         ALTER TABLE exetable ADD COLUMN IF NOT EXISTS game_version_new INTEGER;
         
-        -- Migrate data: convert version strings to version codes
+        -- Migrate data: convert version strings to version codes (id)
         UPDATE exetable e
-        SET game_version_new = gv.version_code
+        SET game_version_new = gv.id
         FROM game_versions gv
         WHERE e.game_version = gv.version_string
           AND e.game_version IS NOT NULL
@@ -169,7 +167,7 @@ BEGIN
         ) THEN
             ALTER TABLE exetable 
             ADD CONSTRAINT fk_exetable_game_version 
-            FOREIGN KEY (game_version) REFERENCES game_versions(version_code)
+            FOREIGN KEY (game_version) REFERENCES game_versions(id)
             ON DELETE SET NULL;
             RAISE NOTICE 'Added foreign key constraint on exetable.game_version';
         ELSE
@@ -215,7 +213,7 @@ RETURNS INTEGER AS $$
 DECLARE
     v_code INTEGER;
 BEGIN
-    SELECT version_code INTO v_code
+    SELECT id INTO v_code
     FROM game_versions
     WHERE version_string = version_str;
     
@@ -240,7 +238,6 @@ $$ LANGUAGE plpgsql;
 -- INDEXES
 -- ============================================================================
 
-CREATE INDEX IF NOT EXISTS idx_game_versions_code ON game_versions(version_code);
 CREATE INDEX IF NOT EXISTS idx_game_versions_family ON game_versions(version_family);
 CREATE INDEX IF NOT EXISTS idx_valid_executables_name ON valid_executables(name);
 CREATE INDEX IF NOT EXISTS idx_exetable_sha256 ON exetable(sha256);
