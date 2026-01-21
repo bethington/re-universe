@@ -5495,9 +5495,18 @@
                     const isChanged = prevAddr !== null && addr !== prevAddr && addr;
                     let cellClass = !addr ? 'missing' : (isChanged ? 'changed' : '');
 
-                    // Add exact-match class if this cell's version matches the selected version and function exists in both
-                    if (selectedVersion && addr && version === selectedVersion) {
-                        cellClass += ' exact-match';
+                    // Add exact-match class for blue highlighting
+                    if (selectedVersion && addr) {
+                        if (version === selectedVersion) {
+                            // Selected version column: all functions are blue (it's the baseline)
+                            cellClass += ' exact-match';
+                        } else {
+                            // Other versions: blue only if function exists in BOTH selected version and this version
+                            const selectedVersionKey = selectedVersion.split('/')[1] || selectedVersion;
+                            if (func.addresses && func.addresses[selectedVersionKey]) {
+                                cellClass += ' exact-match';
+                            }
+                        }
                     }
 
                     prevAddr = addr || prevAddr;
