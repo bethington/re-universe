@@ -247,19 +247,21 @@ public class WebDataService {
      */
     @Cacheable(value = "crossVersionFunctions", key = "#filename")
     public Map<String, Object> getCrossVersionFunctions(String filename) {
-        // Get all executables matching this filename pattern (e.g., *_D2Client.dll)
+        // Get all executables matching this filename exactly
         String executablesSql = """
             SELECT
                 e.id,
                 e.name_exec,
-                e.md5
+                e.md5,
+                gv.version_string,
+                gv.version_family
             FROM exetable e
-            WHERE e.name_exec LIKE ?
-            ORDER BY e.name_exec
+            LEFT JOIN game_versions gv ON e.game_version = gv.id
+            WHERE e.name_exec = ?
+            ORDER BY gv.id
         """;
 
-        String filenamePattern = "%_" + filename;
-        List<Map<String, Object>> executables = jdbcTemplate.queryForList(executablesSql, filenamePattern);
+        List<Map<String, Object>> executables = jdbcTemplate.queryForList(executablesSql, filename);
 
         if (executables.isEmpty()) {
             Map<String, Object> emptyResponse = new HashMap<>();
@@ -270,44 +272,26 @@ public class WebDataService {
             return emptyResponse;
         }
 
-        // Build version list - deduplicate by using unique version numbers
-        // Classic and LoD share DLLs (same binary), so we only need one column per version number
+        // Build version list from game_versions table
         Map<String, Long> versionToExeId = new LinkedHashMap<>(); // Preserve insertion order
         Map<String, String> versionToMd5 = new HashMap<>();
         List<String> allVersions = new ArrayList<>();
         boolean isExe = filename.toLowerCase().endsWith(".exe");
 
         for (Map<String, Object> exe : executables) {
-            String nameExec = (String) exe.get("name_exec");
-            Long exeId = (Long) exe.get("id");
+            Long exeId = Long.valueOf(exe.get("id").toString());
             String md5 = (String) exe.get("md5");
+            String versionString = (String) exe.get("version_string");
 
-            // Parse version from name: Classic_1.00_D2Client.dll -> 1.00
-            String[] parts = nameExec.split("_");
-            if (parts.length >= 3) {
-                String gameType = parts[0]; // Classic or LoD
-                String version = parts[1];  // 1.00, 1.07, etc.
-
-                // For .exe files, include gameType in the key (they differ between Classic/LoD)
-                // For .dll files, just use version number (same binary shared)
-                String versionKey = isExe ? (gameType + "/" + version) : version;
-
-                // Only add if we haven't seen this version (or if it's an exe, which can differ)
-                if (!versionToExeId.containsKey(versionKey)) {
-                    versionToExeId.put(versionKey, exeId);
-                    versionToMd5.put(versionKey, md5);
-                    allVersions.add(versionKey);
-                }
+            if (versionString != null && !versionToExeId.containsKey(versionString)) {
+                versionToExeId.put(versionString, exeId);
+                versionToMd5.put(versionString, md5);
+                allVersions.add(versionString);
             }
         }
 
         // Sort versions naturally (1.00, 1.01, 1.02, ..., 1.10, 1.11, etc.)
-        allVersions.sort((a, b) -> {
-            // Extract numeric version for comparison
-            String verA = a.contains("/") ? a.split("/")[1] : a;
-            String verB = b.contains("/") ? b.split("/")[1] : b;
-            return compareVersions(verA, verB);
-        });
+        allVersions.sort(this::compareVersions);
 
         // Get all function data for these executables
         String functionsSql = """
@@ -316,30 +300,26 @@ public class WebDataService {
                 d.addr,
                 d.flags,
                 e.id as exe_id,
-                e.name_exec
+                gv.version_string
             FROM desctable d
             JOIN exetable e ON d.id_exe = e.id
-            WHERE e.name_exec LIKE ?
-            ORDER BY d.name_func, e.name_exec
+            LEFT JOIN game_versions gv ON e.game_version = gv.id
+            WHERE e.name_exec = ?
+            ORDER BY d.name_func, gv.id
         """;
 
-        List<Map<String, Object>> functionResults = jdbcTemplate.queryForList(functionsSql, filenamePattern);
+        List<Map<String, Object>> functionResults = jdbcTemplate.queryForList(functionsSql, filename);
 
         // Build function map: function_name -> { name, addresses: { version: address }, category }
         Map<String, Map<String, Object>> functionsMap = new LinkedHashMap<>();
 
         for (Map<String, Object> row : functionResults) {
             String funcName = (String) row.get("name_func");
-            Long addr = (Long) row.get("addr");
-            String nameExec = (String) row.get("name_exec");
+            Long addr = Long.valueOf(row.get("addr").toString());
+            String versionString = (String) row.get("version_string");
 
-            // Parse version from executable name
-            String[] parts = nameExec.split("_");
-            if (parts.length < 3) continue;
-
-            String gameType = parts[0];
-            String version = parts[1];
-            String versionKey = isExe ? (gameType + "/" + version) : version;
+            // Skip if no version information
+            if (versionString == null) continue;
 
             // Initialize function entry if not exists
             functionsMap.computeIfAbsent(funcName, k -> {
@@ -356,7 +336,7 @@ public class WebDataService {
             String formattedAddr = "0x" + String.format("%08x", addr).toUpperCase();
 
             // If this version already has an address for this function, create a unique variant
-            if (addresses.containsKey(versionKey)) {
+            if (addresses.containsKey(versionString)) {
                 // This is a duplicate function name in the same version - create unique entry
                 String uniqueFuncName = funcName + "_" + formattedAddr;
                 Map<String, Object> uniqueFuncData = new LinkedHashMap<>();
@@ -364,9 +344,9 @@ public class WebDataService {
                 uniqueFuncData.put("category", categorizeFunctionName(funcName));
                 uniqueFuncData.put("addresses", new LinkedHashMap<String, String>());
                 functionsMap.put(uniqueFuncName, uniqueFuncData);
-                ((Map<String, String>) uniqueFuncData.get("addresses")).put(versionKey, formattedAddr);
+                ((Map<String, String>) uniqueFuncData.get("addresses")).put(versionString, formattedAddr);
             } else {
-                addresses.put(versionKey, formattedAddr);
+                addresses.put(versionString, formattedAddr);
             }
         }
 
@@ -431,7 +411,7 @@ public class WebDataService {
 
         for (Map<String, Object> row : results) {
             String funcName = (String) row.get("name_func");
-            Long addr = (Long) row.get("addr");
+            Long addr = Long.valueOf(row.get("addr").toString());
 
             Map<String, Object> funcData = new HashMap<>();
             funcData.put("name", funcName);
@@ -665,7 +645,7 @@ public class WebDataService {
             String gameType = (String) row.get("game_type");
             String version = (String) row.get("version");
             String versionKey = gameType + "/" + version;
-            Long addr = (Long) row.get("addr");
+            Long addr = Long.valueOf(row.get("addr").toString());
 
             functionsMap.computeIfAbsent(funcName, k -> new HashMap<>());
 
