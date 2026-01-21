@@ -147,6 +147,26 @@ public class ApiController {
     }
 
     /**
+     * Get BSim-enhanced cross-version function data for a specific version and binary file.
+     * Returns function addresses with similarity scores across all versions.
+     * Example: GET /api/functions/cross-version/1.00/D2Client.dll
+     */
+    @GetMapping("/functions/cross-version/{version}/{filename}")
+    public ResponseEntity<Map<String, Object>> getBSimCrossVersionFunctions(
+            @PathVariable String version,
+            @PathVariable String filename,
+            @RequestParam(defaultValue = "0.6") double threshold) {
+        try {
+            Map<String, Object> functions = webDataService.getBSimCrossVersionFunctions(
+                version, filename, threshold);
+            return ResponseEntity.ok(functions);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
      * Clears all caches. Call this after ingesting new binaries to refresh data.
      * Example: POST /api/cache/clear
      */
