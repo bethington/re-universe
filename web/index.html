@@ -1103,6 +1103,12 @@
             display: table-cell;
         }
 
+        /* Exact match with selected version - blue color */
+        .exports-table .addr-cell.exact-match {
+            color: #6969ff !important;
+            font-weight: 600 !important;
+        }
+
         /* Tier-colored address cells */
         .exports-table .addr-cell.tier-1-match {
             color: var(--accent-gold);
@@ -5487,7 +5493,13 @@
                     }
 
                     const isChanged = prevAddr !== null && addr !== prevAddr && addr;
-                    const cellClass = !addr ? 'missing' : (isChanged ? 'changed' : '');
+                    let cellClass = !addr ? 'missing' : (isChanged ? 'changed' : '');
+
+                    // Add exact-match class if this cell's version matches the selected version and function exists in both
+                    if (selectedVersion && addr && version === selectedVersion) {
+                        cellClass += ' exact-match';
+                    }
+
                     prevAddr = addr || prevAddr;
 
                     if (addr) {
