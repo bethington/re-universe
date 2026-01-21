@@ -22,6 +22,7 @@ import org.springframework.context.annotation.Primary;
  * - "functions" - Function data per executable
  * - "functionIndex" - Index of all executables with functions
  * - "crossVersionFunctions" - Cross-version function matrix data
+ * - "bsimCrossVersionFunctions" - BSim-enhanced cross-version function data with similarity scores
  */
 @Configuration
 @EnableCaching
@@ -32,7 +33,7 @@ public class CacheConfig {
     public CacheManager cacheManager() {
         return new ConcurrentMapCacheManager(
             "versions",
-            "binaries", 
+            "binaries",
             "categories",
             "fileHistory",
             "diffs",
@@ -41,7 +42,8 @@ public class CacheConfig {
             "functions",
             "functionIndex",
             "crossVersionFunctions",
-            "crossVersionAnalysis"
+            "crossVersionAnalysis",
+            "bsimCrossVersionFunctions"
         );
     }
 }
