@@ -2880,60 +2880,11 @@
             } catch (error) {
                 console.error('Failed to load API data:', error);
                 hideLoadingToast();
-                showErrorToast('Failed to connect to BSim API. Using fallback mode.');
+                showErrorToast('Failed to connect to BSim API. Please check the API connection.');
 
-                // Fallback: Load known working data from internal API
-                console.log('Loading fallback version data...');
-                VERSIONS_DATA = [
-                    {
-                        "folder_name": "Classic/Unknown",
-                        "game_type": "Classic",
-                        "version": "Unknown",
-                        "file_count": 102,
-                        "change_count": 102,
-                        "is_lod": false,
-                        "raw_pe_version": "1, 0, 0, 0",
-                        "total_size_readable": "Unknown",
-                        "nocd_status": "unknown"
-                    },
-                    {
-                        "folder_name": "LoD/1.07",
-                        "game_type": "LoD",
-                        "version": "1.07",
-                        "file_count": 312,
-                        "change_count": 312,
-                        "is_lod": true,
-                        "raw_pe_version": "1, 0, 7, 0",
-                        "total_size_readable": "Unknown",
-                        "nocd_status": "unknown"
-                    }
-                ];
-
-                // Basic categories fallback
-                FILE_CATEGORIES = {
-                    "Game Logic": { "color": "#00FF00", "short": "GL" },
-                    "Graphics": { "color": "#6969FF", "short": "GR" },
-                    "Audio": { "color": "#A59263", "short": "AU" },
-                    "Network": { "color": "#FF6600", "short": "NW" },
-                    "Launcher": { "color": "#FFFF00", "short": "LA" },
-                    "MPQ": { "color": "#C7B377", "short": "MPQ" },
-                    "Utility": { "color": "#808080", "short": "UT" },
-                    "Other": { "color": "#FFFFFF", "short": "OT" }
-                };
-
-                console.log('Fallback data loaded:', {
-                    versions: VERSIONS_DATA.length,
-                    categories: Object.keys(FILE_CATEGORIES).length
-                });
-
-                // Ensure version list is rendered with fallback data
-                setTimeout(() => {
-                    if (typeof renderVersionList === 'function') {
-                        renderVersionList();
-                    }
-                }, 100);
-
-                return true; // Return true to continue with fallback data
+                // No fallback data - return false to indicate failure
+                console.log('No fallback data - API connection required');
+                return false;
             }
         }
 
