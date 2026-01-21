@@ -383,7 +383,7 @@ public class WebDataService {
         // Get all functions from baseline version
         String baselineSql = """
             SELECT
-                d.rowid as baseline_rowid,
+                d.id as baseline_rowid,
                 d.name_func,
                 d.addr,
                 d.flags
@@ -483,10 +483,10 @@ public class WebDataService {
                 target_gv.version_string as target_version,
                 CASE
                     WHEN EXISTS (SELECT 1 FROM vectortable v1 WHERE v1.id = ? AND v1.lsh_hash IS NOT NULL)
-                    AND EXISTS (SELECT 1 FROM vectortable v2 WHERE v2.id = target_d.rowid AND v2.lsh_hash IS NOT NULL)
+                    AND EXISTS (SELECT 1 FROM vectortable v2 WHERE v2.id = target_d.id AND v2.lsh_hash IS NOT NULL)
                     THEN COALESCE(
                         (SELECT similarity FROM bsim_similarity_cache
-                         WHERE function1_id = ? AND function2_id = target_d.rowid),
+                         WHERE function1_id = ? AND function2_id = target_d.id),
                         0.8 + (RANDOM() * 0.2)  -- Mock similarity for now
                     )
                     ELSE 0.0
@@ -563,7 +563,7 @@ public class WebDataService {
      * Get formatted address for a specific rowid
      */
     private String getFormattedAddressForRowId(Long rowId) {
-        String sql = "SELECT addr FROM desctable WHERE rowid = ?";
+        String sql = "SELECT addr FROM desctable WHERE id = ?";
         try {
             Long addr = jdbcTemplate.queryForObject(sql, Long.class, rowId);
             return "0x" + String.format("%08X", addr);
