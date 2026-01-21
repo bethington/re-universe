@@ -1109,6 +1109,37 @@
             font-weight: 600 !important;
         }
 
+        /* BSim similarity-based color coding */
+        .exports-table .addr-cell.similarity-identical {
+            color: #0066ff !important;
+            font-weight: 700 !important;
+        }
+
+        .exports-table .addr-cell.similarity-high {
+            color: #0099cc !important;
+            font-weight: 600 !important;
+        }
+
+        .exports-table .addr-cell.similarity-good {
+            color: #00cc66 !important;
+            font-weight: 600 !important;
+        }
+
+        .exports-table .addr-cell.similarity-medium {
+            color: #99cc00 !important;
+            font-weight: 500 !important;
+        }
+
+        .exports-table .addr-cell.similarity-low {
+            color: #cc9900 !important;
+            font-weight: 400 !important;
+        }
+
+        .exports-table .addr-cell.similarity-very-low {
+            color: #cc6600 !important;
+            font-weight: 400 !important;
+        }
+
         /* Tier-colored address cells */
         .exports-table .addr-cell.tier-1-match {
             color: var(--accent-gold);
@@ -2888,27 +2919,52 @@
             }
         }
 
-        // Modified loadFunctionData to use API
+        // Modified loadFunctionData to use BSim-enhanced API
         async function loadFunctionData(filename, forceGroup = false) {
             if (!filename) return null;
 
-            // Check if already loaded
-            const dataVarName = `FUNCTIONS_${filename.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`;
+            // Get the currently selected version for BSim baseline
+            const currentSelectedVersion = selectedVersion ? selectedVersion.split('/')[1] || selectedVersion : '1.00';
+
+            // Check if already loaded for this version
+            const dataVarName = `FUNCTIONS_${filename.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}_${currentSelectedVersion.replace(/[^a-zA-Z0-9]/g, '_')}`;
             if (window[dataVarName] && !forceGroup) {
-                console.log(`Function data for ${filename} already loaded`);
+                console.log(`Function data for ${filename} (version ${currentSelectedVersion}) already loaded`);
                 return window[dataVarName];
             }
 
             try {
-                showLoadingToast(`Loading functions for ${filename}...`);
+                showLoadingToast(`Loading BSim analysis for ${filename} (baseline: ${currentSelectedVersion})...`);
 
-                // Use the new cross-version API endpoint
-                const response = await fetch(`${API_BASE_URL}/functions/cross-version/${filename}`);
-                if (!response.ok) {
-                    throw new Error(`Failed to load function data for ${filename}`);
+                // Try the new BSim-enhanced endpoint first
+                let response;
+                let apiData;
+                let usedBSim = false;
+
+                try {
+                    response = await fetch(`${API_BASE_URL}/functions/cross-version/${currentSelectedVersion}/${filename}?threshold=0.6`);
+                    if (response.ok) {
+                        apiData = await response.json();
+                        usedBSim = true;
+                        console.log(`BSim analysis loaded for ${filename} with baseline ${currentSelectedVersion}`);
+                    }
+                } catch (bsimError) {
+                    console.log(`BSim endpoint failed, falling back to original endpoint:`, bsimError.message);
                 }
 
-                const apiData = await response.json();
+                // Fallback to original endpoint if BSim fails
+                if (!usedBSim) {
+                    response = await fetch(`${API_BASE_URL}/functions/cross-version/${filename}`);
+                    if (!response.ok) {
+                        throw new Error(`Failed to load function data for ${filename}`);
+                    }
+                    apiData = await response.json();
+                    console.log(`Fallback to name-based matching for ${filename}`);
+                }
+
+                if (apiData.error) {
+                    throw new Error(apiData.error);
+                }
 
                 // Transform API response to match expected format for renderFunctionsTable
                 const functionData = {
@@ -2916,17 +2972,19 @@
                     functions: {},
                     filename: filename,
                     versionMd5s: apiData.versionMd5s || {},
-                    isExe: apiData.isExe || false
+                    isExe: apiData.isExe || false,
+                    usedBSim: usedBSim,
+                    baselineVersion: apiData.baselineVersion || currentSelectedVersion
                 };
 
-                // Transform functions: { funcName: { addresses: { version: addr } } }
-                // to: { funcName: { name, addresses: { version: addr } } }
+                // Transform functions: { funcName: { addresses: { version: addr }, similarities: { version: score } } }
                 if (apiData.functions) {
                     for (const [funcName, funcData] of Object.entries(apiData.functions)) {
                         functionData.functions[funcName] = {
                             name: funcData.name || funcName,
                             category: funcData.category || 'Game',
-                            addresses: funcData.addresses || {}
+                            addresses: funcData.addresses || {},
+                            similarities: funcData.similarities || {}  // Add similarity scores
                         };
                     }
                 }
@@ -5446,16 +5504,22 @@
                     const isChanged = prevAddr !== null && addr !== prevAddr && addr;
                     let cellClass = !addr ? 'missing' : (isChanged ? 'changed' : '');
 
-                    // Add exact-match class for blue highlighting
+                    // Add BSim similarity-based color coding
                     if (selectedVersion && addr) {
                         if (version === selectedVersion) {
-                            // Selected version column: all functions are blue (it's the baseline)
+                            // Selected version column: baseline - always blue
                             cellClass += ' exact-match';
                         } else {
-                            // Other versions: blue only if function exists in BOTH selected version and this version
-                            const selectedVersionKey = selectedVersion.split('/')[1] || selectedVersion;
-                            if (func.addresses && func.addresses[selectedVersionKey]) {
-                                cellClass += ' exact-match';
+                            // Other versions: color based on BSim similarity score
+                            const similarity = func.similarities && func.similarities[version];
+                            if (similarity !== undefined) {
+                                cellClass += ' ' + getSimilarityColorClass(similarity);
+                            } else {
+                                // Fallback to original logic if no similarity data
+                                const selectedVersionKey = selectedVersion.split('/')[1] || selectedVersion;
+                                if (func.addresses && func.addresses[selectedVersionKey]) {
+                                    cellClass += ' exact-match';
+                                }
                             }
                         }
                     }
@@ -5463,7 +5527,14 @@
                     prevAddr = addr || prevAddr;
 
                     if (addr) {
-                        return '<td class="addr-cell ' + cellClass + '" onclick="showComparePanel(\'' + key + '\', \'' + version + '\', \'' + cellSourceVersion + '\', false)" style="cursor:pointer" title="Click to compare">' + addr + '</td>';
+                        // Generate tooltip with similarity information
+                        const similarity = func.similarities && func.similarities[version];
+                        let tooltip = 'Click to compare';
+                        if (similarity !== undefined) {
+                            tooltip = `BSim Similarity: ${(similarity * 100).toFixed(1)}% | ${tooltip}`;
+                        }
+
+                        return '<td class="addr-cell ' + cellClass + '" onclick="showComparePanel(\'' + key + '\', \'' + version + '\', \'' + cellSourceVersion + '\', false)" style="cursor:pointer" title="' + tooltip + '">' + addr + '</td>';
                     }
                     return '<td class="addr-cell ' + cellClass + '">—</td>';
                 }).join('');
@@ -5678,6 +5749,16 @@
                 'Other': '#FFFFFF'
             };
             return colors[category] || '#FFFFFF';
+        }
+
+        // Get CSS class based on BSim similarity score
+        function getSimilarityColorClass(similarity) {
+            if (similarity >= 0.95) return 'similarity-identical';   // #0066ff - Blue (very high similarity)
+            if (similarity >= 0.85) return 'similarity-high';        // #0099cc - Light Blue (high similarity)
+            if (similarity >= 0.75) return 'similarity-good';        // #00cc66 - Green (good similarity)
+            if (similarity >= 0.65) return 'similarity-medium';      // #99cc00 - Yellow-Green (medium similarity)
+            if (similarity >= 0.50) return 'similarity-low';         // #cc9900 - Orange (low similarity)
+            return 'similarity-very-low';                           // #cc6600 - Red-Orange (very low similarity)
         }
 
         function formatSize(bytes) {
