@@ -605,7 +605,7 @@ public class WebDataService {
      */
     private List<String> getAllVersionsForFile(String filename) {
         String sql = """
-            SELECT DISTINCT gv.version_string
+            SELECT DISTINCT gv.version_string, gv.id
             FROM exetable e
             LEFT JOIN game_versions gv ON e.game_version = gv.id
             WHERE e.name_exec = ?
@@ -614,7 +614,10 @@ public class WebDataService {
         """;
 
         try {
-            return jdbcTemplate.queryForList(sql, String.class, filename);
+            List<Map<String, Object>> results = jdbcTemplate.queryForList(sql, filename);
+            return results.stream()
+                    .map(row -> (String) row.get("version_string"))
+                    .collect(Collectors.toList());
         } catch (Exception e) {
             return new ArrayList<>();
         }
