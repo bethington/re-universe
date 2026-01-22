@@ -316,7 +316,7 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
         }
 
         String versionFilter = askString("Version Filter",
-            "Enter version pattern (e.g., '1.03', '1.13c', 'Classic'):", "1.03");
+            "Enter version pattern (e.g., '1.03', '1.04b', '1.13c', 'Classic'):", "1.04b");
 
         if (versionFilter == null || versionFilter.trim().isEmpty()) {
             println("Operation cancelled - no filter provided");
@@ -329,33 +329,55 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
         List<DomainFile> programFiles = new ArrayList<>();
         collectProgramFiles(rootFolder, programFiles);
 
-        // Filter by unified version info
+        // Get programs from BSim database that match the version filter
+        Set<String> bsimProgramNames = getBSimProgramsByVersion(versionFilter);
+
+        if (bsimProgramNames.isEmpty()) {
+            popup("No programs matching version '" + versionFilter + "' found in BSim database.\n" +
+                  "Available versions can be seen by running Step1 first.");
+            return;
+        }
+
+        println("Found " + bsimProgramNames.size() + " programs in BSim database for version '" + versionFilter + "':");
+        for (String name : bsimProgramNames) {
+            println("  - " + name);
+        }
+
+        // Filter Ghidra project files by matching names in BSim database
         List<DomainFile> matchingFiles = new ArrayList<>();
         for (DomainFile file : programFiles) {
             String fileName = file.getName();
-            UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(fileName);
 
-            if (fileName.toLowerCase().contains(versionFilter.toLowerCase()) ||
-                (versionInfo.gameVersion != null && versionInfo.gameVersion.contains(versionFilter)) ||
-                versionInfo.familyType.toLowerCase().contains(versionFilter.toLowerCase())) {
+            // Direct name match
+            if (bsimProgramNames.contains(fileName)) {
                 matchingFiles.add(file);
+                continue;
+            }
+
+            // Check for unified name formats that might match
+            for (String bsimName : bsimProgramNames) {
+                if (isNameMatch(fileName, bsimName)) {
+                    matchingFiles.add(file);
+                    break;
+                }
             }
         }
 
         if (matchingFiles.isEmpty()) {
-            popup("No programs matching filter '" + versionFilter + "' found.");
+            popup("No programs matching version '" + versionFilter + "' found in Ghidra project.\n\n" +
+                  "BSim database contains programs for this version:\n" +
+                  String.join(", ", bsimProgramNames) + "\n\n" +
+                  "But none were found in the current Ghidra project.");
             return;
         }
 
-        println("Found " + matchingFiles.size() + " programs matching '" + versionFilter + "'");
-        println("Matching programs:");
+        println("Found " + matchingFiles.size() + " matching programs in Ghidra project:");
         for (DomainFile file : matchingFiles) {
-            UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(file.getName());
-            println("  - " + file.getName() + " (" + versionInfo.getDisplayInfo() + ")");
+            println("  - " + file.getName());
         }
 
         boolean proceed = askYesNo("Generate Signatures for Filtered Programs",
-            String.format("Generate signatures for %d programs matching '%s'?",
+            String.format("Generate signatures for %d programs matching version '%s'?",
             matchingFiles.size(), versionFilter));
 
         if (!proceed) {
@@ -708,6 +730,93 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
                 println("Note: Could not refresh materialized views");
             }
         }
+    }
+
+    /**
+     * Query BSim database to get program names for a specific version
+     */
+    private Set<String> getBSimProgramsByVersion(String versionFilter) {
+        Set<String> programNames = new HashSet<>();
+
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
+            // Try exact version match first
+            String exactSql = "SELECT DISTINCT e.name_exec FROM exetable e " +
+                            "JOIN game_versions gv ON e.game_version = gv.id " +
+                            "WHERE gv.version_string = ?";
+
+            try (PreparedStatement stmt = conn.prepareStatement(exactSql)) {
+                stmt.setString(1, versionFilter);
+                ResultSet rs = stmt.executeQuery();
+                while (rs.next()) {
+                    programNames.add(rs.getString("name_exec"));
+                }
+            }
+
+            // If no exact matches, try partial matching for version and family
+            if (programNames.isEmpty()) {
+                String partialSql = "SELECT DISTINCT e.name_exec FROM exetable e " +
+                                  "JOIN game_versions gv ON e.game_version = gv.id " +
+                                  "WHERE gv.version_string ILIKE ? OR gv.version_family ILIKE ? OR e.version_family ILIKE ?";
+
+                try (PreparedStatement stmt = conn.prepareStatement(partialSql)) {
+                    String pattern = "%" + versionFilter + "%";
+                    stmt.setString(1, pattern);
+                    stmt.setString(2, pattern);
+                    stmt.setString(3, pattern);
+                    ResultSet rs = stmt.executeQuery();
+                    while (rs.next()) {
+                        programNames.add(rs.getString("name_exec"));
+                    }
+                }
+            }
+
+        } catch (SQLException e) {
+            printerr("Error querying BSim database: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        return programNames;
+    }
+
+    /**
+     * Check if two names match, accounting for different naming conventions
+     */
+    private boolean isNameMatch(String fileName1, String fileName2) {
+        if (fileName1 == null || fileName2 == null) return false;
+        if (fileName1.equals(fileName2)) return true;
+
+        // Extract base names (remove paths and version prefixes)
+        String base1 = extractBaseName(fileName1);
+        String base2 = extractBaseName(fileName2);
+
+        return base1.equalsIgnoreCase(base2);
+    }
+
+    /**
+     * Extract base executable name from various naming formats
+     */
+    private String extractBaseName(String fileName) {
+        String name = fileName;
+
+        // Remove path components
+        if (name.contains("/")) name = name.substring(name.lastIndexOf("/") + 1);
+        if (name.contains("\\")) name = name.substring(name.lastIndexOf("\\") + 1);
+
+        // Remove version prefixes like "1.04b_" or "Classic_1.04b_"
+        if (name.contains("_")) {
+            String[] parts = name.split("_");
+            if (parts.length >= 2) {
+                // If first part looks like version (starts with digit or known family)
+                String firstPart = parts[0];
+                if (firstPart.matches("\\d.*") || firstPart.equalsIgnoreCase("Classic") ||
+                    firstPart.equalsIgnoreCase("LoD") || firstPart.equalsIgnoreCase("PD2")) {
+                    // Return everything after the first underscore
+                    name = name.substring(name.indexOf("_") + 1);
+                }
+            }
+        }
+
+        return name;
     }
 
     // Helper class for function signatures
