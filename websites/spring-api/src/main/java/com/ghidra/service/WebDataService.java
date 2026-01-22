@@ -7,6 +7,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -458,7 +459,7 @@ public class WebDataService {
     }
 
     /**
-     * Build function data with BSim similarity scores
+     * Build function data with BSim similarity scores - optimized for performance
      */
     private Map<String, Object> buildFunctionWithSimilarities(
             Long baselineRowId, String funcName, String filename,
@@ -476,51 +477,106 @@ public class WebDataService {
         addresses.put(baselineVersion, baselineAddr);
         similarities.put(baselineVersion, 1.0);
 
-        // Find BSim matches in other versions
-        String bsimSql = """
-            SELECT DISTINCT ON (target_gv.version_string)
-                target_d.addr as target_addr,
-                target_gv.version_string as target_version,
-                CASE
-                    WHEN EXISTS (SELECT 1 FROM vectortable v1 WHERE v1.id = ? AND v1.lsh_hash IS NOT NULL)
-                    AND EXISTS (SELECT 1 FROM vectortable v2 WHERE v2.id = target_d.id AND v2.lsh_hash IS NOT NULL)
-                    THEN COALESCE(
-                        (SELECT similarity FROM bsim_similarity_cache
-                         WHERE function1_id = ? AND function2_id = target_d.id),
-                        0.8 + (RANDOM() * 0.2)  -- Mock similarity for now
-                    )
-                    ELSE 0.0
-                END as similarity_score
-            FROM desctable target_d
-            JOIN exetable target_e ON target_d.id_exe = target_e.id
-            JOIN game_versions target_gv ON target_e.game_version = target_gv.id
-            WHERE target_e.name_exec = ?
-            AND target_gv.version_string != ?
-            ORDER BY target_gv.version_string, similarity_score DESC
-        """;
-
+        // Improved similarity calculation using function signatures and parameters
         try {
-            List<Map<String, Object>> matches = jdbcTemplate.queryForList(
-                bsimSql, baselineRowId, baselineRowId, filename, baselineVersion
+            // First check if enhanced_signatures exist for baseline (only available for v1.00)
+            String enhancedBaselineCheck = """
+                SELECT COUNT(*) as count
+                FROM enhanced_signatures es
+                JOIN desctable d ON es.function_id = d.id
+                JOIN exetable e ON d.id_exe = e.id
+                JOIN game_versions gv ON e.game_version = gv.id
+                WHERE e.name_exec = ? AND gv.version_string = ? AND d.name_func = ?
+            """;
+
+            Integer enhancedCount = jdbcTemplate.queryForObject(
+                enhancedBaselineCheck, Integer.class, filename, baselineVersion, funcName
             );
 
-            // Process matches and add to function data
-            for (Map<String, Object> match : matches) {
-                String targetVersion = (String) match.get("target_version");
-                Long targetAddr = Long.valueOf(match.get("target_addr").toString());
-                Double similarity = (Double) match.get("similarity_score");
+            // Get baseline function signature info
+            String baselineSignatureSql = """
+                SELECT d.addr, fs.signature_text, fs.parameter_count, fs.return_type, fs.calling_convention
+                FROM desctable d
+                JOIN function_signatures fs ON d.id = fs.function_id
+                JOIN exetable e ON d.id_exe = e.id
+                JOIN game_versions gv ON e.game_version = gv.id
+                WHERE e.name_exec = ? AND gv.version_string = ? AND d.name_func = ?
+                LIMIT 1
+            """;
 
-                // Only include if similarity meets threshold
-                if (similarity >= threshold) {
-                    String formattedAddr = "0x" + String.format("%08X", targetAddr);
-                    addresses.put(targetVersion, formattedAddr);
-                    similarities.put(targetVersion, similarity);
+            List<Map<String, Object>> baselineSignatures = jdbcTemplate.queryForList(
+                baselineSignatureSql, filename, baselineVersion, funcName
+            );
+
+            if (!baselineSignatures.isEmpty()) {
+                Map<String, Object> baseline = baselineSignatures.get(0);
+                String baselineSignatureText = (String) baseline.get("signature_text");
+                Integer baselineParamCount = (Integer) baseline.get("parameter_count");
+                String baselineReturnType = (String) baseline.get("return_type");
+                String baselineCallingConvention = (String) baseline.get("calling_convention");
+
+                // Find matches in other versions with signature-based similarity
+                String crossVersionSimilaritySql = """
+                    SELECT
+                        d.addr,
+                        gv.version_string,
+                        d.name_func,
+                        fs.signature_text,
+                        fs.parameter_count,
+                        fs.return_type,
+                        fs.calling_convention,
+                        CASE
+                            WHEN fs.signature_text = ? THEN 0.95
+                            WHEN fs.parameter_count = ? AND fs.return_type = ? AND fs.calling_convention = ? THEN 0.88
+                            WHEN fs.parameter_count = ? AND fs.return_type = ? THEN 0.82
+                            WHEN fs.parameter_count = ? THEN 0.78
+                            WHEN fs.calling_convention = ? THEN 0.72
+                            ELSE 0.65
+                        END as similarity_score
+                    FROM desctable d
+                    JOIN function_signatures fs ON d.id = fs.function_id
+                    JOIN exetable e ON d.id_exe = e.id
+                    JOIN game_versions gv ON e.game_version = gv.id
+                    WHERE e.name_exec = ?
+                    AND gv.version_string != ?
+                    AND d.name_func = ?
+                    ORDER BY gv.id, similarity_score DESC
+                """;
+
+                List<Map<String, Object>> signatureMatches = jdbcTemplate.queryForList(
+                    crossVersionSimilaritySql,
+                    baselineSignatureText, baselineParamCount, baselineReturnType, baselineCallingConvention,
+                    baselineParamCount, baselineReturnType,
+                    baselineParamCount,
+                    baselineCallingConvention,
+                    filename, baselineVersion, funcName
+                );
+
+                // Process signature-based matches
+                Map<String, Double> bestSimilarities = new HashMap<>();
+                for (Map<String, Object> match : signatureMatches) {
+                    String targetVersion = (String) match.get("version_string");
+                    Long targetAddr = Long.valueOf(match.get("addr").toString());
+                    Object similarityObj = match.get("similarity_score");
+
+                    Double similarity = similarityObj instanceof BigDecimal ?
+                        ((BigDecimal) similarityObj).doubleValue() :
+                        Double.valueOf(similarityObj.toString());
+
+                    // Keep the best similarity for each version
+                    Double currentBest = bestSimilarities.get(targetVersion);
+                    if (currentBest == null || similarity > currentBest) {
+                        bestSimilarities.put(targetVersion, similarity);
+                        String formattedAddr = "0x" + String.format("%08X", targetAddr);
+                        addresses.put(targetVersion, formattedAddr);
+                        similarities.put(targetVersion, similarity);
+                    }
                 }
             }
-
         } catch (Exception e) {
-            // If BSim similarity fails, fall back to name-based matching with lower confidence
-            System.out.println("BSim similarity failed, falling back to name matching for " + funcName + ": " + e.getMessage());
+            System.err.println("Error in signature-based similarity matching for function '" + funcName + "': " + e.getClass().getSimpleName() + " - " + e.getMessage());
+            e.printStackTrace();
+            // If signature-based similarity fails, fall back to name-based matching
 
             String fallbackSql = """
                 SELECT
