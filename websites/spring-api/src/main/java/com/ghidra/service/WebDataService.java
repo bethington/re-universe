@@ -25,16 +25,17 @@ public class WebDataService {
 
     @Cacheable(value = "versions", key = "'all'")
     public List<VersionData> getVersions() {
-        // Query game_versions table directly - return exactly what's in the table
+        // Query game_versions table but only return versions that have executables
         String sql = """
-            SELECT
-                id,
-                version_string,
-                version_family,
-                description,
-                created_at
-            FROM game_versions
-            ORDER BY id
+            SELECT DISTINCT
+                gv.id,
+                gv.version_string,
+                gv.version_family,
+                gv.description,
+                gv.created_at
+            FROM game_versions gv
+            INNER JOIN exetable e ON gv.id = e.game_version
+            ORDER BY gv.id
         """;
 
         List<Map<String, Object>> results = jdbcTemplate.queryForList(sql);
