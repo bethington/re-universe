@@ -77,19 +77,38 @@ ORDER BY t.table_name, c.ordinal_position;
 -- VERSION STATISTICS VIEWS
 -- =========================================================================
 
--- View for binary count per version (main requested view)
+-- View showing which binaries are shared across multiple versions
+-- Useful for identifying unchanged DLLs between patches
+CREATE OR REPLACE VIEW shared_binaries AS
+SELECT
+    e.name_exec as binary_name,
+    e.md5,
+    COUNT(bv.game_version) as version_count,
+    string_agg(gv.version_string, ', ' ORDER BY gv.id) as versions,
+    MIN(gv.version_string) as first_version,
+    MAX(gv.version_string) as last_version
+FROM exetable e
+JOIN binary_versions bv ON e.id = bv.executable_id
+JOIN game_versions gv ON bv.game_version = gv.id
+GROUP BY e.id, e.name_exec, e.md5
+HAVING COUNT(bv.game_version) > 1
+ORDER BY COUNT(bv.game_version) DESC, e.name_exec;
+
+-- View for binary count per version (uses binary_versions junction table)
+-- This counts ALL binaries in each version, including shared binaries
 CREATE OR REPLACE VIEW version_binary_counts AS
 SELECT
     gv.version_string,
     gv.version_family,
-    COUNT(e.id) as binary_count,
+    COUNT(bv.executable_id) as binary_count,
     COUNT(CASE WHEN e.is_reference = true THEN 1 END) as reference_binaries,
     COUNT(CASE WHEN e.is_reference = false OR e.is_reference IS NULL THEN 1 END) as non_reference_binaries,
-    MIN(e.ingest_date) as first_ingested,
-    MAX(e.ingest_date) as last_ingested,
+    MIN(bv.discovered_at) as first_ingested,
+    MAX(bv.discovered_at) as last_ingested,
     string_agg(DISTINCT a.val, ', ' ORDER BY a.val) as architectures
 FROM game_versions gv
-LEFT JOIN exetable e ON gv.id = e.game_version
+LEFT JOIN binary_versions bv ON gv.id = bv.game_version
+LEFT JOIN exetable e ON bv.executable_id = e.id
 LEFT JOIN archtable a ON e.architecture = a.id
 GROUP BY gv.id, gv.version_string, gv.version_family
 ORDER BY gv.version_string;
@@ -108,7 +127,7 @@ WHERE version_family IS NOT NULL
 GROUP BY version_family
 ORDER BY version_family;
 
--- Detailed binary analysis per version
+-- Detailed binary analysis per version (uses binary_versions junction table)
 CREATE OR REPLACE VIEW version_binary_details AS
 SELECT
     gv.version_string,
@@ -119,7 +138,7 @@ SELECT
     e.sha256,
     a.val as architecture,
     c.val as compiler,
-    e.ingest_date,
+    bv.discovered_at as ingest_date,
     e.is_reference,
     pg_size_pretty((LENGTH(e.md5::text) * 8)::bigint) as hash_info,
     CASE
@@ -128,10 +147,10 @@ SELECT
         ELSE 'Other'
     END as binary_type
 FROM game_versions gv
-LEFT JOIN exetable e ON gv.id = e.game_version
+JOIN binary_versions bv ON gv.id = bv.game_version
+JOIN exetable e ON bv.executable_id = e.id
 LEFT JOIN archtable a ON e.architecture = a.id
 LEFT JOIN compilertable c ON e.name_compiler = c.id
-WHERE e.id IS NOT NULL
 ORDER BY gv.version_string, e.name_exec;
 
 -- =========================================================================
