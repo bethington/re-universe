@@ -1,4 +1,4 @@
-// STEP 3a: Populate Function Comments (OPTIONAL ENRICHMENT)
+// STEP 3: Populate Function Comments (OPTIONAL ENRICHMENT)
 //
 // Extracts function comments from Ghidra analysis and stores them in the BSim database
 // for enhanced similarity analysis. Comments provide valuable context for function
