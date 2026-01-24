@@ -48,41 +48,8 @@ CREATE TABLE IF NOT EXISTS game_versions (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Insert all known Diablo 2 versions (id = version code for direct sorting)
-INSERT INTO game_versions (id, version_string, version_family, description) VALUES
-    -- Classic era (1.00 - 1.06b)
-    (1000, '1.00',  'Classic', 'Original release'),
-    (1010, '1.01',  'Classic', 'First patch'),
-    (1020, '1.02',  'Classic', 'Bug fixes'),
-    (1030, '1.03',  'Classic', 'Balance changes'),
-    (1040, '1.04',  'Classic', 'Major update'),
-    (1041, '1.04b', 'Classic', 'Bug fix patch'),
-    (1042, '1.04c', 'Classic', 'Bug fix patch'),
-    (1050, '1.05',  'Classic', 'Pre-LoD update'),
-    (1051, '1.05b', 'Classic', 'Bug fix patch'),
-    (1060, '1.06',  'Classic', 'Final Classic-era patch'),
-    (1061, '1.06b', 'Classic', 'Bug fix patch'),
-    -- LoD era (1.07+)
-    (1070, '1.07',  'LoD', 'Lord of Destruction release'),
-    (1080, '1.08',  'LoD', 'LoD patch'),
-    (1090, '1.09',  'LoD', 'Major LoD update'),
-    (1091, '1.09b', 'LoD', 'Bug fix patch'),
-    (1093, '1.09d', 'LoD', 'Bug fix patch'),
-    (1100, '1.10',  'LoD', 'Synergies patch'),
-    (1101, '1.10s', 'LoD', 'Beta/test version'),
-    (1110, '1.11',  'LoD', 'Uber content'),
-    (1111, '1.11b', 'LoD', 'Bug fix patch'),
-    (1120, '1.12',  'LoD', 'No-CD patch'),
-    (1121, '1.12a', 'LoD', 'Bug fix patch'),
-    (1130, '1.13',  'LoD', 'Respec patch'),
-    (1132, '1.13c', 'LoD', 'Bug fix patch'),
-    (1133, '1.13d', 'LoD', 'Final 1.13 patch'),
-    (1140, '1.14',  'LoD', 'Windows 10 compatibility'),
-    (1141, '1.14a', 'LoD', 'Bug fix patch'),
-    (1142, '1.14b', 'LoD', 'Bug fix patch'),
-    (1143, '1.14c', 'LoD', 'Bug fix patch'),
-    (1144, '1.14d', 'LoD', 'Final legacy patch')
-ON CONFLICT (id) DO NOTHING;
+-- Game versions will be populated dynamically by the Ghidra script as binaries are encountered
+-- This ensures only versions with actual data are added to the database
 
 -- Valid executables lookup table
 CREATE TABLE IF NOT EXISTS valid_executables (
