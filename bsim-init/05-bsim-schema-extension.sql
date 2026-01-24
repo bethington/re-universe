@@ -29,10 +29,25 @@ ALTER TABLE desctable ADD COLUMN IF NOT EXISTS enhanced_signature TEXT;
 
 -- Extend exetable (authentic BSim executable table) with version metadata
 -- game_version stores INTEGER version code (e.g., 1093 for 1.09d) - FK to game_versions.id
+-- NOTE: game_version is the FIRST version this binary was seen in (canonical/origin version)
 ALTER TABLE exetable ADD COLUMN IF NOT EXISTS sha256 VARCHAR(64);
 ALTER TABLE exetable ADD COLUMN IF NOT EXISTS game_version INTEGER;
 ALTER TABLE exetable ADD COLUMN IF NOT EXISTS version_family VARCHAR(16);
 ALTER TABLE exetable ADD COLUMN IF NOT EXISTS is_reference BOOLEAN DEFAULT FALSE;
+
+-- Binary-to-Version junction table for tracking which versions contain each binary
+-- Allows the same binary (by MD5) to be associated with multiple game versions
+-- Example: Storm.dll might be identical in 1.04b, 1.04c, and 1.05
+CREATE TABLE IF NOT EXISTS binary_versions (
+    executable_id BIGINT REFERENCES exetable(id) ON DELETE CASCADE,
+    game_version INTEGER REFERENCES game_versions(id) ON DELETE CASCADE,
+    version_family VARCHAR(16),
+    discovered_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (executable_id, game_version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_binary_versions_exe ON binary_versions(executable_id);
+CREATE INDEX IF NOT EXISTS idx_binary_versions_ver ON binary_versions(game_version);
 
 -- ============================================================================
 -- STEP 1b: Game Versions and Valid Executables Lookup Tables

@@ -219,6 +219,7 @@ public class Step0_ResetBSimDatabase extends GhidraScript {
             // Executable-level tables (reference exetable)
             deleteFromTable(conn, "api_imports", "API Imports");
             deleteFromTable(conn, "api_exports", "API Exports");
+            deleteFromTable(conn, "binary_versions", "Binary Versions");
             
             // Executables table (references game_versions)
             deleteFromTable(conn, "exetable", "Executables");
