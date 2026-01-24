@@ -1037,6 +1037,10 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 // Step 1b: Store API imports and exports (once per executable)
                 storeApiImports(conn, executableId, program);
                 storeApiExports(conn, executableId, program);
+                
+                // Step 1c: Record this version association in binary_versions junction table
+                // This allows tracking when the same binary appears in multiple game versions
+                storeBinaryVersionAssociation(conn, executableId, versionInfo);
             } catch (Exception e) {
                 try {
                     if (!conn.getAutoCommit()) {
@@ -1160,9 +1164,11 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
         // Create new executable record with SHA256 and integer version code
         // Use ON CONFLICT (md5) for idempotent insert (standard BSim behavior - md5 is unique)
+        // NOTE: Do NOT update game_version on conflict - keep the first seen version as canonical
+        // The binary_versions junction table tracks all versions that contain this binary
         String insertSql = "INSERT INTO exetable (name_exec, md5, sha256, architecture, name_compiler, ingest_date, repository, path, game_version, version_family) " +
             "VALUES (?, ?, ?, get_or_create_arch_id(?), get_or_create_compiler_id(?), NOW(), get_or_create_repository_id(?), get_or_create_path_id(?), ?, ?) " +
-            "ON CONFLICT (md5) DO UPDATE SET name_exec = EXCLUDED.name_exec, sha256 = EXCLUDED.sha256, ingest_date = NOW(), game_version = EXCLUDED.game_version, version_family = EXCLUDED.version_family " +
+            "ON CONFLICT (md5) DO UPDATE SET name_exec = EXCLUDED.name_exec, sha256 = EXCLUDED.sha256, ingest_date = NOW() " +
             "RETURNING id";
 
         try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
@@ -1213,9 +1219,10 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             // Fall back to basic insert
             println("  Attempting basic insert with integer version code");
 
+            // NOTE: Do NOT update game_version on conflict - keep the first seen version as canonical
             String basicInsertSql = "INSERT INTO exetable (name_exec, md5, sha256, architecture, name_compiler, ingest_date, repository, path, game_version, version_family) " +
                 "VALUES (?, ?, ?, get_or_create_arch_id(?), get_or_create_compiler_id(?), NOW(), get_or_create_repository_id(?), get_or_create_path_id(?), ?, ?) " +
-                "ON CONFLICT (md5) DO UPDATE SET name_exec = EXCLUDED.name_exec, sha256 = EXCLUDED.sha256, ingest_date = NOW(), game_version = EXCLUDED.game_version, version_family = EXCLUDED.version_family " +
+                "ON CONFLICT (md5) DO UPDATE SET name_exec = EXCLUDED.name_exec, sha256 = EXCLUDED.sha256, ingest_date = NOW() " +
                 "RETURNING id";
             try (PreparedStatement stmt = conn.prepareStatement(basicInsertSql)) {
                 stmt.setString(1, execName);
@@ -2988,6 +2995,42 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             }
         } catch (Exception e) {
             println("Note: Error extracting API exports: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Store binary-version association in the junction table.
+     * This allows tracking when the same binary (by MD5) appears in multiple game versions.
+     * Example: Storm.dll might be identical in 1.04b, 1.04c, and 1.05
+     */
+    private void storeBinaryVersionAssociation(Connection conn, int executableId, UnifiedVersionInfo versionInfo) {
+        Integer versionCode = versionInfo.getVersionCode();
+        String versionFamily = versionInfo.getValidatedVersionFamily();
+        
+        if (versionCode == null) {
+            println("  Skipping binary_versions entry - no version code");
+            return;
+        }
+        
+        String insertSql = """
+            INSERT INTO binary_versions (executable_id, game_version, version_family)
+            VALUES (?, ?, ?)
+            ON CONFLICT (executable_id, game_version) DO NOTHING
+            """;
+        
+        try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+            stmt.setInt(1, executableId);
+            stmt.setInt(2, versionCode);
+            stmt.setString(3, versionFamily);
+            
+            int rows = stmt.executeUpdate();
+            if (rows > 0) {
+                println("  Recorded version association: binary " + executableId + " → version " + versionCode);
+            } else {
+                println("  Version association already exists for binary " + executableId + " → version " + versionCode);
+            }
+        } catch (SQLException e) {
+            println("  Note: Could not store binary version association: " + e.getMessage());
         }
     }
 
