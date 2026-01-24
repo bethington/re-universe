@@ -71,8 +71,9 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
     // Known valid Diablo 2 versions (for validation display)
     private static final String[] VALID_GAME_VERSIONS = VERSION_CODES.keySet().toArray(new String[0]);
 
-    // Valid version families
-    private static final String[] VALID_VERSION_FAMILIES = {"Classic", "LoD", "D2R"};
+    // Valid version families (ONLY official Diablo 2 releases)
+    // Classic: 1.00-1.06b | LoD: 1.07-1.14d
+    private static final String[] VALID_VERSION_FAMILIES = {"Classic", "LoD"};
 
     // Processing mode
     private static final String MODE_SINGLE = "Single Program (current)";
@@ -272,6 +273,46 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             return false;
         }
 
+        /**
+         * Check if this program should be skipped (not an official D2 version)
+         * Only Classic 1.00-1.06b and LoD 1.07-1.14d are processed
+         * All mods (PD2, PoD, MedianXL, etc.) are ignored
+         */
+        public boolean shouldSkip() {
+            // Skip if family type is a mod folder
+            if (familyType != null && isModFolder(familyType)) {
+                return true;
+            }
+            
+            // Skip if version is unknown or not in our valid list
+            if (gameVersion == null || gameVersion.equals("Unknown")) {
+                return true;
+            }
+            
+            // Extract base version (strip mod suffix like "1.13c-PD2")
+            String baseVersion = gameVersion.contains("-") ? gameVersion.split("-")[0] : gameVersion;
+            
+            // Only allow versions in VERSION_CODES (1.00 through 1.14d)
+            return !VERSION_CODES.containsKey(baseVersion);
+        }
+
+        /**
+         * Get the reason why this program would be skipped
+         */
+        public String getSkipReason() {
+            if (familyType != null && isModFolder(familyType)) {
+                return "Mod folder (" + familyType + ") - only official D2 versions processed";
+            }
+            if (gameVersion == null || gameVersion.equals("Unknown")) {
+                return "Unknown version - cannot determine version from path or filename";
+            }
+            String baseVersion = gameVersion.contains("-") ? gameVersion.split("-")[0] : gameVersion;
+            if (!VERSION_CODES.containsKey(baseVersion)) {
+                return "Unsupported version (" + baseVersion + ") - only 1.00-1.14d supported";
+            }
+            return "Unknown reason";
+        }
+
         public boolean isValidUnifiedFormat() {
             return gameVersion != null && !gameVersion.equals("Unknown") && isKnownVersion(gameVersion);
         }
@@ -316,26 +357,32 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
         /**
          * Get the validated version family (returns null if invalid)
+         * RULE: Versions 1.07+ are ALWAYS LoD (Lord of Destruction era)
+         *       Only versions 1.00-1.06b can be Classic
          */
         public String getValidatedVersionFamily() {
-            if (familyType == null || familyType.equals("Unknown") || familyType.equals("Unified")) {
-                // Infer family from version if not explicitly set
-                if (gameVersion != null && isClassicVersion(gameVersion)) {
-                    return "Classic";
-                }
-                return "LoD";  // Default to LoD for most versions
+            // First check if version is 1.07+ - these are ALWAYS LoD regardless of folder
+            if (gameVersion != null && !isClassicVersion(gameVersion)) {
+                return "LoD";  // 1.07+ versions are always LoD
             }
+            
+            // For Classic-era versions (1.00-1.06b), use folder structure
+            if (familyType == null || familyType.equals("Unknown") || familyType.equals("Unified")) {
+                return "Classic";  // Default to Classic for pre-1.07 versions
+            }
+            
             // Check if it's a valid family
             for (String validFamily : VALID_VERSION_FAMILIES) {
                 if (familyType.equals(validFamily)) {
                     return familyType;
                 }
             }
+            
             // Mods are treated as LoD
             if (isModFolder(familyType)) {
                 return "LoD";
             }
-            return "LoD";  // Default fallback
+            return "Classic";  // Fallback for pre-1.07
         }
 
         public String getDisplayInfo() {
@@ -417,6 +464,18 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(programName, programPath);
         currentVersionInfo = versionInfo;  // Store for helper methods
 
+        // Check if this program should be skipped (mod or unsupported version)
+        if (versionInfo.shouldSkip()) {
+            popup("Program Skipped\n\n" +
+                "This program cannot be processed:\n\n" +
+                versionInfo.getSkipReason() + "\n\n" +
+                "Only official Diablo 2 versions are supported:\n" +
+                "• Classic: 1.00 through 1.06b\n" +
+                "• LoD: 1.07 through 1.14d");
+            println("Skipped: " + versionInfo.getSkipReason());
+            return;
+        }
+
         println("Program: " + programName);
         println("Project Path: " + programPath);
         println("Version Info: " + versionInfo.getDisplayInfo());
@@ -468,15 +527,43 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         DomainFolder rootFolder = projectData.getRootFolder();
 
         // Collect all program files
-        List<DomainFile> programFiles = new ArrayList<>();
-        collectProgramFiles(rootFolder, programFiles);
+        List<DomainFile> allProgramFiles = new ArrayList<>();
+        collectProgramFiles(rootFolder, allProgramFiles);
 
-        if (programFiles.isEmpty()) {
+        if (allProgramFiles.isEmpty()) {
             popup("No programs found in the project.");
             return;
         }
 
-        // Validate unified naming convention
+        // Filter to only official D2 versions (exclude mods and unsupported versions)
+        List<DomainFile> programFiles = new ArrayList<>();
+        List<String> skippedMods = new ArrayList<>();
+        
+        for (DomainFile file : allProgramFiles) {
+            UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(file.getName(), file.getPathname());
+            if (versionInfo.shouldSkip()) {
+                skippedMods.add(file.getName() + " (" + versionInfo.getSkipReason() + ")");
+            } else {
+                programFiles.add(file);
+            }
+        }
+
+        // Report what's being skipped
+        if (!skippedMods.isEmpty()) {
+            println("Skipping " + skippedMods.size() + " non-official binaries (mods/unsupported):");
+            for (String skipped : skippedMods) {
+                println("  ⏭ " + skipped);
+            }
+            println("");
+        }
+
+        if (programFiles.isEmpty()) {
+            popup("No official Diablo 2 programs found in the project.\n\n" +
+                  "Only Classic (1.00-1.06b) and LoD (1.07-1.14d) versions are supported.");
+            return;
+        }
+
+        // Validate unified naming convention for remaining files
         int validCount = 0;
         int invalidCount = 0;
         for (DomainFile file : programFiles) {
@@ -488,7 +575,8 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             }
         }
 
-        println("Found " + programFiles.size() + " programs in project");
+        println("Found " + programFiles.size() + " official D2 programs to process");
+        println("  (Excluded " + skippedMods.size() + " mod/unsupported binaries)");
         println("  Valid unified format: " + validCount);
         println("  Invalid/unknown format: " + invalidCount);
 
@@ -504,8 +592,12 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             }
         }
 
-        boolean proceed = askYesNo("Process All Programs",
-            String.format("Add all %d programs to BSim database?\n\nThis may take a while.", programFiles.size()));
+        boolean proceed = askYesNo("Process Official D2 Programs",
+            String.format("Add %d official D2 programs to BSim database?\n\n" +
+                "• Classic (1.00-1.06b): included\n" +
+                "• LoD (1.07-1.14d): included\n" +
+                "• Mods/Other: %d excluded\n\n" +
+                "This may take a while.", programFiles.size(), skippedMods.size()));
 
         if (!proceed) {
             println("Operation cancelled by user");
@@ -544,14 +636,20 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 successfulFiles.add(file.getName());
                 println("  ✓ Successfully added: " + file.getName());
             } catch (Exception e) {
-                if ("SKIP_EXISTING".equals(e.getMessage())) {
+                String msg = e.getMessage();
+                if (msg != null && msg.startsWith("SKIP_EXISTING")) {
                     println("  ⏭ Skipped " + file.getName() + " (already in database)");
                     skippedCount++;
-                    skippedFiles.add(file.getName());
+                    skippedFiles.add(file.getName() + " (already in database)");
+                } else if (msg != null && msg.startsWith("SKIP_NONOFFICIAL")) {
+                    String reason = msg.replace("SKIP_NONOFFICIAL: ", "");
+                    println("  ⏭ Skipped " + file.getName() + " (" + reason + ")");
+                    skippedCount++;
+                    skippedFiles.add(file.getName() + " (" + reason + ")");
                 } else {
-                    printerr("  ✗ Error processing " + file.getName() + ": " + e.getMessage());
+                    printerr("  ✗ Error processing " + file.getName() + ": " + msg);
                     errorCount++;
-                    errorFiles.add(file.getName() + ": " + e.getMessage());
+                    errorFiles.add(file.getName() + ": " + msg);
                 }
             }
         }
@@ -629,14 +727,23 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         collectProgramFiles(rootFolder, programFiles);
 
         // Filter by version and/or family using EXACT matching
+        // Also exclude mods and unsupported versions
         final String finalFamilyFilter = familyFilter;
         final String finalVersionFilter = versionFilterPart;
         
         List<DomainFile> matchingFiles = new ArrayList<>();
+        int skippedModCount = 0;
+        
         for (DomainFile file : programFiles) {
             String fileName = file.getName();
             String filePath = file.getPathname();
             UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(fileName, filePath);
+
+            // Skip mods and unsupported versions first
+            if (versionInfo.shouldSkip()) {
+                skippedModCount++;
+                continue;
+            }
 
             boolean familyMatches = true;
             boolean versionMatches = true;
@@ -664,8 +771,13 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             }
         }
 
+        if (skippedModCount > 0) {
+            println("(Excluded " + skippedModCount + " mod/unsupported binaries from search)");
+        }
+
         if (matchingFiles.isEmpty()) {
-            popup("No programs matching filter '" + versionFilter + "' found.");
+            popup("No official D2 programs matching filter '" + versionFilter + "' found.\n\n" +
+                  "Only Classic (1.00-1.06b) and LoD (1.07-1.14d) versions are supported.");
             return;
         }
 
@@ -717,14 +829,20 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 successfulFiles.add(file.getName());
                 println("  ✓ Successfully added: " + file.getName());
             } catch (Exception e) {
-                if ("SKIP_EXISTING".equals(e.getMessage())) {
+                String msg = e.getMessage();
+                if (msg != null && msg.startsWith("SKIP_EXISTING")) {
                     println("  ⏭ Skipped " + file.getName() + " (already in database)");
                     skippedCount++;
-                    skippedFiles.add(file.getName());
+                    skippedFiles.add(file.getName() + " (already in database)");
+                } else if (msg != null && msg.startsWith("SKIP_NONOFFICIAL")) {
+                    String reason = msg.replace("SKIP_NONOFFICIAL: ", "");
+                    println("  ⏭ Skipped " + file.getName() + " (" + reason + ")");
+                    skippedCount++;
+                    skippedFiles.add(file.getName() + " (" + reason + ")");
                 } else {
-                    printerr("  ✗ Error processing " + file.getName() + ": " + e.getMessage());
+                    printerr("  ✗ Error processing " + file.getName() + ": " + msg);
                     errorCount++;
-                    errorFiles.add(file.getName() + ": " + e.getMessage());
+                    errorFiles.add(file.getName() + ": " + msg);
                 }
             }
         }
@@ -786,14 +904,21 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
      * Process a single project file
      */
     private void processProjectFile(DomainFile file) throws Exception {
-        println("Processing: " + file.getPathname());
+        String programPath = file.getPathname();
+        String programName = file.getName();
+        
+        // Check if this program should be skipped BEFORE opening it
+        UnifiedVersionInfo preCheckInfo = new UnifiedVersionInfo(programName, programPath);
+        if (preCheckInfo.shouldSkip()) {
+            throw new Exception("SKIP_NONOFFICIAL: " + preCheckInfo.getSkipReason());
+        }
+        
+        println("Processing: " + programPath);
 
         // Open the program
         Program program = (Program) file.getDomainObject(this, true, false, monitor);
 
         try {
-            String programName = program.getName();
-            String programPath = file.getPathname();
             UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(programName, programPath);
             currentVersionInfo = versionInfo;  // Store for helper methods
 
