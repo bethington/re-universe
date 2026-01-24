@@ -522,6 +522,11 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         int successCount = 0;
         int errorCount = 0;
         int skippedCount = 0;
+        
+        // Store results for summary
+        List<String> successfulFiles = new ArrayList<>();
+        List<String> skippedFiles = new ArrayList<>();
+        List<String> errorFiles = new ArrayList<>();
 
         for (int i = 0; i < programFiles.size(); i++) {
             DomainFile file = programFiles.get(i);
@@ -536,18 +541,38 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             try {
                 processProjectFile(file);
                 successCount++;
+                successfulFiles.add(file.getName());
+                println("  ✓ Successfully added: " + file.getName());
             } catch (Exception e) {
                 if ("SKIP_EXISTING".equals(e.getMessage())) {
-                    println("  Skipped " + file.getName() + " (existing executable)");
+                    println("  ⏭ Skipped " + file.getName() + " (already in database)");
                     skippedCount++;
+                    skippedFiles.add(file.getName());
                 } else {
-                    printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                    printerr("  ✗ Error processing " + file.getName() + ": " + e.getMessage());
                     errorCount++;
+                    errorFiles.add(file.getName() + ": " + e.getMessage());
                 }
             }
         }
 
-        println(String.format("Completed: %d successful, %d errors, %d skipped", successCount, errorCount, skippedCount));
+        // Print detailed summary
+        println("");
+        println("═══════════════════════════════════════════════════════════════");
+        println("                    PROCESSING SUMMARY");
+        println("═══════════════════════════════════════════════════════════════");
+        println(String.format("Total processed: %d files", programFiles.size()));
+        println(String.format("  ✓ Successful: %d", successCount));
+        println(String.format("  ⏭ Skipped:    %d", skippedCount));
+        println(String.format("  ✗ Errors:     %d", errorCount));
+        if (!errorFiles.isEmpty()) {
+            println("");
+            println("Errors encountered:");
+            for (String err : errorFiles) {
+                println("  ! " + err);
+            }
+        }
+        println("═══════════════════════════════════════════════════════════════");
     }
 
     /**
@@ -562,11 +587,38 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
         // Ask for version filter
         String versionFilter = askString("Version Filter",
-            "Enter version pattern to match (e.g., '1.03', '1.13c', 'Classic'):", "1.03");
+            "Enter filter in one of these formats:\n\n" +
+            "• 'Classic/1.09' - Classic binaries for version 1.09 only\n" +
+            "• 'LoD/1.09' - LoD binaries for version 1.09 only\n" +
+            "• '1.09' - Both Classic and LoD for version 1.09\n" +
+            "• 'Classic' - All Classic versions\n" +
+            "• 'LoD' - All LoD versions", "LoD/1.09");
 
         if (versionFilter == null || versionFilter.trim().isEmpty()) {
             println("Operation cancelled - no filter provided");
             return;
+        }
+
+        // Parse the filter - check for family/version format
+        String familyFilter = null;
+        String versionFilterPart = null;
+        
+        if (versionFilter.contains("/")) {
+            // Format: "Classic/1.09" or "LoD/1.13c"
+            String[] parts = versionFilter.split("/", 2);
+            familyFilter = parts[0].trim();
+            versionFilterPart = parts[1].trim();
+            println("Filter: Family='" + familyFilter + "', Version='" + versionFilterPart + "'");
+        } else if (versionFilter.equalsIgnoreCase("Classic") || 
+                   versionFilter.equalsIgnoreCase("LoD") ||
+                   versionFilter.equalsIgnoreCase("D2R")) {
+            // Family-only filter
+            familyFilter = versionFilter;
+            println("Filter: Family='" + familyFilter + "' (all versions)");
+        } else {
+            // Version-only filter
+            versionFilterPart = versionFilter;
+            println("Filter: Version='" + versionFilterPart + "' (all families)");
         }
 
         ProjectData projectData = project.getProjectData();
@@ -576,16 +628,38 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         List<DomainFile> programFiles = new ArrayList<>();
         collectProgramFiles(rootFolder, programFiles);
 
-        // Filter by version using unified format
+        // Filter by version and/or family using EXACT matching
+        final String finalFamilyFilter = familyFilter;
+        final String finalVersionFilter = versionFilterPart;
+        
         List<DomainFile> matchingFiles = new ArrayList<>();
         for (DomainFile file : programFiles) {
             String fileName = file.getName();
-            UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(fileName, file.getPathname());
+            String filePath = file.getPathname();
+            UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(fileName, filePath);
 
-            // Match against version, family type, or filename
-            if (fileName.toLowerCase().contains(versionFilter.toLowerCase()) ||
-                (versionInfo.gameVersion != null && versionInfo.gameVersion.contains(versionFilter)) ||
-                versionInfo.familyType.toLowerCase().contains(versionFilter.toLowerCase())) {
+            boolean familyMatches = true;
+            boolean versionMatches = true;
+            
+            // Check family filter (if specified)
+            if (finalFamilyFilter != null) {
+                familyMatches = versionInfo.familyType.equalsIgnoreCase(finalFamilyFilter);
+            }
+            
+            // Check version filter (if specified) - EXACT match only
+            if (finalVersionFilter != null) {
+                versionMatches = false;
+                // Check parsed version info (exact match)
+                if (versionInfo.gameVersion != null && versionInfo.gameVersion.equals(finalVersionFilter)) {
+                    versionMatches = true;
+                }
+                // Also check folder path for exact version folder (e.g., "/1.09/" not "/1.09b/")
+                else if (filePath.contains("/" + finalVersionFilter + "/")) {
+                    versionMatches = true;
+                }
+            }
+            
+            if (familyMatches && versionMatches) {
                 matchingFiles.add(file);
             }
         }
@@ -621,6 +695,11 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         int successCount = 0;
         int errorCount = 0;
         int skippedCount = 0;
+        
+        // Store results for summary
+        List<String> successfulFiles = new ArrayList<>();
+        List<String> skippedFiles = new ArrayList<>();
+        List<String> errorFiles = new ArrayList<>();
 
         for (int i = 0; i < matchingFiles.size(); i++) {
             DomainFile file = matchingFiles.get(i);
@@ -635,18 +714,57 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             try {
                 processProjectFile(file);
                 successCount++;
+                successfulFiles.add(file.getName());
+                println("  ✓ Successfully added: " + file.getName());
             } catch (Exception e) {
                 if ("SKIP_EXISTING".equals(e.getMessage())) {
-                    println("  Skipped " + file.getName() + " (existing executable)");
+                    println("  ⏭ Skipped " + file.getName() + " (already in database)");
                     skippedCount++;
+                    skippedFiles.add(file.getName());
                 } else {
-                    printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                    printerr("  ✗ Error processing " + file.getName() + ": " + e.getMessage());
                     errorCount++;
+                    errorFiles.add(file.getName() + ": " + e.getMessage());
                 }
             }
         }
 
-        println(String.format("Completed: %d successful, %d errors, %d skipped", successCount, errorCount, skippedCount));
+        // Print detailed summary
+        println("");
+        println("═══════════════════════════════════════════════════════════════");
+        println("                    PROCESSING SUMMARY");
+        println("═══════════════════════════════════════════════════════════════");
+        println(String.format("Total processed: %d files", matchingFiles.size()));
+        println(String.format("  ✓ Successful: %d", successCount));
+        println(String.format("  ⏭ Skipped:    %d", skippedCount));
+        println(String.format("  ✗ Errors:     %d", errorCount));
+        println("");
+        
+        if (!successfulFiles.isEmpty()) {
+            println("Successfully added to database:");
+            for (String name : successfulFiles) {
+                println("  + " + name);
+            }
+            println("");
+        }
+        
+        if (!skippedFiles.isEmpty()) {
+            println("Skipped (already exist):");
+            for (String name : skippedFiles) {
+                println("  - " + name);
+            }
+            println("");
+        }
+        
+        if (!errorFiles.isEmpty()) {
+            println("Errors encountered:");
+            for (String err : errorFiles) {
+                println("  ! " + err);
+            }
+            println("");
+        }
+        
+        println("═══════════════════════════════════════════════════════════════");
     }
 
     /**
@@ -845,8 +963,20 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                         return existingId;
 
                     case ADD_MISSING:
-                        println("  Skipping existing executable (Add Missing mode)");
-                        throw new RuntimeException("SKIP_EXISTING");
+                        // Verify function counts match before skipping
+                        int dbFunctionCount = getDatabaseFunctionCount(conn, existingId);
+                        int ghidraFunctionCount = program.getFunctionManager().getFunctionCount();
+                        
+                        if (dbFunctionCount < ghidraFunctionCount) {
+                            // Functions are missing - need to process
+                            println("  ⚠ Function count mismatch: DB has " + dbFunctionCount + ", Ghidra has " + ghidraFunctionCount);
+                            println("  Processing missing functions...");
+                            return existingId;  // Return ID so functions get processed
+                        } else {
+                            println("  ✓ Function counts match (DB: " + dbFunctionCount + ", Ghidra: " + ghidraFunctionCount + ")");
+                            println("  Skipping existing executable (Add Missing mode)");
+                            throw new RuntimeException("SKIP_EXISTING");
+                        }
 
                     case ASK_INDIVIDUAL:
                         boolean update = askYesNo("Executable Exists",
@@ -1061,6 +1191,25 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         } catch (SQLException e) {
             printerr("  Error verifying executable: " + e.getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Get the count of functions in the database for a given executable
+     * Used to verify that all functions have been imported
+     */
+    private int getDatabaseFunctionCount(Connection conn, int executableId) {
+        String sql = "SELECT COUNT(*) as func_count FROM desctable WHERE id_exe = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, executableId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("func_count");
+            }
+            return 0;
+        } catch (SQLException e) {
+            printerr("  Error getting function count: " + e.getMessage());
+            return 0;  // Return 0 to trigger re-processing on error
         }
     }
 
