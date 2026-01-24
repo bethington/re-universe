@@ -38,7 +38,7 @@ import ghidra.framework.model.*;
 import java.sql.*;
 import java.util.*;
 
-public class Step3a_PopulateCommentsIntoBSim extends GhidraScript {
+public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
 
     private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
     private static final String DEFAULT_DB_USER = "ben";

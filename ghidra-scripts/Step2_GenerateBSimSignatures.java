@@ -4,26 +4,17 @@
 // different versions of binaries. This step transforms raw function data from Step1
 // into comparable signatures optimized for cross-version analysis.
 //
+// SIMPLIFIED IDEMPOTENT DESIGN:
+// - Automatically finds all functions in BSim database WITHOUT signatures
+// - Processes only unprocessed functions (safe to run multiple times)
+// - No mode selection needed - just run and it does the right thing
+// - Batch processes by executable for efficiency
+//
 // SIGNATURE GENERATION PROCESS:
 // - Analyzes function control flow and instruction patterns
-// - Creates LSH (Locality Sensitive Hash) signatures for similarity matching
+// - Creates structural signatures for similarity matching
 // - Stores enhanced signatures in BSim database for rapid comparison
-// - Optimizes signatures for unified version system cross-analysis
-//
-// UNIFIED VERSION INTEGRATION:
-// - Processes functions from binaries added via Step1
-// - Maintains version metadata for cross-version similarity analysis
-// - Compatible with both standard (1.03_D2Game.dll) and exception formats
-//
-// PROCESSING MODES:
-// - Single Program: Generate signatures for currently opened program
-// - All Programs: Batch signature generation for all project programs
-// - Version Filter: Generate signatures for programs matching version criteria
-//
-// TECHNICAL DETAILS:
-// - Compatible with Ghidra 11.4.2 - No BSim client dependencies required
-// - Uses direct PostgreSQL connectivity to remote database (localhost:5432)
-// - Implements enhanced signature algorithms for improved accuracy
+// - Enables cross-version function matching
 //
 // WORKFLOW POSITION: Requires Step1 completion, enables Step3-5 operations
 //
@@ -35,383 +26,338 @@
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.*;
 import ghidra.program.model.address.*;
-import ghidra.program.model.lang.*;
-import ghidra.util.exception.CancelledException;
 import ghidra.framework.model.*;
 import java.sql.*;
 import java.util.*;
-import java.util.regex.*;
 
 public class Step2_GenerateBSimSignatures extends GhidraScript {
 
     private static final String DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
     private static final String DB_USER = "ben";
     private static final String DB_PASS = "goodyx12";
-
-    // Mode selection constants
-    private static final String MODE_SINGLE = "Single Program (current)";
-    private static final String MODE_ALL = "All Programs in Project";
-    private static final String MODE_VERSION = "Programs by Version Filter";
-
-    // Unified version info helper
-    private static class UnifiedVersionInfo {
-        String gameVersion = null;
-        String familyType = "Unified";
-        boolean isException = false;
-
-        UnifiedVersionInfo(String executableName) {
-            parseUnifiedName(executableName);
-        }
-
-        private void parseUnifiedName(String executableName) {
-            if (executableName == null || executableName.isEmpty()) return;
-
-            // Try to extract version info from file path first
-            if (executableName.contains("/") || executableName.contains("\\")) {
-                parseFromPath(executableName);
-                if (gameVersion != null) return; // Successfully parsed from path
-            }
-
-            // Standard binaries: 1.03_D2Game.dll
-            Pattern standardPattern = Pattern.compile("^(1\\.[0-9]+[a-z]?)_([A-Za-z0-9_]+)\\.(dll|exe)$");
-            Matcher standardMatcher = standardPattern.matcher(executableName);
-
-            if (standardMatcher.matches()) {
-                gameVersion = standardMatcher.group(1);
-                familyType = "Unified";
-                isException = false;
-                return;
-            }
-
-            // Exception binaries: Classic_1.03_Game.exe
-            Pattern exceptionPattern = Pattern.compile("^(Classic|LoD)_(1\\.[0-9]+[a-z]?)_(Game|Diablo_II)\\.(exe|dll)$");
-            Matcher exceptionMatcher = exceptionPattern.matcher(executableName);
-
-            if (exceptionMatcher.matches()) {
-                familyType = exceptionMatcher.group(1);
-                gameVersion = exceptionMatcher.group(2);
-                isException = true;
-            }
-        }
-
-        private void parseFromPath(String fullPath) {
-            // Parse paths like "/Classic/1.05b/D2Sound.dll" or "/PD2/Game.exe"
-            String[] pathParts = fullPath.split("[/\\\\]");
-
-            for (int i = 0; i < pathParts.length; i++) {
-                String part = pathParts[i];
-                if (part.isEmpty()) continue; // Skip empty parts from leading slashes
-
-                // Check for family type (Classic, LoD, PD2, etc.)
-                if (part.equalsIgnoreCase("Classic") || part.equalsIgnoreCase("LoD")) {
-                    familyType = part;
-                    isException = true;
-
-                    // Look for version in next part
-                    if (i + 1 < pathParts.length) {
-                        String nextPart = pathParts[i + 1];
-                        // Updated regex to handle 1.00, 1.05b, 1.13c, etc.
-                        if (nextPart.matches("1\\.[0-9]{1,2}[a-z]?")) {
-                            gameVersion = nextPart;
-                        }
-                    }
-                    return;
-                }
-
-                // Check for PD2 or mod paths
-                if (part.equalsIgnoreCase("PD2")) {
-                    familyType = "PD2";
-                    gameVersion = "PD2";
-                    isException = false;
-                    return;
-                }
-
-                // Direct version pattern (like "1.05b" or "1.00")
-                if (part.matches("1\\.[0-9]{1,2}[a-z]?")) {
-                    gameVersion = part;
-                    if (familyType == null) {
-                        familyType = "Unified";
-                    }
-                    return;
-                }
-            }
-
-            // Fallback: try to infer from filename
-            String fileName = fullPath;
-            if (fileName.contains("/")) fileName = fileName.substring(fileName.lastIndexOf("/") + 1);
-            if (fileName.contains("\\")) fileName = fileName.substring(fileName.lastIndexOf("\\") + 1);
-
-            if (fileName.equals("Game.exe") || fileName.equals("Diablo II.exe")) {
-                familyType = "Classic";
-                gameVersion = "Unknown";
-                isException = true;
-            }
-        }
-
-        public String getDisplayInfo() {
-            if (gameVersion == null) return "Unknown format";
-            return isException ?
-                String.format("%s %s (Exception)", familyType, gameVersion) :
-                String.format("Unified %s (Standard)", gameVersion);
-        }
-
-        public boolean isValid() {
-            return gameVersion != null;
-        }
-    }
+    
+    // Statistics
+    private int totalProcessed = 0;
+    private int totalSkipped = 0;
+    private int totalErrors = 0;
 
     @Override
     public void run() throws Exception {
-        println("=== Enhanced BSim Signature Generation ===");
+        println("=== Enhanced BSim Signature Generation (Idempotent) ===");
+        println("");
 
-        // Ask user for processing mode
-        String[] modes = { MODE_SINGLE, MODE_ALL, MODE_VERSION };
-        String selectedMode = askChoice("Select Processing Mode",
-            "How would you like to generate signatures?",
-            Arrays.asList(modes), MODE_SINGLE);
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
+            println("Connected to BSim database");
 
-        if (selectedMode == null) {
-            println("Operation cancelled by user");
-            return;
-        }
-
-        if (selectedMode.equals(MODE_SINGLE)) {
-            processSingleProgram();
-        } else if (selectedMode.equals(MODE_ALL)) {
-            processAllPrograms();
-        } else if (selectedMode.equals(MODE_VERSION)) {
-            processVersionFiltered();
-        }
-    }
-
-    private void processSingleProgram() throws Exception {
-        if (currentProgram == null) {
-            popup("No program is currently open. Please open a program first.");
-            return;
-        }
-
-        String programName = currentProgram.getName();
-        UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(programName);
-
-        println("Program: " + programName);
-        println("Version Info: " + versionInfo.getDisplayInfo());
-
-        FunctionManager funcManager = currentProgram.getFunctionManager();
-        int functionCount = funcManager.getFunctionCount();
-        println("Total functions: " + functionCount);
-
-        if (!versionInfo.isValid()) {
-            boolean proceed = askYesNo("Non-Unified Format",
-                "This executable doesn't follow unified naming.\n" +
-                "Signatures will be generated but may not have optimal version mapping.\n\n" +
-                "Continue?");
-            if (!proceed) {
-                println("Operation cancelled");
+            // Check if enhanced_signatures table exists
+            if (!checkEnhancedSignaturesTable(conn)) {
+                popup("Enhanced signatures table not found in database.\n" +
+                      "Please ensure the BSim schema extension is installed.");
                 return;
             }
-        }
 
-        boolean proceed = askYesNo("Generate Enhanced Signatures",
-            String.format("Generate enhanced signatures for %d functions?\n\n" +
-            "Version: %s\n\n" +
-            "This will:\n" +
-            "- Create structural function signatures\n" +
-            "- Extract instruction patterns and features\n" +
-            "- Store data for similarity analysis\n" +
-            "- Enable cross-version function matching\n\nProceed?",
-            functionCount, versionInfo.getDisplayInfo()));
+            // Get statistics on what needs processing
+            int[] stats = getProcessingStats(conn);
+            int totalFunctions = stats[0];
+            int withSignatures = stats[1];
+            int needsProcessing = totalFunctions - withSignatures;
 
-        if (!proceed) {
-            println("Operation cancelled by user");
-            return;
-        }
+            println(String.format("Database Status:"));
+            println(String.format("  Total functions: %,d", totalFunctions));
+            println(String.format("  Already have signatures: %,d (%.1f%%)", 
+                withSignatures, (100.0 * withSignatures / totalFunctions)));
+            println(String.format("  Need signatures: %,d (%.1f%%)", 
+                needsProcessing, (100.0 * needsProcessing / totalFunctions)));
+            println("");
 
-        try {
-            generateSignatures(currentProgram, programName, versionInfo);
-            println("Successfully generated enhanced signatures!");
+            if (needsProcessing == 0) {
+                println("✓ All functions already have signatures. Nothing to do.");
+                popup("All functions already have signatures!\n\n" +
+                      String.format("Total: %,d functions with signatures.", withSignatures));
+                return;
+            }
 
-        } catch (Exception e) {
-            printerr("Error generating signatures: " + e.getMessage());
+            // Get list of executables that have unprocessed functions
+            List<ExecutableInfo> execsToProcess = getExecutablesNeedingSignatures(conn);
+            
+            if (execsToProcess.isEmpty()) {
+                println("No executables found with unprocessed functions.");
+                return;
+            }
+
+            println(String.format("Found %d executables with unprocessed functions:", execsToProcess.size()));
+            for (ExecutableInfo exec : execsToProcess) {
+                println(String.format("  - %s: %,d functions need signatures", exec.name, exec.unprocessedCount));
+            }
+            println("");
+
+            // Ask for confirmation
+            boolean proceed = askYesNo("Generate Missing Signatures",
+                String.format("Generate signatures for %,d unprocessed functions across %d executables?\n\n" +
+                    "This will:\n" +
+                    "- Open each executable from the Ghidra project\n" +
+                    "- Generate structural signatures for functions without them\n" +
+                    "- Store signatures in BSim database\n\n" +
+                    "Already processed functions will be skipped.\n\nProceed?",
+                    needsProcessing, execsToProcess.size()));
+
+            if (!proceed) {
+                println("Operation cancelled by user");
+                return;
+            }
+
+            // Process each executable
+            Project project = state.getProject();
+            if (project == null) {
+                popup("No project is currently open.");
+                return;
+            }
+
+            ProjectData projectData = project.getProjectData();
+            DomainFolder rootFolder = projectData.getRootFolder();
+
+            // Build map of project files
+            Map<String, DomainFile> projectFiles = new HashMap<>();
+            collectProgramFiles(rootFolder, projectFiles);
+
+            println(String.format("Found %d program files in Ghidra project", projectFiles.size()));
+            println("");
+
+            int execsProcessed = 0;
+            int execsSkipped = 0;
+
+            for (int i = 0; i < execsToProcess.size(); i++) {
+                ExecutableInfo execInfo = execsToProcess.get(i);
+                
+                if (monitor.isCancelled()) {
+                    println("Operation cancelled by user");
+                    break;
+                }
+
+                monitor.setMessage(String.format("Processing %d/%d: %s", 
+                    i + 1, execsToProcess.size(), execInfo.name));
+                monitor.setProgress(i * 100 / execsToProcess.size());
+
+                // Find matching file in project
+                DomainFile matchingFile = findMatchingFile(projectFiles, execInfo.name);
+                
+                if (matchingFile == null) {
+                    println(String.format("⚠ Could not find '%s' in Ghidra project - skipping", execInfo.name));
+                    execsSkipped++;
+                    continue;
+                }
+
+                try {
+                    processExecutable(conn, matchingFile, execInfo);
+                    execsProcessed++;
+                } catch (Exception e) {
+                    printerr(String.format("Error processing %s: %s", execInfo.name, e.getMessage()));
+                    totalErrors++;
+                }
+            }
+
+            // Final summary
+            println("");
+            println("=== Processing Complete ===");
+            println(String.format("Executables processed: %d", execsProcessed));
+            println(String.format("Executables skipped (not in project): %d", execsSkipped));
+            println(String.format("Functions with new signatures: %,d", totalProcessed));
+            println(String.format("Functions skipped (already had signatures): %,d", totalSkipped));
+            println(String.format("Errors: %d", totalErrors));
+
+            // Refresh materialized views
+            refreshMaterializedViews(conn);
+
+        } catch (SQLException e) {
+            printerr("Database error: " + e.getMessage());
             e.printStackTrace();
             throw e;
         }
     }
 
-    private void processAllPrograms() throws Exception {
-        Project project = state.getProject();
-        if (project == null) {
-            popup("No project is currently open.");
-            return;
-        }
-
-        ProjectData projectData = project.getProjectData();
-        DomainFolder rootFolder = projectData.getRootFolder();
-
-        List<DomainFile> programFiles = new ArrayList<>();
-        collectProgramFiles(rootFolder, programFiles);
-
-        if (programFiles.isEmpty()) {
-            popup("No program files found in the project.");
-            return;
-        }
-
-        // Validate unified formats
-        int validCount = 0;
-        int invalidCount = 0;
-        for (DomainFile file : programFiles) {
-            UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(file.getName());
-            if (versionInfo.isValid()) {
-                validCount++;
-            } else {
-                invalidCount++;
+    /**
+     * Get count of total functions and functions with signatures
+     */
+    private int[] getProcessingStats(Connection conn) throws SQLException {
+        String sql = """
+            SELECT 
+                (SELECT COUNT(*) FROM desctable) as total,
+                (SELECT COUNT(*) FROM enhanced_signatures) as with_sigs
+            """;
+        
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            if (rs.next()) {
+                return new int[] { rs.getInt("total"), rs.getInt("with_sigs") };
             }
         }
-
-        println("Found " + programFiles.size() + " program files");
-        println("  Valid unified format: " + validCount);
-        println("  Invalid/unknown format: " + invalidCount);
-
-        boolean proceed = askYesNo("Generate Signatures for All Programs",
-            String.format("Generate enhanced signatures for all %d programs?\n\n" +
-            "Valid unified format: %d\n" +
-            "Invalid format: %d\n\n" +
-            "This may take a considerable amount of time.",
-            programFiles.size(), validCount, invalidCount));
-
-        if (!proceed) {
-            println("Operation cancelled by user");
-            return;
-        }
-
-        int successCount = 0;
-        int errorCount = 0;
-
-        for (int i = 0; i < programFiles.size(); i++) {
-            DomainFile file = programFiles.get(i);
-            monitor.setMessage(String.format("Processing %d/%d: %s", i + 1, programFiles.size(), file.getName()));
-            monitor.setProgress(i);
-
-            if (monitor.isCancelled()) {
-                println("Operation cancelled by user");
-                break;
-            }
-
-            try {
-                processProjectFile(file);
-                successCount++;
-            } catch (Exception e) {
-                printerr("Error processing " + file.getName() + ": " + e.getMessage());
-                errorCount++;
-            }
-        }
-
-        println(String.format("Completed: %d successful, %d errors", successCount, errorCount));
+        return new int[] { 0, 0 };
     }
 
-    private void processVersionFiltered() throws Exception {
-        Project project = state.getProject();
-        if (project == null) {
-            popup("No project is currently open.");
-            return;
-        }
-
-        String versionFilter = askString("Version Filter",
-            "Enter version pattern (e.g., '1.03', '1.04b', '1.13c', 'Classic'):", "1.04b");
-
-        if (versionFilter == null || versionFilter.trim().isEmpty()) {
-            println("Operation cancelled - no filter provided");
-            return;
-        }
-
-        ProjectData projectData = project.getProjectData();
-        DomainFolder rootFolder = projectData.getRootFolder();
-
-        List<DomainFile> programFiles = new ArrayList<>();
-        collectProgramFiles(rootFolder, programFiles);
-
-        // Get programs from BSim database that match the version filter
-        Set<String> bsimProgramNames = getBSimProgramsByVersion(versionFilter);
-
-        if (bsimProgramNames.isEmpty()) {
-            popup("No programs matching version '" + versionFilter + "' found in BSim database.\n" +
-                  "Available versions can be seen by running Step1 first.");
-            return;
-        }
-
-        println("Found " + bsimProgramNames.size() + " programs in BSim database for version '" + versionFilter + "':");
-        for (String name : bsimProgramNames) {
-            println("  - " + name);
-        }
-
-        // Filter Ghidra project files by matching names in BSim database
-        List<DomainFile> matchingFiles = new ArrayList<>();
-        for (DomainFile file : programFiles) {
-            String fileName = file.getName();
-
-            // Direct name match
-            if (bsimProgramNames.contains(fileName)) {
-                matchingFiles.add(file);
-                continue;
+    /**
+     * Get list of executables that have functions without signatures
+     */
+    private List<ExecutableInfo> getExecutablesNeedingSignatures(Connection conn) throws SQLException {
+        List<ExecutableInfo> result = new ArrayList<>();
+        
+        String sql = """
+            SELECT e.id, e.name_exec, 
+                   COUNT(d.id) as total_functions,
+                   COUNT(d.id) - COUNT(es.id) as unprocessed_count
+            FROM exetable e
+            JOIN desctable d ON d.id_exe = e.id
+            LEFT JOIN enhanced_signatures es ON es.function_id = d.id
+            GROUP BY e.id, e.name_exec
+            HAVING COUNT(d.id) - COUNT(es.id) > 0
+            ORDER BY unprocessed_count DESC
+            """;
+        
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                ExecutableInfo info = new ExecutableInfo();
+                info.id = rs.getInt("id");
+                info.name = rs.getString("name_exec");
+                info.totalFunctions = rs.getInt("total_functions");
+                info.unprocessedCount = rs.getInt("unprocessed_count");
+                result.add(info);
             }
+        }
+        
+        return result;
+    }
 
-            // Check for unified name formats that might match
-            for (String bsimName : bsimProgramNames) {
-                if (isNameMatch(fileName, bsimName)) {
-                    matchingFiles.add(file);
-                    break;
+    /**
+     * Get list of function IDs that don't have signatures yet for this executable
+     */
+    private List<FunctionToProcess> getFunctionsNeedingSignatures(Connection conn, int executableId) throws SQLException {
+        List<FunctionToProcess> result = new ArrayList<>();
+        
+        String sql = """
+            SELECT d.id, d.name_func, d.addr
+            FROM desctable d
+            LEFT JOIN enhanced_signatures es ON es.function_id = d.id
+            WHERE d.id_exe = ? AND es.id IS NULL
+            ORDER BY d.addr
+            """;
+        
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, executableId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                FunctionToProcess func = new FunctionToProcess();
+                func.id = rs.getInt("id");
+                func.name = rs.getString("name_func");
+                func.address = rs.getLong("addr");
+                result.add(func);
+            }
+        }
+        
+        return result;
+    }
+
+    /**
+     * Process a single executable - generate signatures for unprocessed functions
+     */
+    private void processExecutable(Connection conn, DomainFile file, ExecutableInfo execInfo) throws Exception {
+        println(String.format("Processing: %s (%,d functions need signatures)", 
+            execInfo.name, execInfo.unprocessedCount));
+
+        // Get list of functions needing signatures
+        List<FunctionToProcess> functionsToProcess = getFunctionsNeedingSignatures(conn, execInfo.id);
+        
+        if (functionsToProcess.isEmpty()) {
+            println("  All functions already have signatures - skipping");
+            return;
+        }
+
+        // Build lookup map by address
+        Map<Long, FunctionToProcess> addressMap = new HashMap<>();
+        for (FunctionToProcess func : functionsToProcess) {
+            addressMap.put(func.address, func);
+        }
+
+        // Open the program
+        Program program = (Program) file.getDomainObject(this, true, false, monitor);
+        
+        try {
+            FunctionManager funcManager = program.getFunctionManager();
+            
+            String insertSql = """
+                INSERT INTO enhanced_signatures 
+                    (function_id, executable_id, signature_hash, signature_data, lsh_vector, confidence_score)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT (function_id) DO NOTHING
+                """;
+            
+            int processed = 0;
+            int skipped = 0;
+            
+            try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+                FunctionIterator functions = funcManager.getFunctions(true);
+                
+                while (functions.hasNext() && !monitor.isCancelled()) {
+                    Function function = functions.next();
+                    long addr = function.getEntryPoint().getOffset();
+                    
+                    // Check if this function needs processing
+                    FunctionToProcess funcInfo = addressMap.get(addr);
+                    if (funcInfo == null) {
+                        skipped++;
+                        continue; // Already has signature
+                    }
+                    
+                    // Generate signature
+                    FunctionSignature sig = generateFunctionSignature(program, function);
+                    
+                    // Create JSON signature data
+                    String signatureData = String.format(
+                        "{\"instructionCount\":%d,\"basicBlockCount\":%d,\"callCount\":%d,\"quality\":%.2f,\"featureVector\":\"%s\"}",
+                        sig.instructionCount, sig.basicBlockCount, sig.callCount,
+                        sig.quality, sig.featureVector);
+                    
+                    stmt.setInt(1, funcInfo.id);
+                    stmt.setInt(2, execInfo.id);
+                    stmt.setString(3, sig.hash);
+                    stmt.setString(4, signatureData);
+                    stmt.setString(5, sig.featureVector);
+                    stmt.setDouble(6, sig.quality);
+                    
+                    stmt.addBatch();
+                    processed++;
+                    
+                    // Execute batch periodically
+                    if (processed % 500 == 0) {
+                        stmt.executeBatch();
+                        monitor.setMessage(String.format("Processing %s: %,d/%,d", 
+                            execInfo.name, processed, functionsToProcess.size()));
+                    }
                 }
+                
+                // Execute remaining batch
+                stmt.executeBatch();
             }
+            
+            println(String.format("  ✓ Generated %,d signatures (skipped %,d already processed)", 
+                processed, skipped));
+            
+            totalProcessed += processed;
+            totalSkipped += skipped;
+            
+        } finally {
+            program.release(this);
         }
-
-        if (matchingFiles.isEmpty()) {
-            popup("No programs matching version '" + versionFilter + "' found in Ghidra project.\n\n" +
-                  "BSim database contains programs for this version:\n" +
-                  String.join(", ", bsimProgramNames) + "\n\n" +
-                  "But none were found in the current Ghidra project.");
-            return;
-        }
-
-        println("Found " + matchingFiles.size() + " matching programs in Ghidra project:");
-        for (DomainFile file : matchingFiles) {
-            println("  - " + file.getName());
-        }
-
-        boolean proceed = askYesNo("Generate Signatures for Filtered Programs",
-            String.format("Generate signatures for %d programs matching version '%s'?",
-            matchingFiles.size(), versionFilter));
-
-        if (!proceed) {
-            println("Operation cancelled by user");
-            return;
-        }
-
-        int successCount = 0;
-        int errorCount = 0;
-
-        for (int i = 0; i < matchingFiles.size(); i++) {
-            DomainFile file = matchingFiles.get(i);
-            monitor.setMessage(String.format("Processing %d/%d: %s", i + 1, matchingFiles.size(), file.getName()));
-
-            if (monitor.isCancelled()) {
-                break;
-            }
-
-            try {
-                processProjectFile(file);
-                successCount++;
-            } catch (Exception e) {
-                printerr("Error processing " + file.getName() + ": " + e.getMessage());
-                errorCount++;
-            }
-        }
-
-        println(String.format("Completed: %d successful, %d errors", successCount, errorCount));
     }
 
-    private void collectProgramFiles(DomainFolder folder, List<DomainFile> files) throws Exception {
+    /**
+     * Collect all program files from project into a map
+     */
+    private void collectProgramFiles(DomainFolder folder, Map<String, DomainFile> files) throws Exception {
         for (DomainFile file : folder.getFiles()) {
             if (file.getContentType().equals("Program")) {
-                files.add(file);
+                // Store by full path and by name for flexible matching
+                files.put(file.getPathname(), file);
+                files.put(file.getName(), file);
             }
         }
 
@@ -420,251 +366,83 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
         }
     }
 
-    private void processProjectFile(DomainFile file) throws Exception {
-        println("Processing: " + file.getPathname());
-
-        Program program = (Program) file.getDomainObject(this, true, false, monitor);
-
-        try {
-            String programName = program.getName();
-            UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(programName);
-            generateSignatures(program, programName, versionInfo);
-            println("  Generated signatures for " + programName + " (" + versionInfo.getDisplayInfo() + ")");
-
-        } finally {
-            program.release(this);
-        }
-    }
-
-    private void generateSignatures(Program program, String programName, UnifiedVersionInfo versionInfo) throws Exception {
-        println("Connecting to BSim database...");
-
-        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
-            println("Connected to BSim database");
-
-            // Get executable ID
-            int executableId = getExecutableId(conn, programName, versionInfo);
-            if (executableId == -1) {
-                // Provide more helpful error message
-                String unifiedName = generateUnifiedExecutableName(programName, versionInfo);
-                throw new Exception(String.format("Executable not found in database.\n" +
-                    "  Tried: '%s', unified: '%s', version: %s\n" +
-                    "  Run AddProgramToBSimDatabase first for this binary.",
-                    programName, unifiedName, versionInfo.getDisplayInfo()));
-            }
-
-            println("Found executable ID: " + executableId);
-
-            // Generate enhanced signatures
-            generateEnhancedSignatures(conn, executableId, program, versionInfo);
-
-            // Update similarity analysis
-            updateSimilarityAnalysis(conn, executableId);
-
-            println("Signature generation completed for " + programName);
-
-        } catch (SQLException e) {
-            printerr("Database error: " + e.getMessage());
-            throw e;
-        }
-    }
-
-    private int getExecutableId(Connection conn, String programName, UnifiedVersionInfo versionInfo) throws SQLException {
-        // First try with the original name (for backward compatibility)
-        String originalSql = "SELECT id FROM exetable WHERE name_exec = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(originalSql)) {
-            stmt.setString(1, programName);
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                return rs.getInt("id");
-            }
+    /**
+     * Find a project file matching the executable name from the database
+     */
+    private DomainFile findMatchingFile(Map<String, DomainFile> projectFiles, String execName) {
+        // Direct match
+        if (projectFiles.containsKey(execName)) {
+            return projectFiles.get(execName);
         }
 
-        // Try with unified name format (generated by Step1)
-        String unifiedName = generateUnifiedExecutableName(programName, versionInfo);
-        String unifiedSql = "SELECT id FROM exetable WHERE name_exec = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(unifiedSql)) {
-            stmt.setString(1, unifiedName);
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                println("Found executable using unified name: " + unifiedName);
-                return rs.getInt("id");
+        // Extract base filename for matching
+        String baseName = execName;
+        
+        // Handle unified naming: "1.05b_D2Game.dll" -> "D2Game.dll"
+        if (baseName.matches("^\\d+\\.\\d+[a-z]?_.*")) {
+            baseName = baseName.substring(baseName.indexOf("_") + 1);
+        }
+        
+        // Handle exception naming: "Classic_1.05b_Diablo_II.exe" -> "Diablo II.exe" or "Game.exe"
+        if (baseName.matches("^(Classic|LoD)_\\d+\\.\\d+[a-z]?_.*")) {
+            String[] parts = baseName.split("_", 3);
+            if (parts.length >= 3) {
+                baseName = parts[2].replace("_", " ");
             }
         }
-
-        // Try partial matching for executables stored with different naming patterns
-        // Order by function count to prefer more complete entries
-        String partialSql = """
-            SELECT e.id, e.name_exec, COUNT(d.id) as function_count
-            FROM exetable e
-            LEFT JOIN desctable d ON d.id_exe = e.id
-            WHERE e.name_exec ILIKE ?
-            GROUP BY e.id, e.name_exec
-            ORDER BY function_count DESC, e.name_exec
-            """;
-        try (PreparedStatement stmt = conn.prepareStatement(partialSql)) {
-            // Extract just the base filename
-            String baseFileName = programName;
-            if (baseFileName.contains("/")) {
-                baseFileName = baseFileName.substring(baseFileName.lastIndexOf("/") + 1);
+        
+        // Search for matching file
+        for (Map.Entry<String, DomainFile> entry : projectFiles.entrySet()) {
+            String path = entry.getKey();
+            String fileName = path;
+            if (fileName.contains("/")) {
+                fileName = fileName.substring(fileName.lastIndexOf("/") + 1);
             }
-            if (baseFileName.contains("\\")) {
-                baseFileName = baseFileName.substring(baseFileName.lastIndexOf("\\") + 1);
-            }
-
-            stmt.setString(1, "%" + baseFileName);
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                int id = rs.getInt("id");
-                String foundName = rs.getString("name_exec");
-                int functionCount = rs.getInt("function_count");
-                println("Found executable using partial match: " + foundName + " (" + functionCount + " functions) for " + baseFileName);
-                return id;
+            
+            // Check various matching conditions
+            if (fileName.equals(baseName) || 
+                fileName.replace(" ", "_").equals(baseName) ||
+                fileName.equals(baseName.replace("_", " "))) {
+                
+                // Verify version matches by checking path
+                if (execName.contains("_") && path.contains("/")) {
+                    String version = extractVersion(execName);
+                    if (version != null && path.contains("/" + version + "/")) {
+                        return entry.getValue();
+                    }
+                }
             }
         }
-
-        return -1;
+        
+        // Looser matching - just find by base name
+        for (Map.Entry<String, DomainFile> entry : projectFiles.entrySet()) {
+            String fileName = entry.getValue().getName();
+            if (fileName.equals(baseName) || 
+                fileName.replace(" ", "_").equals(baseName.replace(" ", "_"))) {
+                return entry.getValue();
+            }
+        }
+        
+        return null;
     }
 
     /**
-     * Generate unified executable name (matching Step1 logic)
+     * Extract version string from executable name
      */
-    private String generateUnifiedExecutableName(String programName, UnifiedVersionInfo versionInfo) {
-        String fileName = programName;
-        if (fileName.contains("/")) {
-            fileName = fileName.substring(fileName.lastIndexOf("/") + 1);
+    private String extractVersion(String execName) {
+        // Match patterns like "1.05b" from "1.05b_D2Game.dll" or "Classic_1.05b_..."
+        java.util.regex.Pattern p = java.util.regex.Pattern.compile("(\\d+\\.\\d+[a-z]?)");
+        java.util.regex.Matcher m = p.matcher(execName);
+        if (m.find()) {
+            return m.group(1);
         }
-        if (fileName.contains("\\")) {
-            fileName = fileName.substring(fileName.lastIndexOf("\\") + 1);
-        }
-        fileName = fileName.replace(" ", "_");
-
-        // Handle null/missing version info
-        String gameVersion = versionInfo.gameVersion != null ? versionInfo.gameVersion : "Unknown";
-        String familyType = versionInfo.familyType != null ? versionInfo.familyType : "Unified";
-
-        if (fileName.equals("Game.exe") || fileName.equals("Diablo_II.exe")) {
-            return String.format("%s_%s_Diablo_II.exe", familyType, gameVersion);
-        }
-        return String.format("%s_%s", gameVersion, fileName);
+        return null;
     }
 
-    private void generateEnhancedSignatures(Connection conn, int executableId, Program program, UnifiedVersionInfo versionInfo) throws Exception {
-        println("Generating enhanced signatures...");
-
-        FunctionManager funcManager = program.getFunctionManager();
-        FunctionIterator functions = funcManager.getFunctions(true);
-
-        int functionCount = 0;
-        int signatureCount = 0;
-
-        // Check if enhanced_signatures table exists
-        boolean hasEnhancedTable = checkEnhancedSignaturesTable(conn);
-
-        String insertSql;
-        if (hasEnhancedTable) {
-            insertSql = "INSERT INTO enhanced_signatures (function_id, executable_id, signature_hash, " +
-                "signature_data, lsh_vector, confidence_score) " +
-                "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (function_id) DO UPDATE SET " +
-                "signature_hash = EXCLUDED.signature_hash, " +
-                "signature_data = EXCLUDED.signature_data, " +
-                "lsh_vector = EXCLUDED.lsh_vector, " +
-                "confidence_score = EXCLUDED.confidence_score";
-        } else {
-            println("Enhanced signatures table not available - using basic signature storage");
-            return;
-        }
-
-        try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
-
-            while (functions.hasNext() && !monitor.isCancelled()) {
-                Function function = functions.next();
-                functionCount++;
-
-                if (functionCount % 50 == 0) {
-                    monitor.setMessage(String.format("Processing function %d: %s", functionCount, function.getName()));
-                }
-
-                try {
-                    // Get function ID from desctable (try address first, then name)
-                    int functionId = getFunctionId(conn, function, executableId);
-                    if (functionId == -1) {
-                        continue; // Function not in database
-                    }
-
-                    // Generate enhanced signature
-                    FunctionSignature signature = generateFunctionSignature(function);
-
-                    // Create JSON signature data
-                    String signatureData = String.format(
-                        "{\"instructionCount\":%d,\"basicBlockCount\":%d,\"callCount\":%d,\"quality\":%.2f,\"featureVector\":\"%s\"}",
-                        signature.instructionCount, signature.basicBlockCount, signature.callCount,
-                        signature.quality, signature.featureVector);
-
-                    stmt.setInt(1, functionId);
-                    stmt.setInt(2, executableId);
-                    stmt.setString(3, signature.hash);
-                    stmt.setString(4, signatureData);
-                    stmt.setString(5, signature.featureVector);  // Use as LSH vector
-                    stmt.setDouble(6, signature.quality);
-
-                    stmt.addBatch();
-                    signatureCount++;
-
-                    // Execute batch periodically
-                    if (signatureCount % 100 == 0) {
-                        stmt.executeBatch();
-                    }
-
-                } catch (SQLException e) {
-                    printerr("Error processing function " + function.getName() + ": " + e.getMessage());
-                }
-            }
-
-            // Execute remaining batch
-            stmt.executeBatch();
-        }
-
-        println(String.format("Generated %d enhanced signatures for %d functions", signatureCount, functionCount));
-    }
-
-    private boolean checkEnhancedSignaturesTable(Connection conn) {
-        try (Statement stmt = conn.createStatement()) {
-            stmt.executeQuery("SELECT 1 FROM enhanced_signatures LIMIT 1");
-            return true;
-        } catch (SQLException e) {
-            return false;
-        }
-    }
-
-    private int getFunctionId(Connection conn, Function function, int executableId) throws SQLException {
-        // Try matching by address first (most reliable)
-        long address = function.getEntryPoint().getOffset();
-        String addressSql = "SELECT id FROM desctable WHERE addr = ? AND id_exe = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(addressSql)) {
-            stmt.setLong(1, address);
-            stmt.setInt(2, executableId);
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                return rs.getInt("id");
-            }
-        }
-
-        // Fallback to name matching (for backward compatibility)
-        String nameSql = "SELECT id FROM desctable WHERE name_func = ? AND id_exe = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(nameSql)) {
-            stmt.setString(1, function.getName());
-            stmt.setInt(2, executableId);
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                return rs.getInt("id");
-            }
-        }
-
-        return -1;
-    }
-
-    private FunctionSignature generateFunctionSignature(Function function) {
+    /**
+     * Generate structural signature for a function
+     */
+    private FunctionSignature generateFunctionSignature(Program program, Function function) {
         FunctionSignature signature = new FunctionSignature();
 
         // Basic metrics
@@ -673,7 +451,7 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
 
         // Count calls
         signature.callCount = 0;
-        InstructionIterator instructions = currentProgram.getListing().getInstructions(function.getBody(), true);
+        InstructionIterator instructions = program.getListing().getInstructions(function.getBody(), true);
         while (instructions.hasNext()) {
             Instruction instruction = instructions.next();
             if (instruction.getFlowType().isCall()) {
@@ -681,7 +459,7 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
             }
         }
 
-        // Generate feature vector (simplified)
+        // Generate feature vector
         signature.featureVector = String.format("inst:%d,bb:%d,calls:%d",
             signature.instructionCount, signature.basicBlockCount, signature.callCount);
 
@@ -695,13 +473,10 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
     }
 
     private double calculateQuality(FunctionSignature signature) {
-        // Simple quality calculation based on signature completeness
         double quality = 0.5; // Base quality
-
         if (signature.instructionCount > 10) quality += 0.2;
         if (signature.basicBlockCount > 1) quality += 0.2;
         if (signature.callCount > 0) quality += 0.1;
-
         return Math.min(quality, 1.0);
     }
 
@@ -711,115 +486,46 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
         return Integer.toHexString(data.hashCode());
     }
 
-    private void updateSimilarityAnalysis(Connection conn, int executableId) throws SQLException {
-        println("Updating similarity analysis...");
+    private boolean checkEnhancedSignaturesTable(Connection conn) {
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeQuery("SELECT 1 FROM enhanced_signatures LIMIT 1");
+            return true;
+        } catch (SQLException e) {
+            return false;
+        }
+    }
 
+    private void refreshMaterializedViews(Connection conn) {
+        println("Refreshing materialized views...");
         try {
-            // Trigger refresh of materialized views for cross-version analysis
-            String sql = "SELECT refresh_cross_version_data()";
-            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-                stmt.executeQuery();
-                println("Cross-version analysis updated");
-            }
-        } catch (SQLException e) {
-            // Fall back to manual view refresh
             try (Statement stmt = conn.createStatement()) {
-                stmt.execute("REFRESH MATERIALIZED VIEW cross_version_functions");
-                println("Materialized views refreshed");
-            } catch (SQLException e2) {
-                println("Note: Could not refresh materialized views");
+                stmt.execute("SELECT refresh_cross_version_data()");
+                println("✓ Cross-version analysis updated");
             }
-        }
-    }
-
-    /**
-     * Query BSim database to get program names for a specific version
-     */
-    private Set<String> getBSimProgramsByVersion(String versionFilter) {
-        Set<String> programNames = new HashSet<>();
-
-        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
-            // Try exact version match first
-            String exactSql = "SELECT DISTINCT e.name_exec FROM exetable e " +
-                            "JOIN game_versions gv ON e.game_version = gv.id " +
-                            "WHERE gv.version_string = ?";
-
-            try (PreparedStatement stmt = conn.prepareStatement(exactSql)) {
-                stmt.setString(1, versionFilter);
-                ResultSet rs = stmt.executeQuery();
-                while (rs.next()) {
-                    programNames.add(rs.getString("name_exec"));
-                }
-            }
-
-            // If no exact matches, try partial matching for version and family
-            if (programNames.isEmpty()) {
-                String partialSql = "SELECT DISTINCT e.name_exec FROM exetable e " +
-                                  "JOIN game_versions gv ON e.game_version = gv.id " +
-                                  "WHERE gv.version_string ILIKE ? OR gv.version_family ILIKE ? OR e.version_family ILIKE ?";
-
-                try (PreparedStatement stmt = conn.prepareStatement(partialSql)) {
-                    String pattern = "%" + versionFilter + "%";
-                    stmt.setString(1, pattern);
-                    stmt.setString(2, pattern);
-                    stmt.setString(3, pattern);
-                    ResultSet rs = stmt.executeQuery();
-                    while (rs.next()) {
-                        programNames.add(rs.getString("name_exec"));
-                    }
-                }
-            }
-
         } catch (SQLException e) {
-            printerr("Error querying BSim database: " + e.getMessage());
-            e.printStackTrace();
-        }
-
-        return programNames;
-    }
-
-    /**
-     * Check if two names match, accounting for different naming conventions
-     */
-    private boolean isNameMatch(String fileName1, String fileName2) {
-        if (fileName1 == null || fileName2 == null) return false;
-        if (fileName1.equals(fileName2)) return true;
-
-        // Extract base names (remove paths and version prefixes)
-        String base1 = extractBaseName(fileName1);
-        String base2 = extractBaseName(fileName2);
-
-        return base1.equalsIgnoreCase(base2);
-    }
-
-    /**
-     * Extract base executable name from various naming formats
-     */
-    private String extractBaseName(String fileName) {
-        String name = fileName;
-
-        // Remove path components
-        if (name.contains("/")) name = name.substring(name.lastIndexOf("/") + 1);
-        if (name.contains("\\")) name = name.substring(name.lastIndexOf("\\") + 1);
-
-        // Remove version prefixes like "1.04b_" or "Classic_1.04b_"
-        if (name.contains("_")) {
-            String[] parts = name.split("_");
-            if (parts.length >= 2) {
-                // If first part looks like version (starts with digit or known family)
-                String firstPart = parts[0];
-                if (firstPart.matches("\\d.*") || firstPart.equalsIgnoreCase("Classic") ||
-                    firstPart.equalsIgnoreCase("LoD") || firstPart.equalsIgnoreCase("PD2")) {
-                    // Return everything after the first underscore
-                    name = name.substring(name.indexOf("_") + 1);
-                }
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY cross_version_functions");
+                println("✓ Materialized views refreshed");
+            } catch (SQLException e2) {
+                println("Note: Could not refresh materialized views - may need manual refresh");
             }
         }
-
-        return name;
     }
 
-    // Helper class for function signatures
+    // Helper classes
+    private static class ExecutableInfo {
+        int id;
+        String name;
+        int totalFunctions;
+        int unprocessedCount;
+    }
+
+    private static class FunctionToProcess {
+        int id;
+        String name;
+        long address;
+    }
+
     private static class FunctionSignature {
         String hash;
         int instructionCount;
