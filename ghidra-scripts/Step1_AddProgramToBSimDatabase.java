@@ -2532,8 +2532,8 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
     private void ensureGameVersionsExist(Connection conn) throws SQLException {
         // First check if any versions are missing
         String checkSql = "SELECT id FROM game_versions WHERE id = ?";
-        String insertSql = "INSERT INTO game_versions (id, version_string, version_family, release_date, is_expansion) " +
-                          "VALUES (?, ?, ?, NULL, ?) ON CONFLICT (id) DO NOTHING";
+        String insertSql = "INSERT INTO game_versions (id, version_string, version_family) " +
+                          "VALUES (?, ?, ?) ON CONFLICT (id) DO NOTHING";
         
         int inserted = 0;
         try (PreparedStatement checkStmt = conn.prepareStatement(checkSql);
@@ -2549,12 +2549,10 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                     if (!rs.next()) {
                         // Version doesn't exist, insert it
                         String family = isClassicVersionCode(versionCode) ? "Classic" : "LoD";
-                        boolean isExpansion = !isClassicVersionCode(versionCode);
                         
                         insertStmt.setInt(1, versionCode);
                         insertStmt.setString(2, versionString);
                         insertStmt.setString(3, family);
-                        insertStmt.setBoolean(4, isExpansion);
                         insertStmt.executeUpdate();
                         inserted++;
                     }
