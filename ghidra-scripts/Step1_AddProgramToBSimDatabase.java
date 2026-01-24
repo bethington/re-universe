@@ -982,6 +982,9 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
             println("Connected to BSim database successfully");
 
+            // Ensure game_versions table has all required version codes
+            ensureGameVersionsExist(conn);
+
             // Use individual transactions for better error isolation
             conn.setAutoCommit(true);
 
@@ -2520,6 +2523,56 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
     @Deprecated
     private String generateUnifiedExecutableName(String programName, UnifiedVersionInfo versionInfo) {
         return extractExecutableName(programName);
+    }
+
+    /**
+     * Ensure all game versions from VERSION_CODES exist in the game_versions table.
+     * This allows the database to be reset and repopulated without manual SQL.
+     */
+    private void ensureGameVersionsExist(Connection conn) throws SQLException {
+        // First check if any versions are missing
+        String checkSql = "SELECT id FROM game_versions WHERE id = ?";
+        String insertSql = "INSERT INTO game_versions (id, version_string, version_family, release_date, is_expansion) " +
+                          "VALUES (?, ?, ?, NULL, ?) ON CONFLICT (id) DO NOTHING";
+        
+        int inserted = 0;
+        try (PreparedStatement checkStmt = conn.prepareStatement(checkSql);
+             PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
+            
+            for (Map.Entry<String, Integer> entry : VERSION_CODES.entrySet()) {
+                String versionString = entry.getKey();
+                int versionCode = entry.getValue();
+                
+                // Check if exists
+                checkStmt.setInt(1, versionCode);
+                try (ResultSet rs = checkStmt.executeQuery()) {
+                    if (!rs.next()) {
+                        // Version doesn't exist, insert it
+                        String family = isClassicVersionCode(versionCode) ? "Classic" : "LoD";
+                        boolean isExpansion = !isClassicVersionCode(versionCode);
+                        
+                        insertStmt.setInt(1, versionCode);
+                        insertStmt.setString(2, versionString);
+                        insertStmt.setString(3, family);
+                        insertStmt.setBoolean(4, isExpansion);
+                        insertStmt.executeUpdate();
+                        inserted++;
+                    }
+                }
+            }
+        }
+        
+        if (inserted > 0) {
+            println("  Initialized " + inserted + " game version entries in database");
+        }
+    }
+
+    /**
+     * Check if a version code represents a Classic-era version (1.00-1.06b)
+     */
+    private boolean isClassicVersionCode(int versionCode) {
+        // Classic: 1.00 (1000) through 1.06b (1061)
+        return versionCode >= 1000 && versionCode <= 1061;
     }
 
     /**
