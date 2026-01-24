@@ -1059,6 +1059,11 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         String validatedGameVersion = versionInfo.getValidatedGameVersion();
         String validatedVersionFamily = versionInfo.getValidatedVersionFamily();
 
+        // Ensure the version exists in game_versions table (create if needed)
+        if (versionCode != null && validatedGameVersion != null && validatedVersionFamily != null) {
+            ensureVersionExists(conn, versionCode, validatedGameVersion, validatedVersionFamily);
+        }
+
         // Validate executable name against valid_executables table
         if (!isValidExecutableName(conn, execName)) {
             println("WARNING: Executable '" + execName + "' not in valid_executables table");
@@ -2466,6 +2471,46 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             // If table doesn't exist, allow any executable
             println("Note: valid_executables table not found, skipping validation");
             return true;
+        }
+    }
+
+    /**
+     * Ensures a game version exists in the game_versions table, creating it if necessary
+     */
+    private void ensureVersionExists(Connection conn, int versionCode, String versionString, String versionFamily) {
+        try {
+            // Check if version already exists
+            String checkSql = "SELECT 1 FROM game_versions WHERE id = ?";
+            try (PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
+                checkStmt.setInt(1, versionCode);
+                ResultSet rs = checkStmt.executeQuery();
+
+                if (rs.next()) {
+                    // Version already exists
+                    return;
+                }
+            }
+
+            // Create the version record
+            String insertSql = "INSERT INTO game_versions (id, version_string, version_family, description) " +
+                              "VALUES (?, ?, ?, ?) " +
+                              "ON CONFLICT (id) DO NOTHING";
+
+            try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
+                insertStmt.setInt(1, versionCode);
+                insertStmt.setString(2, versionString);
+                insertStmt.setString(3, versionFamily);
+                insertStmt.setString(4, "Dynamically created from binary analysis");
+
+                int rowsInserted = insertStmt.executeUpdate();
+                if (rowsInserted > 0) {
+                    println("Created new game version: " + versionString + " (" + versionFamily + ")");
+                }
+            }
+
+        } catch (SQLException e) {
+            println("Warning: Could not ensure version " + versionString + " exists: " + e.getMessage());
+            // Non-fatal error - continue processing
         }
     }
 
