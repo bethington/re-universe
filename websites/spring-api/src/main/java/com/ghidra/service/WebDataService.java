@@ -66,6 +66,13 @@ public class WebDataService {
     public List<BinaryData> getBinariesForVersion(String gameType, String version) {
         System.out.println("DEBUG: getBinariesForVersion called with gameType=" + gameType + ", version=" + version);
 
+        // AUTO-MAPPING LOGIC: Auto-detect correct version family
+        String resolvedGameType = resolveVersionFamily(gameType, version);
+
+        if (!resolvedGameType.equals(gameType)) {
+            System.out.println("DEBUG: Auto-mapped gameType from '" + gameType + "' to '" + resolvedGameType + "' for version " + version);
+        }
+
         String sql = """
             SELECT
                 name_exec,
@@ -82,8 +89,8 @@ public class WebDataService {
             ORDER BY name_exec
         """;
 
-        System.out.println("DEBUG: Executing SQL query with parameters: [" + gameType + ", " + version + "]");
-        List<Map<String, Object>> results = jdbcTemplate.queryForList(sql, gameType, version);
+        System.out.println("DEBUG: Executing SQL query with parameters: [" + resolvedGameType + ", " + version + "]");
+        List<Map<String, Object>> results = jdbcTemplate.queryForList(sql, resolvedGameType, version);
         System.out.println("DEBUG: Query returned " + results.size() + " rows");
         List<BinaryData> binaries = new ArrayList<>();
 
@@ -143,6 +150,58 @@ public class WebDataService {
         }
 
         return binaries;
+    }
+
+    /**
+     * Resolves the correct version family for auto-mapping functionality.
+     * This allows users to query with gameType=Classic&version=1.10 and still get LoD results.
+     */
+    private String resolveVersionFamily(String gameType, String version) {
+        // First, check if the combination exists as-is
+        String checkSql = """
+            SELECT COUNT(*) FROM exetable_denormalized
+            WHERE version_family = ? AND version_string = ?
+        """;
+
+        Integer count = jdbcTemplate.queryForObject(checkSql, Integer.class, gameType, version);
+        if (count != null && count > 0) {
+            return gameType; // Use as-is if data exists
+        }
+
+        // Auto-mapping rules based on Diablo II version history
+        if (version != null) {
+            try {
+                // Extract numeric version (e.g., "1.10" -> 1.10)
+                String numericVersion = version.replaceAll("[^0-9.]", "");
+                String[] parts = numericVersion.split("\\.");
+                if (parts.length >= 2) {
+                    double versionNum = Double.parseDouble(parts[0] + "." + parts[1]);
+
+                    // Version 1.07+ are LoD family (Lord of Destruction expansion)
+                    if (versionNum >= 1.07) {
+                        // Check if LoD family has this version
+                        Integer lodCount = jdbcTemplate.queryForObject(checkSql, Integer.class, "LoD", version);
+                        if (lodCount != null && lodCount > 0) {
+                            return "LoD";
+                        }
+                    }
+
+                    // Version 1.06b and below are Classic family
+                    if (versionNum <= 1.06) {
+                        // Check if Classic family has this version
+                        Integer classicCount = jdbcTemplate.queryForObject(checkSql, Integer.class, "Classic", version);
+                        if (classicCount != null && classicCount > 0) {
+                            return "Classic";
+                        }
+                    }
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("DEBUG: Could not parse version for auto-mapping: " + version);
+            }
+        }
+
+        // If no auto-mapping applies, return original gameType
+        return gameType;
     }
 
     private String extractFileName(String nameExec) {
