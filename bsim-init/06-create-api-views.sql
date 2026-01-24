@@ -174,35 +174,7 @@ ON CONFLICT DO NOTHING;
 CREATE OR REPLACE VIEW api_categories_view AS
 SELECT name, description FROM api_categories;
 
--- File history placeholder (empty for now)
-CREATE TABLE IF NOT EXISTS api_file_history (
-    filename TEXT,
-    version TEXT,
-    change_type TEXT,
-    description TEXT
-);
-
--- Diffs placeholder (empty for now)
-CREATE TABLE IF NOT EXISTS api_diffs (
-    filename TEXT,
-    version_from TEXT,
-    version_to TEXT,
-    diff_data TEXT
-);
-
--- Exports placeholder (empty for now)
-CREATE TABLE IF NOT EXISTS api_exports (
-    filename TEXT,
-    ordinal INTEGER,
-    name TEXT,
-    address TEXT
-);
-
--- Text content placeholder (empty for now)
-CREATE TABLE IF NOT EXISTS api_text_content (
-    filename TEXT,
-    content TEXT
-);
+-- Note: api_exports table is created in 05-bsim-schema-extension.sql and populated by Step1
 
 -- =========================================================================
 -- COMPLETION MESSAGE
