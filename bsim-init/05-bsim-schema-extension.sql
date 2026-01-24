@@ -35,20 +35,6 @@ ALTER TABLE exetable ADD COLUMN IF NOT EXISTS game_version INTEGER;
 ALTER TABLE exetable ADD COLUMN IF NOT EXISTS version_family VARCHAR(16);
 ALTER TABLE exetable ADD COLUMN IF NOT EXISTS is_reference BOOLEAN DEFAULT FALSE;
 
--- Binary-to-Version junction table for tracking which versions contain each binary
--- Allows the same binary (by MD5) to be associated with multiple game versions
--- Example: Storm.dll might be identical in 1.04b, 1.04c, and 1.05
-CREATE TABLE IF NOT EXISTS binary_versions (
-    executable_id BIGINT REFERENCES exetable(id) ON DELETE CASCADE,
-    game_version INTEGER REFERENCES game_versions(id) ON DELETE CASCADE,
-    version_family VARCHAR(16),
-    discovered_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (executable_id, game_version)
-);
-
-CREATE INDEX IF NOT EXISTS idx_binary_versions_exe ON binary_versions(executable_id);
-CREATE INDEX IF NOT EXISTS idx_binary_versions_ver ON binary_versions(game_version);
-
 -- ============================================================================
 -- STEP 1b: Game Versions and Valid Executables Lookup Tables
 -- ============================================================================
@@ -65,6 +51,20 @@ CREATE TABLE IF NOT EXISTS game_versions (
 
 -- Game versions will be populated dynamically by the Ghidra script as binaries are encountered
 -- This ensures only versions with actual data are added to the database
+
+-- Binary-to-Version junction table for tracking which versions contain each binary
+-- Allows the same binary (by MD5) to be associated with multiple game versions
+-- Example: Storm.dll might be identical in 1.04b, 1.04c, and 1.05
+CREATE TABLE IF NOT EXISTS binary_versions (
+    executable_id BIGINT REFERENCES exetable(id) ON DELETE CASCADE,
+    game_version INTEGER REFERENCES game_versions(id) ON DELETE CASCADE,
+    version_family VARCHAR(16),
+    discovered_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (executable_id, game_version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_binary_versions_exe ON binary_versions(executable_id);
+CREATE INDEX IF NOT EXISTS idx_binary_versions_ver ON binary_versions(game_version);
 
 -- Valid executables lookup table
 CREATE TABLE IF NOT EXISTS valid_executables (
