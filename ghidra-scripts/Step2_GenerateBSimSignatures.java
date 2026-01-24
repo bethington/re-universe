@@ -1,27 +1,26 @@
-// STEP 2: Generate Enhanced Function Signatures (REQUIRED SECOND STEP)
+// Enhanced signature generation now happens INLINE during Step1 as each function
+// is processed. This eliminates the need for a separate pass through all functions.
 //
-// Creates mathematical signatures for functions that enable similarity analysis across
-// different versions of binaries. This step transforms raw function data from Step1
-// into comparable signatures optimized for cross-version analysis.
+// WHAT THIS SCRIPT DID:
+// - Analyzed function control flow and instruction patterns
+// - Created structural signatures for similarity matching
+// - Stored enhanced signatures in BSim database
 //
-// SIMPLIFIED IDEMPOTENT DESIGN:
-// - Automatically finds all functions in BSim database WITHOUT signatures
-// - Processes only unprocessed functions (safe to run multiple times)
-// - No mode selection needed - just run and it does the right thing
-// - Batch processes by executable for efficiency
+// WHY IT'S DEPRECATED:
+// - Step1 now generates enhanced signatures immediately when each function is added
+// - No need to re-open programs and iterate through functions a second time
+// - More efficient: single pass instead of two passes
 //
-// SIGNATURE GENERATION PROCESS:
-// - Analyzes function control flow and instruction patterns
-// - Creates structural signatures for similarity matching
-// - Stores enhanced signatures in BSim database for rapid comparison
-// - Enables cross-version function matching
-//
-// WORKFLOW POSITION: Requires Step1 completion, enables Step3-5 operations
+// IF YOU RUN THIS SCRIPT:
+// - It will report that all functions already have signatures (because Step1 did it)
+// - Safe to run - it's idempotent and will just skip already-processed functions
+// - Consider deleting this script once you've verified Step1 works correctly
 //
 // @author Claude Code Assistant
 // @category BSim
 // @keybinding ctrl shift L
-// @menupath Tools.BSim.Step2 - Generate Enhanced Signatures
+// @menupath Tools.BSim.Step2 - Generate Enhanced Signatures (DEPRECATED)
+// @deprecated Use Step1_AddProgramToBSimDatabase instead
 
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.*;

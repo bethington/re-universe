@@ -145,13 +145,27 @@ public class Step0_ResetBSimDatabase extends GhidraScript {
     private Map<String, Integer> getCurrentDataCounts(Connection conn) throws SQLException {
         Map<String, Integer> counts = new LinkedHashMap<>();  // Preserve order
 
-        // Check each table
-        counts.put("Executables (exetable)", getTableCount(conn, "exetable"));
-        counts.put("Functions (desctable)", getTableCount(conn, "desctable"));
+        // Check each table - order by dependency (children first)
+        counts.put("Function Similarity Matrix", getTableCount(conn, "function_similarity_matrix"));
+        counts.put("Function Version Matches", getTableCount(conn, "function_version_matches"));
+        counts.put("Function Equivalence", getTableCount(conn, "function_equivalence"));
+        counts.put("Function String Refs", getTableCount(conn, "function_string_refs"));
+        counts.put("Function Tags", getTableCount(conn, "function_tags"));
+        counts.put("Function Parameters", getTableCount(conn, "function_parameters"));
+        counts.put("Function Signatures", getTableCount(conn, "function_signatures"));
+        counts.put("Function Calls", getTableCount(conn, "function_calls"));
+        counts.put("Function API Usage", getTableCount(conn, "function_api_usage"));
+        counts.put("Function Analysis", getTableCount(conn, "function_analysis"));
         counts.put("Enhanced Signatures", getTableCount(conn, "enhanced_signatures"));
-        counts.put("Function Comments", getTableCount(conn, "function_comments"));
-        counts.put("Vector Table (vectable)", getTableCount(conn, "vectable"));
-        counts.put("Callgraph Entries", getTableCount(conn, "callgraphtable"));
+        counts.put("Data References", getTableCount(conn, "data_references"));
+        counts.put("String References", getTableCount(conn, "string_references"));
+        counts.put("Call Graph Metrics", getTableCount(conn, "call_graph_metrics"));
+        counts.put("Core Comments", getTableCount(conn, "core_comment"));
+        counts.put("Functions (desctable)", getTableCount(conn, "desctable"));
+        counts.put("API Imports", getTableCount(conn, "api_imports"));
+        counts.put("API Exports", getTableCount(conn, "api_exports"));
+        counts.put("Executables (exetable)", getTableCount(conn, "exetable"));
+        counts.put("Game Versions", getTableCount(conn, "game_versions"));
 
         return counts;
     }
@@ -182,23 +196,35 @@ public class Step0_ResetBSimDatabase extends GhidraScript {
             // Delete in order to respect foreign key constraints
             // Child tables first, then parent tables
             
-            // 1. Delete enhanced signatures (references desctable)
+            // Function-level analysis tables (reference desctable)
+            deleteFromTable(conn, "function_similarity_matrix", "Function Similarity Matrix");
+            deleteFromTable(conn, "function_version_matches", "Function Version Matches");
+            deleteFromTable(conn, "function_equivalence", "Function Equivalence");
+            deleteFromTable(conn, "function_string_refs", "Function String Refs");
+            deleteFromTable(conn, "function_tags", "Function Tags");
+            deleteFromTable(conn, "function_parameters", "Function Parameters");
+            deleteFromTable(conn, "function_signatures", "Function Signatures");
+            deleteFromTable(conn, "function_calls", "Function Calls");
+            deleteFromTable(conn, "function_api_usage", "Function API Usage");
+            deleteFromTable(conn, "function_analysis", "Function Analysis");
             deleteFromTable(conn, "enhanced_signatures", "Enhanced Signatures");
+            deleteFromTable(conn, "data_references", "Data References");
+            deleteFromTable(conn, "string_references", "String References");
+            deleteFromTable(conn, "call_graph_metrics", "Call Graph Metrics");
+            deleteFromTable(conn, "core_comment", "Core Comments");
             
-            // 2. Delete function comments (references desctable)
-            deleteFromTable(conn, "function_comments", "Function Comments");
-            
-            // 3. Delete callgraph entries (references desctable)
-            deleteFromTable(conn, "callgraphtable", "Callgraph Entries");
-            
-            // 4. Delete vector table entries (references desctable)  
-            deleteFromTable(conn, "vectable", "Vector Table");
-            
-            // 5. Delete functions/desctable (references exetable)
+            // Functions table (references exetable)
             deleteFromTable(conn, "desctable", "Functions");
             
-            // 6. Delete executables (parent table)
+            // Executable-level tables (reference exetable)
+            deleteFromTable(conn, "api_imports", "API Imports");
+            deleteFromTable(conn, "api_exports", "API Exports");
+            
+            // Executables table (references game_versions)
             deleteFromTable(conn, "exetable", "Executables");
+            
+            // Game versions (parent table - Step1 will recreate these)
+            deleteFromTable(conn, "game_versions", "Game Versions");
 
             conn.commit();
             println("");
