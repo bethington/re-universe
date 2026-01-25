@@ -3,7 +3,6 @@ package com.ghidra.service;
 import com.ghidra.model.VersionData;
 import com.ghidra.model.BinaryData;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -18,13 +17,12 @@ public class WebDataService {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @Cacheable(value = "versions", key = "'count'")
     public int getExecutableCount() {
         return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM exetable", Integer.class);
     }
 
-    @Cacheable(value = "versions", key = "'all'")
     public List<VersionData> getVersions() {
+        System.out.println("DEBUG: getVersions() called");
         // Query game_versions table but only return versions that have binaries via binary_versions
         String sql = """
             SELECT DISTINCT
@@ -38,7 +36,9 @@ public class WebDataService {
             ORDER BY gv.id
         """;
 
+        System.out.println("DEBUG: Executing SQL query for versions");
         List<Map<String, Object>> results = jdbcTemplate.queryForList(sql);
+        System.out.println("DEBUG: Query returned " + results.size() + " rows");
         List<VersionData> versions = new ArrayList<>();
 
         for (Map<String, Object> row : results) {
@@ -62,7 +62,6 @@ public class WebDataService {
         return versions;
     }
 
-    @Cacheable(value = "binaries", key = "#gameType + '_' + #version")
     public List<BinaryData> getBinariesForVersion(String gameType, String version) {
         System.out.println("DEBUG: getBinariesForVersion called with gameType=" + gameType + ", version=" + version);
 
@@ -243,7 +242,6 @@ public class WebDataService {
         }
     }
 
-    @Cacheable(value = "categories", key = "'all'")
     public Map<String, Object> getCategories() {
         // Return basic file categories structure
         Map<String, Object> categories = new HashMap<>();
@@ -258,31 +256,26 @@ public class WebDataService {
         return categories;
     }
 
-    @Cacheable(value = "fileHistory", key = "'all'")
     public Map<String, Object> getFileHistory() {
         // Placeholder - would need to implement based on file tracking
         return new HashMap<>();
     }
 
-    @Cacheable(value = "diffs", key = "'all'")
     public Map<String, Object> getDiffs() {
         // Placeholder - would need version comparison logic
         return new HashMap<>();
     }
 
-    @Cacheable(value = "exports", key = "'all'")
     public Map<String, Object> getExports() {
         // Placeholder - would need PE export analysis
         return new HashMap<>();
     }
 
-    @Cacheable(value = "textContent", key = "'all'")
     public Map<String, Object> getTextContent() {
         // Placeholder - would need text file content storage
         return new HashMap<>();
     }
 
-    @Cacheable(value = "functionIndex", key = "'all'")
     public Map<String, Object> getFunctionIndex() {
         // Get list of available executables for function data
         String sql = "SELECT DISTINCT name_exec FROM exetable ORDER BY name_exec";
@@ -306,7 +299,6 @@ public class WebDataService {
      * Returns functions with addresses across all versions, handling Classic/LoD deduplication.
      * DLLs are shared between Classic and LoD (except for .exe files), so we use unique version numbers.
      */
-    @Cacheable(value = "crossVersionFunctions", key = "#filename")
     public Map<String, Object> getCrossVersionFunctions(String filename) {
         // Get all executables matching this filename exactly
         String executablesSql = """
@@ -429,7 +421,6 @@ public class WebDataService {
      * Get BSim-enhanced cross-version function data for a specific version and binary file.
      * Returns functions with BSim similarity scores across all versions.
      */
-    @Cacheable(value = "bsimCrossVersionFunctions", key = "#version + '_' + #filename + '_' + #threshold")
     public Map<String, Object> getBSimCrossVersionFunctions(String version, String filename, double threshold) {
         // Get baseline version executable ID
         Long baselineExeId = getExecutableIdForVersion(filename, version);
@@ -762,7 +753,6 @@ public class WebDataService {
         return suffix1.compareTo(suffix2);
     }
 
-    @Cacheable(value = "functions", key = "#filename")
     public Map<String, Object> getFunctions(String filename) {
         // Get function data for specific executable using authentic BSim schema
         String sql = """
@@ -960,7 +950,6 @@ public class WebDataService {
         return fileDetails;
     }
 
-    @Cacheable(value = "crossVersionAnalysis", key = "#filename")
     public Map<String, Object> getCrossVersionFunctionAnalysis(String filename) {
         // Simplified cross-version analysis for authentic BSim schema
         // Get available versions for this filename pattern using authentic schema
