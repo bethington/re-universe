@@ -23,7 +23,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.bsim-postgres
-    image: bsim-postgres:15-lshvector
+    image: bsim-postgres:fixed
     container_name: bsim-postgres
     environment:
       - POSTGRES_DB=${BSIM_DB_NAME:-bsim}
