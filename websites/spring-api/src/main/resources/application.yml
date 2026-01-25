@@ -26,9 +26,7 @@ spring:
           max-idle: 10
           min-idle: 5
   cache:
-    type: redis
-    redis:
-      time-to-live: 30m
+    type: none
 
 # Ghidra Integration Settings
 ghidra:
