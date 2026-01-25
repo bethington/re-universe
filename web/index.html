@@ -964,6 +964,62 @@
             background-color: #404040;
         }
 
+        /* Cross-version similarity legend bars */
+        .category-legend-bar.similarity-identical {
+            background-color: #0066ff;
+        }
+
+        .category-legend-bar.similarity-high {
+            background-color: #0099cc;
+        }
+
+        .category-legend-bar.similarity-good {
+            background-color: #00cc66;
+        }
+
+        .category-legend-bar.similarity-medium {
+            background-color: #99cc00;
+        }
+
+        .category-legend-bar.similarity-low {
+            background-color: #cc9900;
+        }
+
+        .category-legend-bar.similarity-very-low {
+            background-color: #cc6600;
+        }
+
+        /* Legacy legend item colors for cross-version similarity */
+        .legend-item.similarity-identical {
+            color: #0066ff;
+            font-weight: 600;
+        }
+
+        .legend-item.similarity-high {
+            color: #0099cc;
+            font-weight: 600;
+        }
+
+        .legend-item.similarity-good {
+            color: #00cc66;
+            font-weight: 600;
+        }
+
+        .legend-item.similarity-medium {
+            color: #99cc00;
+            font-weight: 500;
+        }
+
+        .legend-item.similarity-low {
+            color: #cc9900;
+            font-weight: 400;
+        }
+
+        .legend-item.similarity-very-low {
+            color: #cc6600;
+            font-weight: 400;
+        }
+
         .exports-search {
             flex: 1;
             min-width: 120px;
@@ -3024,6 +3080,7 @@
         // State
         let selectedVersion = null;
         let selectedFile = null;
+        let currentBinaries = []; // Store current binaries for filtering
         let isGrouped = true;
         let collapsedCategories = {}; // Track which categories are collapsed
 
@@ -4052,7 +4109,10 @@
 
             // Update version list selection
             document.querySelectorAll('.version-item').forEach(el => {
-                el.classList.toggle('selected', el.getAttribute('onclick').includes(folderName));
+                const onclick = el.getAttribute('onclick');
+                const match = onclick.match(/selectVersion\('([^']+)'\)/);
+                const elementFolderName = match ? match[1] : '';
+                el.classList.toggle('selected', elementFolderName === folderName);
             });
 
             // Extract gameType and version from folderName (e.g., "Classic/1.01")
@@ -4064,6 +4124,8 @@
                 const response = await fetch(`${API_BASE_URL}/binaries?gameType=${gameType}&version=${version}`);
                 if (!response.ok) {
                     console.error('Failed to fetch binaries:', response.status);
+                    currentBinaries = [];
+                    selectedFile = null; // Clear selection on fetch failure
                     document.getElementById('filesTable').innerHTML = '<div class="details-empty">Failed to load binaries</div>';
                     return;
                 }
@@ -4072,19 +4134,49 @@
                 console.log('Loaded binaries:', binaries.length);
 
                 if (binaries.length === 0) {
+                    currentBinaries = [];
+                    selectedFile = null; // Clear selection when no binaries found
                     document.getElementById('filesTable').innerHTML = '<div class="details-empty">No binaries found for this version</div>';
                     return;
                 }
 
-                // Show filter
+                // Store binaries for filtering and show filter
+                currentBinaries = binaries;
                 document.getElementById('filesFilter').style.display = 'block';
                 document.getElementById('filesFilter').value = '';
 
                 // Render binaries
                 renderBinariesTable(binaries);
 
+                // Try to restore previously selected file after DOM update
+                setTimeout(() => {
+                    if (previousFileBase) {
+                        // Look for exact match first
+                        let matchingFile = binaries.find(b => b.fileName === previousFileBase);
+
+                        // If no exact match, try partial match (ignore variant suffixes)
+                        if (!matchingFile) {
+                            matchingFile = binaries.find(b => b.fileName.split(' (')[0] === previousFileBase);
+                        }
+
+                        // If we found a matching file, select it and force reload function data
+                        if (matchingFile) {
+                            console.log(`Restoring selection: ${matchingFile.fileName} for version ${selectedVersion}`);
+                            console.log('This will update the cross-version matrix with new baseline version');
+                            selectFileWithReload(matchingFile.fileName);
+                        } else {
+                            console.log(`Could not restore selection for: ${previousFileBase}`);
+                            selectedFile = null; // Clear selection if file doesn't exist in new version
+                        }
+                    } else {
+                        selectedFile = null; // Clear selection if no previous file
+                    }
+                }, 0);
+
             } catch (error) {
                 console.error('Error loading binaries:', error);
+                currentBinaries = [];
+                selectedFile = null; // Clear selection on error
                 document.getElementById('filesTable').innerHTML = '<div class="details-empty">Error loading binaries</div>';
             }
         }
@@ -4313,7 +4405,10 @@
         }
 
         function filterFiles() {
-            // Note: File filtering is now handled by renderBinariesTable() in selectVersion()
+            // Re-render the binaries table with current filter value
+            if (currentBinaries.length > 0) {
+                renderBinariesTable(currentBinaries);
+            }
         }
 
         function selectFileByName(filename) {
@@ -4325,6 +4420,39 @@
                     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
             });
+        }
+
+        function selectFileWithReload(filename) {
+            console.log('selectFileWithReload called with:', filename);
+            selectedFile = filename;
+
+            // Update file list selection
+            document.querySelectorAll('.file-row').forEach(el => {
+                const elFilename = el.querySelector('.filename').textContent;
+                el.classList.toggle('selected', elFilename === filename);
+            });
+
+            // Force reload function data for the new version by clearing cached data
+            const baseName = filename.split(' (')[0];
+            const currentSelectedVersion = selectedVersion ? selectedVersion.split('/')[1] || selectedVersion : '1.00';
+            const dataVarName = `FUNCTIONS_${baseName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}_${currentSelectedVersion.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+            // Clear ALL cached data for this file across all versions to ensure fresh load
+            const basePattern = `FUNCTIONS_${baseName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}_`;
+            Object.keys(window).forEach(key => {
+                if (key.startsWith(basePattern)) {
+                    console.log(`Clearing cached function data: ${key}`);
+                    delete window[key];
+                }
+            });
+
+            // Now render with forced reload
+            const fileInfo = null; // File info comes from binaries API
+            const history = FILE_HISTORY_DATA[baseName];
+
+            console.log('Calling renderFileDetails with force reload...');
+            renderFileDetails(filename, fileInfo, history);
+            console.log('renderFileDetails returned');
         }
 
         function selectFile(filename) {
@@ -4479,10 +4607,12 @@
                         </select>
                         <div class="function-count">${functionNames.length}/${functionNames.length} (${functionNames.length})</div>
                         <div class="legend">
-                            <span class="legend-item game">Game</span>
-                            <span class="legend-item crt">CRT</span>
-                            <span class="legend-item imp">IMP</span>
-                            <span class="legend-item eh">EH</span>
+                            <span class="legend-item similarity-identical">95%+</span>
+                            <span class="legend-item similarity-high">85%+</span>
+                            <span class="legend-item similarity-good">75%+</span>
+                            <span class="legend-item similarity-medium">65%+</span>
+                            <span class="legend-item similarity-low">50%+</span>
+                            <span class="legend-item similarity-very-low">&lt;50%</span>
                         </div>
                     </div>
                     <div class="exports-table-wrapper" id="functionsTableWrapper">
@@ -5378,10 +5508,12 @@
                                 ${funcKeys.length}/${funcKeys.length} (<span class="named-count">${namedCount}</span>)
                             </span>
                             <div class="category-legend">
-                                <span class="category-legend-item" title="Game Logic"><span class="category-legend-bar cat-game"></span>Game</span>
-                                <span class="category-legend-item" title="C Runtime"><span class="category-legend-bar cat-crt"></span>CRT</span>
-                                <span class="category-legend-item" title="Import Thunk"><span class="category-legend-bar cat-import"></span>IMP</span>
-                                <span class="category-legend-item" title="Exception Handling"><span class="category-legend-bar cat-exception"></span>EH</span>
+                                <span class="category-legend-item" title="95%+ Similarity - Nearly Identical"><span class="category-legend-bar similarity-identical"></span>95%+</span>
+                                <span class="category-legend-item" title="85%+ Similarity - High Match"><span class="category-legend-bar similarity-high"></span>85%+</span>
+                                <span class="category-legend-item" title="75%+ Similarity - Good Match"><span class="category-legend-bar similarity-good"></span>75%+</span>
+                                <span class="category-legend-item" title="65%+ Similarity - Medium Match"><span class="category-legend-bar similarity-medium"></span>65%+</span>
+                                <span class="category-legend-item" title="50%+ Similarity - Low Match"><span class="category-legend-bar similarity-low"></span>50%+</span>
+                                <span class="category-legend-item" title="Under 50% Similarity - Very Low Match"><span class="category-legend-bar similarity-very-low"></span>&lt;50%</span>
                             </div>
                         </div>
                     </div>
