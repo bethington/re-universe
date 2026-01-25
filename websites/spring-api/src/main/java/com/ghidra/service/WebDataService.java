@@ -365,7 +365,7 @@ public class WebDataService {
 
         List<Map<String, Object>> functionResults = jdbcTemplate.queryForList(functionsSql, filename);
 
-        // Build function map: function_name -> { name, addresses: { version: address }, category }
+        // Build function map: function_name -> { name, addresses: { version: address }, category, enhanced metadata }
         Map<String, Map<String, Object>> functionsMap = new LinkedHashMap<>();
 
         for (Map<String, Object> row : functionResults) {
@@ -376,12 +376,26 @@ public class WebDataService {
             // Skip if no version information
             if (versionString == null) continue;
 
-            // Initialize function entry if not exists
+            // Initialize function entry if not exists with enhanced metadata containers
             functionsMap.computeIfAbsent(funcName, k -> {
                 Map<String, Object> funcData = new LinkedHashMap<>();
                 funcData.put("name", funcName);
                 funcData.put("category", categorizeFunctionName(funcName));
                 funcData.put("addresses", new LinkedHashMap<String, String>());
+                // Enhanced metadata containers
+                funcData.put("sizes", new LinkedHashMap<String, Integer>());
+                funcData.put("instruction_counts", new LinkedHashMap<String, Integer>());
+                funcData.put("basic_block_counts", new LinkedHashMap<String, Integer>());
+                funcData.put("cyclomatic_complexity", new LinkedHashMap<String, Integer>());
+                funcData.put("calls_made", new LinkedHashMap<String, Integer>());
+                funcData.put("calls_received", new LinkedHashMap<String, Integer>());
+                funcData.put("stack_frame_sizes", new LinkedHashMap<String, Integer>());
+                funcData.put("has_loops", new LinkedHashMap<String, Boolean>());
+                funcData.put("callees", new LinkedHashMap<String, List<String>>());
+                funcData.put("strings", new LinkedHashMap<String, List<String>>());
+                funcData.put("constants", new LinkedHashMap<String, List<String>>());
+                funcData.put("globals", new LinkedHashMap<String, List<String>>());
+                funcData.put("mnemonic_hashes", new LinkedHashMap<String, String>());
                 return funcData;
             });
 
@@ -398,11 +412,35 @@ public class WebDataService {
                 uniqueFuncData.put("name", uniqueFuncName);
                 uniqueFuncData.put("category", categorizeFunctionName(funcName));
                 uniqueFuncData.put("addresses", new LinkedHashMap<String, String>());
+                // Enhanced metadata containers for unique function
+                uniqueFuncData.put("sizes", new LinkedHashMap<String, Integer>());
+                uniqueFuncData.put("instruction_counts", new LinkedHashMap<String, Integer>());
+                uniqueFuncData.put("basic_block_counts", new LinkedHashMap<String, Integer>());
+                uniqueFuncData.put("cyclomatic_complexity", new LinkedHashMap<String, Integer>());
+                uniqueFuncData.put("calls_made", new LinkedHashMap<String, Integer>());
+                uniqueFuncData.put("calls_received", new LinkedHashMap<String, Integer>());
+                uniqueFuncData.put("stack_frame_sizes", new LinkedHashMap<String, Integer>());
+                uniqueFuncData.put("has_loops", new LinkedHashMap<String, Boolean>());
+                uniqueFuncData.put("callees", new LinkedHashMap<String, List<String>>());
+                uniqueFuncData.put("strings", new LinkedHashMap<String, List<String>>());
+                uniqueFuncData.put("constants", new LinkedHashMap<String, List<String>>());
+                uniqueFuncData.put("globals", new LinkedHashMap<String, List<String>>());
+                uniqueFuncData.put("mnemonic_hashes", new LinkedHashMap<String, String>());
                 functionsMap.put(uniqueFuncName, uniqueFuncData);
                 ((Map<String, String>) uniqueFuncData.get("addresses")).put(versionString, formattedAddr);
             } else {
                 addresses.put(versionString, formattedAddr);
             }
+        }
+
+        // Populate enhanced metadata for all functions
+        for (Map<String, Object> funcData : functionsMap.values()) {
+            String funcName = (String) funcData.get("name");
+            @SuppressWarnings("unchecked")
+            Map<String, String> addresses = (Map<String, String>) funcData.get("addresses");
+
+            // Populate metadata for each version that has an address
+            populateCrossVersionFunctionMetadata(funcName, filename, addresses, funcData);
         }
 
         // Build response
@@ -417,6 +455,154 @@ public class WebDataService {
         response.put("generated", new Date().toString());
 
         return response;
+    }
+
+    /**
+     * Populate enhanced metadata for cross-version function data
+     */
+    private void populateCrossVersionFunctionMetadata(String funcName, String filename, Map<String, String> addresses, Map<String, Object> funcData) {
+        try {
+            System.out.println("DEBUG: populateCrossVersionFunctionMetadata called for " + funcName + " in " + filename);
+
+            // Get metadata containers from funcData
+            @SuppressWarnings("unchecked")
+            Map<String, Integer> sizes = (Map<String, Integer>) funcData.get("sizes");
+            @SuppressWarnings("unchecked")
+            Map<String, Integer> instructionCounts = (Map<String, Integer>) funcData.get("instruction_counts");
+            @SuppressWarnings("unchecked")
+            Map<String, Integer> basicBlockCounts = (Map<String, Integer>) funcData.get("basic_block_counts");
+            @SuppressWarnings("unchecked")
+            Map<String, Integer> cyclomaticComplexity = (Map<String, Integer>) funcData.get("cyclomatic_complexity");
+            @SuppressWarnings("unchecked")
+            Map<String, Integer> callsMade = (Map<String, Integer>) funcData.get("calls_made");
+            @SuppressWarnings("unchecked")
+            Map<String, Integer> callsReceived = (Map<String, Integer>) funcData.get("calls_received");
+            @SuppressWarnings("unchecked")
+            Map<String, Integer> stackFrameSizes = (Map<String, Integer>) funcData.get("stack_frame_sizes");
+            @SuppressWarnings("unchecked")
+            Map<String, Boolean> hasLoops = (Map<String, Boolean>) funcData.get("has_loops");
+            @SuppressWarnings("unchecked")
+            Map<String, List<String>> callees = (Map<String, List<String>>) funcData.get("callees");
+            @SuppressWarnings("unchecked")
+            Map<String, List<String>> strings = (Map<String, List<String>>) funcData.get("strings");
+            @SuppressWarnings("unchecked")
+            Map<String, List<String>> constants = (Map<String, List<String>>) funcData.get("constants");
+            @SuppressWarnings("unchecked")
+            Map<String, List<String>> globals = (Map<String, List<String>>) funcData.get("globals");
+            @SuppressWarnings("unchecked")
+            Map<String, String> mnemonicHashes = (Map<String, String>) funcData.get("mnemonic_hashes");
+
+            // For each version that has an address, populate its metadata
+            for (String version : addresses.keySet()) {
+                System.out.println("DEBUG: Processing version " + version + " for function " + funcName);
+
+                // Get function ID for this version
+                String getFunctionIdSql = """
+                    SELECT d.id, d.addr
+                    FROM desctable d
+                    JOIN exetable e ON d.id_exe = e.id
+                    JOIN binary_versions bv ON e.id = bv.executable_id
+                    JOIN game_versions gv ON bv.game_version = gv.id
+                    WHERE e.name_exec = ? AND gv.version_string = ? AND d.name_func = ?
+                    LIMIT 1
+                """;
+
+                try {
+                    Map<String, Object> functionRow = jdbcTemplate.queryForMap(getFunctionIdSql, filename, version, funcName);
+                    Long functionId = Long.valueOf(functionRow.get("id").toString());
+                    Long addr = Long.valueOf(functionRow.get("addr").toString());
+
+                    // Calculate function size (this is a placeholder - actual size calculation may vary)
+                    sizes.put(version, addr.intValue()); // Using address as placeholder for size
+
+                    System.out.println("DEBUG: Found function ID " + functionId + " for " + funcName + " in " + version);
+
+                    // Get function analysis data
+                    String analysisSql = """
+                        SELECT instruction_count, basic_block_count, cyclomatic_complexity,
+                               calls_made, calls_received, stack_frame_size, has_loops
+                        FROM function_analysis
+                        WHERE function_id = ?
+                        LIMIT 1
+                    """;
+
+                    List<Map<String, Object>> analysisResults = jdbcTemplate.queryForList(analysisSql, functionId);
+                    if (!analysisResults.isEmpty()) {
+                        Map<String, Object> analysis = analysisResults.get(0);
+                        instructionCounts.put(version, (Integer) analysis.get("instruction_count"));
+                        basicBlockCounts.put(version, (Integer) analysis.get("basic_block_count"));
+                        cyclomaticComplexity.put(version, (Integer) analysis.get("cyclomatic_complexity"));
+                        callsMade.put(version, (Integer) analysis.get("calls_made"));
+                        callsReceived.put(version, (Integer) analysis.get("calls_received"));
+                        stackFrameSizes.put(version, (Integer) analysis.get("stack_frame_size"));
+                        hasLoops.put(version, (Boolean) analysis.get("has_loops"));
+                    }
+
+                    // Get string references
+                    String stringRefsSql = """
+                        SELECT sr.string_content
+                        FROM function_string_refs fsr
+                        JOIN string_references sr ON fsr.string_ref_id = sr.id
+                        WHERE fsr.function_id = ?
+                    """;
+
+                    List<String> functionStrings = jdbcTemplate.queryForList(stringRefsSql, String.class, functionId);
+                    strings.put(version, functionStrings);
+
+                    // Get constants and globals from data_references
+                    String dataRefsSql = """
+                        SELECT reference_type, data_address
+                        FROM data_references
+                        WHERE function_id = ?
+                    """;
+
+                    List<Map<String, Object>> dataRefs = jdbcTemplate.queryForList(dataRefsSql, functionId);
+                    List<String> functionConstants = new ArrayList<>();
+                    List<String> functionGlobals = new ArrayList<>();
+
+                    for (Map<String, Object> ref : dataRefs) {
+                        String refType = (String) ref.get("reference_type");
+                        Long dataAddr = (Long) ref.get("data_address");
+                        String dataAddrStr = "0x" + String.format("%08x", dataAddr).toUpperCase();
+
+                        if ("constant".equals(refType)) {
+                            functionConstants.add(dataAddrStr);
+                        } else if ("global".equals(refType)) {
+                            functionGlobals.add(dataAddrStr);
+                        }
+                    }
+
+                    constants.put(version, functionConstants);
+                    globals.put(version, functionGlobals);
+
+                    // Note: callees and mnemonic_hashes would require more complex queries
+                    // Setting empty defaults for now
+                    callees.put(version, new ArrayList<>());
+                    mnemonicHashes.put(version, "");
+
+                } catch (Exception e) {
+                    System.out.println("DEBUG: Failed to get metadata for " + funcName + " in " + version + ": " + e.getMessage());
+                    // Set default values for this version
+                    sizes.put(version, 0);
+                    instructionCounts.put(version, 0);
+                    basicBlockCounts.put(version, 0);
+                    cyclomaticComplexity.put(version, 0);
+                    callsMade.put(version, 0);
+                    callsReceived.put(version, 0);
+                    stackFrameSizes.put(version, 0);
+                    hasLoops.put(version, false);
+                    callees.put(version, new ArrayList<>());
+                    strings.put(version, new ArrayList<>());
+                    constants.put(version, new ArrayList<>());
+                    globals.put(version, new ArrayList<>());
+                    mnemonicHashes.put(version, "");
+                }
+            }
+
+        } catch (Exception e) {
+            System.out.println("ERROR: populateCrossVersionFunctionMetadata failed for " + funcName + ": " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -566,6 +752,21 @@ public class WebDataService {
 
         Map<String, String> addresses = new LinkedHashMap<>();
         Map<String, Double> similarities = new LinkedHashMap<>();
+
+        // Initialize metadata maps for detailed function analysis
+        Map<String, Integer> sizes = new LinkedHashMap<>();
+        Map<String, Integer> instructionCounts = new LinkedHashMap<>();
+        Map<String, Integer> basicBlockCounts = new LinkedHashMap<>();
+        Map<String, Integer> cyclomaticComplexity = new LinkedHashMap<>();
+        Map<String, Integer> callsMade = new LinkedHashMap<>();
+        Map<String, Integer> callsReceived = new LinkedHashMap<>();
+        Map<String, Integer> stackFrameSizes = new LinkedHashMap<>();
+        Map<String, Boolean> hasLoops = new LinkedHashMap<>();
+        Map<String, List<String>> callees = new LinkedHashMap<>();
+        Map<String, List<String>> strings = new LinkedHashMap<>();
+        Map<String, List<String>> constants = new LinkedHashMap<>();
+        Map<String, List<String>> globals = new LinkedHashMap<>();
+        Map<String, String> mnemonicHashes = new LinkedHashMap<>();
 
         // Add baseline data first
         String baselineAddr = getFormattedAddressForRowId(baselineRowId);
@@ -765,8 +966,28 @@ public class WebDataService {
         // This ensures that if we find a match in 1.04b, we also populate 1.04c if they have the same MD5
         propagateMatchesToIdenticalMD5Versions(filename, addresses, similarities, allVersions);
 
+        // Populate detailed function metadata for all versions that have addresses
+        populateFunctionMetadata(baselineRowId, funcName, filename, addresses, sizes, instructionCounts,
+            basicBlockCounts, cyclomaticComplexity, callsMade, callsReceived, stackFrameSizes,
+            hasLoops, callees, strings, constants, globals, mnemonicHashes);
+
         functionData.put("addresses", addresses);
         functionData.put("similarities", similarities);
+
+        // Add detailed metadata to response
+        functionData.put("sizes", sizes);
+        functionData.put("instruction_counts", instructionCounts);
+        functionData.put("basic_block_counts", basicBlockCounts);
+        functionData.put("cyclomatic_complexity", cyclomaticComplexity);
+        functionData.put("calls_made", callsMade);
+        functionData.put("calls_received", callsReceived);
+        functionData.put("stack_frame_sizes", stackFrameSizes);
+        functionData.put("has_loops", hasLoops);
+        functionData.put("callees", callees);
+        functionData.put("strings", strings);
+        functionData.put("constants", constants);
+        functionData.put("globals", globals);
+        functionData.put("mnemonic_hashes", mnemonicHashes);
 
         return functionData;
     }
@@ -1365,5 +1586,138 @@ public class WebDataService {
             System.err.println("Error finding identical MD5 version for " + filename + " " + targetVersion + ": " + e.getMessage());
         }
         return null;
+    }
+
+    /**
+     * Populate detailed function metadata for all versions that have addresses.
+     * This includes structural analysis, string references, constants, etc.
+     */
+    private void populateFunctionMetadata(Long baselineRowId, String funcName, String filename,
+                                        Map<String, String> addresses, Map<String, Integer> sizes,
+                                        Map<String, Integer> instructionCounts, Map<String, Integer> basicBlockCounts,
+                                        Map<String, Integer> cyclomaticComplexity, Map<String, Integer> callsMade,
+                                        Map<String, Integer> callsReceived, Map<String, Integer> stackFrameSizes,
+                                        Map<String, Boolean> hasLoops, Map<String, List<String>> callees,
+                                        Map<String, List<String>> strings, Map<String, List<String>> constants,
+                                        Map<String, List<String>> globals, Map<String, String> mnemonicHashes) {
+
+        try {
+            System.out.println("DEBUG: populateFunctionMetadata called for " + funcName + " in " + filename + " with " + addresses.size() + " versions");
+            // For each version that has an address, populate its metadata
+            for (String version : addresses.keySet()) {
+                System.out.println("DEBUG: Processing version " + version + " for function " + funcName);
+                // Get function ID for this version
+                String getFunctionIdSql = """
+                    SELECT d.id
+                    FROM desctable d
+                    JOIN exetable e ON d.id_exe = e.id
+                    JOIN binary_versions bv ON e.id = bv.executable_id
+                    JOIN game_versions gv ON bv.game_version = gv.id
+                    WHERE e.name_exec = ? AND gv.version_string = ? AND d.name_func = ?
+                    LIMIT 1
+                """;
+
+                try {
+                    Long functionId = jdbcTemplate.queryForObject(getFunctionIdSql, Long.class, filename, version, funcName);
+                    System.out.println("DEBUG: Found function ID " + functionId + " for " + funcName + " in " + version);
+
+                    // Get function analysis data
+                    String analysisSql = """
+                        SELECT instruction_count, basic_block_count, cyclomatic_complexity,
+                               calls_made, calls_received, stack_frame_size, has_loops
+                        FROM function_analysis
+                        WHERE function_id = ?
+                        LIMIT 1
+                    """;
+
+                    List<Map<String, Object>> analysisResults = jdbcTemplate.queryForList(analysisSql, functionId);
+                    if (!analysisResults.isEmpty()) {
+                        Map<String, Object> analysis = analysisResults.get(0);
+                        instructionCounts.put(version, (Integer) analysis.get("instruction_count"));
+                        basicBlockCounts.put(version, (Integer) analysis.get("basic_block_count"));
+                        cyclomaticComplexity.put(version, (Integer) analysis.get("cyclomatic_complexity"));
+                        callsMade.put(version, (Integer) analysis.get("calls_made"));
+                        callsReceived.put(version, (Integer) analysis.get("calls_received"));
+                        stackFrameSizes.put(version, (Integer) analysis.get("stack_frame_size"));
+                        hasLoops.put(version, (Boolean) analysis.get("has_loops"));
+                    }
+
+                    // Get string references
+                    String stringsSql = """
+                        SELECT sr.string_value
+                        FROM function_string_refs fsr
+                        JOIN string_references sr ON fsr.string_ref_id = sr.id
+                        WHERE fsr.function_id = ?
+                        ORDER BY sr.string_value
+                    """;
+
+                    List<String> functionStrings = jdbcTemplate.queryForList(stringsSql, String.class, functionId);
+                    strings.put(version, functionStrings);
+
+                    // Get data references (constants/globals)
+                    String dataRefsSql = """
+                        SELECT data_address, reference_type
+                        FROM data_references
+                        WHERE function_id = ?
+                        ORDER BY data_address
+                    """;
+
+                    List<Map<String, Object>> dataRefs = jdbcTemplate.queryForList(dataRefsSql, functionId);
+                    List<String> functionConstants = new ArrayList<>();
+                    List<String> functionGlobals = new ArrayList<>();
+
+                    for (Map<String, Object> ref : dataRefs) {
+                        String refType = (String) ref.get("reference_type");
+                        String address = "0x" + String.format("%08X", (Long) ref.get("data_address"));
+
+                        if ("constant".equals(refType)) {
+                            functionConstants.add(address);
+                        } else if ("global".equals(refType)) {
+                            functionGlobals.add(address);
+                        }
+                    }
+
+                    constants.put(version, functionConstants);
+                    globals.put(version, functionGlobals);
+
+                    // Calculate function size (placeholder - would need actual implementation)
+                    String address = addresses.get(version);
+                    if (address != null) {
+                        // For now, use instruction count * 4 as rough size estimate
+                        Integer instrCount = instructionCounts.get(version);
+                        if (instrCount != null) {
+                            sizes.put(version, instrCount * 4);
+                        }
+                    }
+
+                    // Get callees (functions this function calls)
+                    // This would require a call graph table - placeholder for now
+                    callees.put(version, new ArrayList<>());
+
+                    // Generate mnemonic hash (placeholder - would need actual implementation)
+                    mnemonicHashes.put(version, "placeholder_hash_" + functionId);
+
+                } catch (Exception e) {
+                    // If we can't find metadata for this version, put empty values
+                    System.out.println("DEBUG: Could not find metadata for function " + funcName + " version " + version + ": " + e.getMessage());
+                    instructionCounts.put(version, 0);
+                    basicBlockCounts.put(version, 0);
+                    cyclomaticComplexity.put(version, 0);
+                    callsMade.put(version, 0);
+                    callsReceived.put(version, 0);
+                    stackFrameSizes.put(version, 0);
+                    hasLoops.put(version, false);
+                    sizes.put(version, 0);
+                    callees.put(version, new ArrayList<>());
+                    strings.put(version, new ArrayList<>());
+                    constants.put(version, new ArrayList<>());
+                    globals.put(version, new ArrayList<>());
+                    mnemonicHashes.put(version, "");
+                }
+            }
+
+        } catch (Exception e) {
+            System.err.println("Error populating function metadata: " + e.getMessage());
+        }
     }
 }

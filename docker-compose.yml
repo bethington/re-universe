@@ -152,10 +152,7 @@ services:
 
   # Spring Boot API - Ghidra Analysis API
   ghidra-api:
-    build:
-      context: ./websites/spring-api
-      dockerfile: Dockerfile
-    image: ghidra-api:latest
+    image: spring-api-enhanced:latest
     container_name: ghidra-api
     ports:
       - "${GHIDRA_API_PORT:-8081}:8080"
