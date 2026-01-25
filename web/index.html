@@ -150,6 +150,18 @@
             letter-spacing: 1px;
         }
 
+        .panel-header-content {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .panel-header .exports-header-info {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin: 0;
+        }
+
         .panel-header-files {
             display: flex;
             align-items: center;
@@ -2788,7 +2800,10 @@
             <!-- Panel 3: Cross Version Matrix -->
             <div class="panel panel-details">
                 <div class="panel-header">
-                    <h2>Cross Version Matrix</h2>
+                    <div class="panel-header-content">
+                        <h2 id="crossVersionTitle">Cross Version Matrix</h2>
+                        <div id="crossVersionInfo" class="exports-header-info" style="display: none;"></div>
+                    </div>
                 </div>
                 <div class="panel-content" id="detailsContent">
                     <div class="details-empty">
@@ -4582,12 +4597,17 @@
                 </tr>`;
             }).join('');
 
+            // Update Cross Version Matrix header
+            const titleElement = document.getElementById('crossVersionTitle');
+            const infoElement = document.getElementById('crossVersionInfo');
+            if (titleElement && infoElement) {
+                titleElement.textContent = `${baseName} - Functions [${currentVersion}]`;
+                infoElement.textContent = `${functionNames.length} functions in this version`;
+                infoElement.style.display = 'block';
+            }
+
             const html = `
                 <div class="exports-container">
-                    <div class="exports-header">
-                        <div class="exports-header-title">${baseName} - Functions [${currentVersion}]</div>
-                        <div class="exports-header-info">${functionNames.length} functions in this version</div>
-                    </div>
                     <div class="exports-controls">
                         <input type="text" placeholder="Search name or address..." id="functionsSearch" class="search-input" />
                         <div class="filter-buttons">
@@ -5463,12 +5483,17 @@
                 ? ` <span style="color: var(--accent-gold); font-size: 0.8rem;">[${selectedVersion.split('/')[1] || selectedVersion}]</span>`
                 : '';
 
+            // Update Cross Version Matrix header
+            const titleElement = document.getElementById('crossVersionTitle');
+            const infoElement = document.getElementById('crossVersionInfo');
+            if (titleElement && infoElement) {
+                titleElement.innerHTML = `${baseName} - Functions${versionIndicator}${filterIndicator}`;
+                infoElement.textContent = `${funcKeys.length} function${funcKeys.length !== 1 ? 's' : ''}${selectedVersion ? ' in this version' : ' across ' + versionGroups.length + ' variant' + (versionGroups.length !== 1 ? 's' : '')}`;
+                infoElement.style.display = 'block';
+            }
+
             let html = `
                 <div class="exports-container">
-                    <div class="exports-header">
-                        <div class="exports-header-title">${baseName} - Functions${versionIndicator}${filterIndicator}</div>
-                        <div class="exports-header-info">${funcKeys.length} function${funcKeys.length !== 1 ? 's' : ''}${selectedVersion ? ' in this version' : ' across ' + versionGroups.length + ' variant' + (versionGroups.length !== 1 ? 's' : '')}</div>
-                    </div>
                     <div class="exports-toolbar">
                         <div class="exports-toolbar-row">
                             <input type="text" class="exports-search" id="funcSearchInput"
@@ -5829,6 +5854,14 @@
         }
 
         function renderEmptyDetails() {
+            // Reset the Cross Version Matrix header
+            const titleElement = document.getElementById('crossVersionTitle');
+            const infoElement = document.getElementById('crossVersionInfo');
+            if (titleElement && infoElement) {
+                titleElement.textContent = 'Cross Version Matrix';
+                infoElement.style.display = 'none';
+            }
+
             document.getElementById('detailsContent').innerHTML = `
                 <div class="details-empty">
                     <div class="details-empty-icon">🔍</div>
