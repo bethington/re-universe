@@ -556,13 +556,16 @@ SELECT
     e.name_exec,
     e.md5,
     e.game_version,
-    ed.architecture,
-    ed.name_compiler,
-    ed.repository,
-    ed.path
+    a.val as architecture,
+    c.val as name_compiler,
+    r.val as repository,
+    p.val as path
 FROM desctable d
 JOIN exetable e ON d.id_exe = e.id
-LEFT JOIN exetable_denormalized ed ON e.id = ed.id;
+LEFT JOIN archtable a ON e.architecture = a.id
+LEFT JOIN compilertable c ON e.name_compiler = c.id
+LEFT JOIN repositorytable r ON e.repository = r.id
+LEFT JOIN pathtable p ON e.path = p.id;
 
 COMMENT ON VIEW v_enhanced_functions IS 'Complete function view combining authentic BSim with extensions';
 
