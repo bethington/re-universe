@@ -328,15 +328,6 @@
             max-width: none;
         }
 
-        .files-toolbar {
-            display: flex;
-            align-items: center;
-            padding: 0.4rem 0.6rem;
-            background-color: var(--bg-medium);
-            border-bottom: 1px solid var(--border-dark);
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
 
         .category-filters {
             display: flex;
@@ -2047,11 +2038,6 @@
                 width: 350px;
             }
 
-            /* Prevent toolbar wrapping on medium screens */
-            .files-toolbar {
-                flex-wrap: nowrap;
-                overflow-x: auto;
-            }
 
             .category-filters {
                 flex-wrap: nowrap;
@@ -2071,12 +2057,6 @@
                 grid-template-columns: 1fr 80px 1fr 24px;
             }
 
-            /* Force no wrapping on smaller screens */
-            .files-toolbar {
-                flex-wrap: nowrap;
-                padding: 0.3rem 0.5rem;
-                gap: 0.3rem;
-            }
 
             .category-filters {
                 flex-wrap: nowrap;
@@ -2738,13 +2718,6 @@
                 <div class="panel-header panel-header-files">
                     <h2 id="filesTitle">Binaries</h2>
                     <input type="text" class="files-filter" id="filesFilter" placeholder="Filter..." oninput="filterFiles()" style="display: none;">
-                </div>
-                <div class="files-toolbar" id="filesToolbar" style="display: none; position: relative;">
-                    <div class="category-filters" id="categoryFilters"></div>
-                    <button class="group-btn" id="groupBtn" onclick="toggleGrouping()">
-                        <span class="full-text">Group</span>
-                        <span class="short-text">▤</span>
-                    </button>
                 </div>
                 <div class="panel-content">
                     <div class="files-table" id="filesTable">
@@ -4103,8 +4076,7 @@
                     return;
                 }
 
-                // Show toolbar and filter
-                document.getElementById('filesToolbar').style.display = 'flex';
+                // Show filter
                 document.getElementById('filesFilter').style.display = 'block';
                 document.getElementById('filesFilter').value = '';
 

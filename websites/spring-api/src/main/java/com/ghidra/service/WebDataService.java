@@ -494,17 +494,22 @@ public class WebDataService {
      * Helper method to get executable ID for a specific version
      */
     private Long getExecutableIdForVersion(String filename, String version) {
+        System.out.println("DEBUG: getExecutableIdForVersion called with filename=" + filename + ", version=" + version);
         String sql = """
             SELECT e.id
             FROM exetable e
-            LEFT JOIN game_versions gv ON e.game_version = gv.id
+            JOIN binary_versions bv ON e.id = bv.executable_id
+            JOIN game_versions gv ON bv.game_version = gv.id
             WHERE e.name_exec = ? AND gv.version_string = ?
             LIMIT 1
         """;
 
         try {
-            return jdbcTemplate.queryForObject(sql, Long.class, filename, version);
+            Long result = jdbcTemplate.queryForObject(sql, Long.class, filename, version);
+            System.out.println("DEBUG: Found executable ID: " + result);
+            return result;
         } catch (Exception e) {
+            System.out.println("DEBUG: Exception in getExecutableIdForVersion: " + e.getMessage());
             return null;
         }
     }
@@ -527,6 +532,22 @@ public class WebDataService {
         String baselineAddr = getFormattedAddressForRowId(baselineRowId);
         addresses.put(baselineVersion, baselineAddr);
         similarities.put(baselineVersion, 1.0);
+
+        // Check if this file has identical versions (same MD5 across versions)
+        if (hasIdenticalVersions(filename)) {
+            System.out.println("DEBUG: File " + filename + " has identical versions - populating all with same addresses");
+            // For identical files, populate all versions with the same function data
+            for (String version : allVersions) {
+                if (!version.equals(baselineVersion)) {
+                    addresses.put(version, baselineAddr);
+                    similarities.put(version, 1.0);
+                }
+            }
+
+            functionData.put("addresses", addresses);
+            functionData.put("similarities", similarities);
+            return functionData;
+        }
 
         // Improved similarity calculation using function signatures and parameters
         try {
@@ -680,13 +701,56 @@ public class WebDataService {
     }
 
     /**
+     * Check if a filename has mostly identical versions and get the dominant MD5
+     */
+    private Map<String, Object> getIdenticalVersionInfo(String filename) {
+        String sql = """
+            SELECT e.md5, COUNT(*) as version_count
+            FROM exetable e
+            JOIN binary_versions bv ON e.id = bv.executable_id
+            JOIN game_versions gv ON bv.game_version = gv.id
+            WHERE e.name_exec = ?
+            GROUP BY e.md5
+            ORDER BY COUNT(*) DESC
+        """;
+
+        Map<String, Object> result = new HashMap<>();
+        try {
+            List<Map<String, Object>> results = jdbcTemplate.queryForList(sql, filename);
+            if (!results.isEmpty()) {
+                Map<String, Object> mostCommon = results.get(0);
+                String dominantMd5 = (String) mostCommon.get("md5");
+                Long dominantCount = Long.valueOf(mostCommon.get("version_count").toString());
+
+                // Get total version count
+                Long totalVersions = results.stream()
+                    .mapToLong(row -> Long.valueOf(row.get("version_count").toString()))
+                    .sum();
+
+                boolean hasDominantVersion = dominantCount > (totalVersions * 0.8); // 80% or more identical
+
+                result.put("hasDominantVersion", hasDominantVersion);
+                result.put("dominantMd5", dominantMd5);
+                result.put("dominantCount", dominantCount);
+                result.put("totalVersions", totalVersions);
+
+                System.out.println("DEBUG: File " + filename + " - " + dominantCount + "/" + totalVersions + " versions identical (dominant=" + hasDominantVersion + ")");
+            }
+            return result;
+        } catch (Exception e) {
+            return result;
+        }
+    }
+
+    /**
      * Get version MD5s for a filename
      */
     private Map<String, String> getVersionMd5s(String filename) {
         String sql = """
             SELECT gv.version_string, e.md5
             FROM exetable e
-            LEFT JOIN game_versions gv ON e.game_version = gv.id
+            JOIN binary_versions bv ON e.id = bv.executable_id
+            JOIN game_versions gv ON bv.game_version = gv.id
             WHERE e.name_exec = ?
             ORDER BY gv.id
         """;
@@ -711,10 +775,12 @@ public class WebDataService {
      * Get all versions that have this filename
      */
     private List<String> getAllVersionsForFile(String filename) {
+        System.out.println("DEBUG: getAllVersionsForFile called for filename=" + filename);
         String sql = """
             SELECT DISTINCT gv.version_string, gv.id
             FROM exetable e
-            LEFT JOIN game_versions gv ON e.game_version = gv.id
+            JOIN binary_versions bv ON e.id = bv.executable_id
+            JOIN game_versions gv ON bv.game_version = gv.id
             WHERE e.name_exec = ?
             AND gv.version_string IS NOT NULL
             ORDER BY gv.id
@@ -722,6 +788,7 @@ public class WebDataService {
 
         try {
             List<Map<String, Object>> results = jdbcTemplate.queryForList(sql, filename);
+            System.out.println("DEBUG: Found " + results.size() + " versions for " + filename);
             return results.stream()
                     .map(row -> (String) row.get("version_string"))
                     .collect(Collectors.toList());

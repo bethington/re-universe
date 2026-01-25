@@ -156,11 +156,14 @@ public class ApiController {
             @PathVariable String version,
             @PathVariable String filename,
             @RequestParam(defaultValue = "0.6") double threshold) {
+        System.out.println("DEBUG CONTROLLER: getBSimCrossVersionFunctions called with version=" + version + ", filename=" + filename + ", threshold=" + threshold);
         try {
             Map<String, Object> functions = webDataService.getBSimCrossVersionFunctions(
                 version, filename, threshold);
+            System.out.println("DEBUG CONTROLLER: Service returned: " + (functions.containsKey("error") ? "ERROR - " + functions.get("error") : "SUCCESS"));
             return ResponseEntity.ok(functions);
         } catch (Exception e) {
+            System.out.println("DEBUG CONTROLLER: Exception occurred: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.internalServerError().build();
         }
