@@ -301,31 +301,11 @@ INSERT INTO pathtable (val) VALUES
     ('C:\Windows\System32');
 
 -- =========================================================================
--- DATA ACCESS VIEW (FOR API COMPATIBILITY)
+-- COMPATIBILITY NOTE
 -- =========================================================================
 
-\echo 'Creating compatibility views...'
-
--- Create a view that joins lookup tables for API compatibility
--- This allows existing APIs to work without major changes
-CREATE VIEW exetable_denormalized AS
-SELECT
-    e.id,
-    e.md5,
-    e.name_exec,
-    a.val as architecture,
-    c.val as name_compiler,
-    e.ingest_date,
-    r.val as repository,
-    p.val as path
-FROM exetable e
-LEFT JOIN archtable a ON e.architecture = a.id
-LEFT JOIN compilertable c ON e.name_compiler = c.id
-LEFT JOIN repositorytable r ON e.repository = r.id
-LEFT JOIN pathtable p ON e.path = p.id;
-
--- Grant permissions on the view
-GRANT SELECT ON exetable_denormalized TO PUBLIC;
+-- The exetable_denormalized view is created in 06-create-api-views.sql
+-- with the proper binary_versions junction table support
 
 -- =========================================================================
 -- COMPLETION
