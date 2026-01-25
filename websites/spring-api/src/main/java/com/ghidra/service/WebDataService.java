@@ -309,7 +309,8 @@ public class WebDataService {
                 gv.version_string,
                 gv.version_family
             FROM exetable e
-            LEFT JOIN game_versions gv ON e.game_version = gv.id
+            LEFT JOIN binary_versions bv ON e.id = bv.executable_id
+            LEFT JOIN game_versions gv ON bv.game_version = gv.id
             WHERE e.name_exec = ?
             ORDER BY gv.id
         """;
@@ -356,7 +357,8 @@ public class WebDataService {
                 gv.version_string
             FROM desctable d
             JOIN exetable e ON d.id_exe = e.id
-            LEFT JOIN game_versions gv ON e.game_version = gv.id
+            LEFT JOIN binary_versions bv ON e.id = bv.executable_id
+            LEFT JOIN game_versions gv ON bv.game_version = gv.id
             WHERE e.name_exec = ?
             ORDER BY d.name_func, gv.id
         """;
@@ -446,14 +448,32 @@ public class WebDataService {
 
         List<Map<String, Object>> baselineFunctions = jdbcTemplate.queryForList(baselineSql, baselineExeId);
 
+        // Track if we use a fallback version
+        String fallbackVersion = null;
+
         if (baselineFunctions.isEmpty()) {
-            Map<String, Object> emptyResponse = new HashMap<>();
-            emptyResponse.put("filename", filename);
-            emptyResponse.put("baselineVersion", version);
-            emptyResponse.put("versions", new ArrayList<>());
-            emptyResponse.put("functions", new HashMap<>());
-            emptyResponse.put("error", "No functions found for " + filename + " version " + version);
-            return emptyResponse;
+            // Check if there's an identical MD5 version we can use as a fallback
+            fallbackVersion = findIdenticalMD5Version(filename, version);
+            if (fallbackVersion != null) {
+                System.out.println("DEBUG: No function data for " + version + ", falling back to identical MD5 version: " + fallbackVersion);
+                Long fallbackExeId = getExecutableIdForVersion(filename, fallbackVersion);
+                if (fallbackExeId != null) {
+                    baselineExeId = fallbackExeId;
+                    baselineFunctions = jdbcTemplate.queryForList(baselineSql, baselineExeId);
+                    System.out.println("DEBUG: Found " + baselineFunctions.size() + " functions in fallback version " + fallbackVersion);
+                }
+            }
+
+            if (baselineFunctions.isEmpty()) {
+                Map<String, Object> emptyResponse = new HashMap<>();
+                emptyResponse.put("filename", filename);
+                emptyResponse.put("baselineVersion", version);
+                emptyResponse.put("versions", new ArrayList<>());
+                emptyResponse.put("functions", new HashMap<>());
+                emptyResponse.put("error", "No functions found for " + filename + " version " + version +
+                    (fallbackVersion != null ? " or fallback version " + fallbackVersion : ""));
+                return emptyResponse;
+            }
         }
 
         // Get all versions for this filename
@@ -467,6 +487,13 @@ public class WebDataService {
         response.put("versionMd5s", getVersionMd5s(filename));
         response.put("functions", new LinkedHashMap<>());
 
+        // Determine the actual baseline version to use for cross-version queries
+        // If we fell back to a different version, we need to use that for the similarity queries
+        String actualBaselineVersion = version;
+        if (fallbackVersion != null && baselineExeId != getExecutableIdForVersion(filename, version)) {
+            actualBaselineVersion = fallbackVersion;
+        }
+
         // For each baseline function, find BSim matches and build data
         Map<String, Map<String, Object>> functionsMap = new LinkedHashMap<>();
 
@@ -475,8 +502,20 @@ public class WebDataService {
             Long baselineRowId = Long.valueOf(baselineFunc.get("baseline_rowid").toString());
 
             Map<String, Object> functionData = buildFunctionWithSimilarities(
-                baselineRowId, funcName, filename, version, threshold, allVersions
+                baselineRowId, funcName, filename, actualBaselineVersion, threshold, allVersions
             );
+
+            // If we used a fallback version, ensure the original requested version appears in results
+            if (!actualBaselineVersion.equals(version)) {
+                Map<String, String> addresses = (Map<String, String>) functionData.get("addresses");
+                Map<String, Double> similarities = (Map<String, Double>) functionData.get("similarities");
+
+                // Copy data from fallback version to requested version
+                if (addresses.containsKey(actualBaselineVersion)) {
+                    addresses.put(version, addresses.get(actualBaselineVersion));
+                    similarities.put(version, similarities.get(actualBaselineVersion));
+                }
+            }
 
             functionsMap.put(funcName, functionData);
         }
@@ -557,7 +596,8 @@ public class WebDataService {
                 FROM enhanced_signatures es
                 JOIN desctable d ON es.function_id = d.id
                 JOIN exetable e ON d.id_exe = e.id
-                JOIN game_versions gv ON e.game_version = gv.id
+                JOIN binary_versions bv ON e.id = bv.executable_id
+                JOIN game_versions gv ON bv.game_version = gv.id
                 WHERE e.name_exec = ? AND gv.version_string = ? AND d.name_func = ?
             """;
 
@@ -565,13 +605,14 @@ public class WebDataService {
                 enhancedBaselineCheck, Integer.class, filename, baselineVersion, funcName
             );
 
-            // Get baseline function signature info
+            // Get baseline function signature info using junction table
             String baselineSignatureSql = """
                 SELECT d.addr, fs.signature_text, fs.parameter_count, fs.return_type, fs.calling_convention
                 FROM desctable d
                 JOIN function_signatures fs ON d.id = fs.function_id
                 JOIN exetable e ON d.id_exe = e.id
-                JOIN game_versions gv ON e.game_version = gv.id
+                JOIN binary_versions bv ON e.id = bv.executable_id
+                JOIN game_versions gv ON bv.game_version = gv.id
                 WHERE e.name_exec = ? AND gv.version_string = ? AND d.name_func = ?
                 LIMIT 1
             """;
@@ -580,6 +621,7 @@ public class WebDataService {
                 baselineSignatureSql, filename, baselineVersion, funcName
             );
 
+            System.out.println("DEBUG: Found " + baselineSignatures.size() + " baseline signatures for function " + funcName);
             if (!baselineSignatures.isEmpty()) {
                 Map<String, Object> baseline = baselineSignatures.get(0);
                 String baselineSignatureText = (String) baseline.get("signature_text");
@@ -587,7 +629,7 @@ public class WebDataService {
                 String baselineReturnType = (String) baseline.get("return_type");
                 String baselineCallingConvention = (String) baseline.get("calling_convention");
 
-                // Find matches in other versions with signature-based similarity
+                // Find matches in other versions with signature-based similarity using junction table
                 String crossVersionSimilaritySql = """
                     SELECT
                         d.addr,
@@ -608,7 +650,8 @@ public class WebDataService {
                     FROM desctable d
                     JOIN function_signatures fs ON d.id = fs.function_id
                     JOIN exetable e ON d.id_exe = e.id
-                    JOIN game_versions gv ON e.game_version = gv.id
+                    JOIN binary_versions bv ON e.id = bv.executable_id
+                    JOIN game_versions gv ON bv.game_version = gv.id
                     WHERE e.name_exec = ?
                     AND gv.version_string != ?
                     AND d.name_func = ?
@@ -625,6 +668,7 @@ public class WebDataService {
                 );
 
                 // Process signature-based matches
+                System.out.println("DEBUG: Found " + signatureMatches.size() + " signature matches for function " + funcName);
                 Map<String, Double> bestSimilarities = new HashMap<>();
                 for (Map<String, Object> match : signatureMatches) {
                     String targetVersion = (String) match.get("version_string");
@@ -644,6 +688,40 @@ public class WebDataService {
                         similarities.put(targetVersion, similarity);
                     }
                 }
+            } else {
+                // No baseline signatures found, fall back to name-based matching
+                System.out.println("DEBUG: No baseline signatures found for function " + funcName + ", using name-based fallback");
+                String fallbackSql = """
+                    SELECT
+                        d.addr,
+                        gv.version_string
+                    FROM desctable d
+                    JOIN exetable e ON d.id_exe = e.id
+                    JOIN binary_versions bv ON e.id = bv.executable_id
+                    JOIN game_versions gv ON bv.game_version = gv.id
+                    WHERE e.name_exec = ?
+                    AND gv.version_string != ?
+                    AND d.name_func = ?
+                    ORDER BY gv.id
+                """;
+
+                try {
+                    List<Map<String, Object>> nameMatches = jdbcTemplate.queryForList(
+                        fallbackSql, filename, baselineVersion, funcName
+                    );
+
+                    for (Map<String, Object> match : nameMatches) {
+                        String targetVersion = (String) match.get("version_string");
+                        Long targetAddr = Long.valueOf(match.get("addr").toString());
+
+                        String formattedAddr = "0x" + String.format("%08X", targetAddr);
+                        addresses.put(targetVersion, formattedAddr);
+                        similarities.put(targetVersion, 0.75); // Default similarity for name matches
+                    }
+                    System.out.println("DEBUG: Found " + nameMatches.size() + " name matches for function " + funcName + " in no-signature fallback");
+                } catch (Exception fallbackError) {
+                    System.out.println("No-signature fallback name matching also failed for " + funcName + ": " + fallbackError.getMessage());
+                }
             }
         } catch (Exception e) {
             System.err.println("Error in signature-based similarity matching for function '" + funcName + "': " + e.getClass().getSimpleName() + " - " + e.getMessage());
@@ -656,7 +734,8 @@ public class WebDataService {
                     gv.version_string
                 FROM desctable d
                 JOIN exetable e ON d.id_exe = e.id
-                JOIN game_versions gv ON e.game_version = gv.id
+                JOIN binary_versions bv ON e.id = bv.executable_id
+                JOIN game_versions gv ON bv.game_version = gv.id
                 WHERE e.name_exec = ?
                 AND gv.version_string != ?
                 AND d.name_func = ?
@@ -676,15 +755,86 @@ public class WebDataService {
                     addresses.put(targetVersion, formattedAddr);
                     similarities.put(targetVersion, 0.75); // Default similarity for name matches
                 }
+                System.out.println("DEBUG: Found " + nameMatches.size() + " name matches for function " + funcName + " in fallback");
             } catch (Exception fallbackError) {
                 System.out.println("Fallback name matching also failed for " + funcName + ": " + fallbackError.getMessage());
             }
         }
 
+        // ENHANCEMENT: Propagate matches to all versions with identical MD5 hashes
+        // This ensures that if we find a match in 1.04b, we also populate 1.04c if they have the same MD5
+        propagateMatchesToIdenticalMD5Versions(filename, addresses, similarities, allVersions);
+
         functionData.put("addresses", addresses);
         functionData.put("similarities", similarities);
 
         return functionData;
+    }
+
+    /**
+     * Propagate function matches to all versions that have identical MD5 hashes
+     * This fixes the issue where 1.04b and 1.04c (same MD5) don't both appear in cross-version results
+     */
+    private void propagateMatchesToIdenticalMD5Versions(String filename, Map<String, String> addresses,
+                                                       Map<String, Double> similarities, List<String> allVersions) {
+        try {
+            // Get MD5 mapping for all versions of this file
+            String sql = """
+                SELECT gv.version_string, e.md5
+                FROM binary_versions bv
+                JOIN exetable e ON bv.executable_id = e.id
+                JOIN game_versions gv ON bv.game_version = gv.id
+                WHERE e.name_exec = ?
+                ORDER BY gv.version_string
+            """;
+
+            Map<String, String> versionMd5Map = new HashMap<>(); // version -> md5
+            Map<String, List<String>> md5ToVersionsMap = new HashMap<>(); // md5 -> [versions]
+
+            List<Map<String, Object>> md5Results = jdbcTemplate.queryForList(sql, filename);
+
+            for (Map<String, Object> row : md5Results) {
+                String version = (String) row.get("version_string");
+                String md5 = (String) row.get("md5");
+
+                versionMd5Map.put(version, md5);
+                md5ToVersionsMap.computeIfAbsent(md5, k -> new ArrayList<>()).add(version);
+            }
+
+            // For each version that has a match, propagate to all other versions with same MD5
+            Map<String, String> newAddresses = new HashMap<>(addresses);
+            Map<String, Double> newSimilarities = new HashMap<>(similarities);
+
+            for (String matchedVersion : new ArrayList<>(addresses.keySet())) {
+                String matchedMd5 = versionMd5Map.get(matchedVersion);
+                if (matchedMd5 != null) {
+                    List<String> identicalVersions = md5ToVersionsMap.get(matchedMd5);
+                    if (identicalVersions != null && identicalVersions.size() > 1) {
+                        String address = addresses.get(matchedVersion);
+                        Double similarity = similarities.get(matchedVersion);
+
+                        System.out.println("DEBUG: Propagating match from " + matchedVersion +
+                                         " to " + identicalVersions.size() + " identical MD5 versions: " + identicalVersions);
+
+                        // Propagate to all versions with same MD5
+                        for (String identicalVersion : identicalVersions) {
+                            if (!addresses.containsKey(identicalVersion)) {
+                                newAddresses.put(identicalVersion, address);
+                                newSimilarities.put(identicalVersion, similarity);
+                                System.out.println("DEBUG: Added " + identicalVersion + " -> " + address + " (similarity: " + similarity + ")");
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Update the original maps
+            addresses.putAll(newAddresses);
+            similarities.putAll(newSimilarities);
+
+        } catch (Exception e) {
+            System.err.println("Error propagating matches to identical MD5 versions: " + e.getMessage());
+        }
     }
 
     /**
@@ -698,6 +848,14 @@ public class WebDataService {
         } catch (Exception e) {
             return "0x00000000";
         }
+    }
+
+    /**
+     * Check if a file has identical versions (same MD5 across all or most versions)
+     */
+    private boolean hasIdenticalVersions(String filename) {
+        Map<String, Object> versionInfo = getIdenticalVersionInfo(filename);
+        return (Boolean) versionInfo.getOrDefault("hasDominantVersion", false);
     }
 
     /**
@@ -1163,5 +1321,49 @@ public class WebDataService {
         response.put("cache_enabled", true);
 
         return response;
+    }
+
+    /**
+     * Find another version with identical MD5 hash that has function data.
+     * Used as a fallback when the requested baseline version has no function data.
+     */
+    private String findIdenticalMD5Version(String filename, String targetVersion) {
+        try {
+            String sql = """
+                SELECT gv1.version_string, gv2.version_string as identical_version
+                FROM binary_versions bv1
+                JOIN exetable e1 ON bv1.executable_id = e1.id
+                JOIN game_versions gv1 ON bv1.game_version = gv1.id
+                JOIN binary_versions bv2 ON e1.md5 = (
+                    SELECT e2.md5 FROM binary_versions bv3
+                    JOIN exetable e2 ON bv3.executable_id = e2.id
+                    JOIN game_versions gv3 ON bv3.game_version = gv3.id
+                    WHERE e2.name_exec = ? AND gv3.version_string = ?
+                    LIMIT 1
+                )
+                JOIN exetable e2 ON bv2.executable_id = e2.id
+                JOIN game_versions gv2 ON bv2.game_version = gv2.id
+                WHERE e1.name_exec = ?
+                AND gv1.version_string = ?
+                AND gv2.version_string != ?
+                AND EXISTS (
+                    SELECT 1 FROM desctable d
+                    WHERE d.id_exe = e2.id
+                    LIMIT 1
+                )
+                LIMIT 1
+            """;
+
+            List<Map<String, Object>> results = jdbcTemplate.queryForList(
+                sql, filename, targetVersion, filename, targetVersion, targetVersion
+            );
+
+            if (!results.isEmpty()) {
+                return (String) results.get(0).get("identical_version");
+            }
+        } catch (Exception e) {
+            System.err.println("Error finding identical MD5 version for " + filename + " " + targetVersion + ": " + e.getMessage());
+        }
+        return null;
     }
 }
