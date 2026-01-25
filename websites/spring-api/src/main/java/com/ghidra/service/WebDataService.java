@@ -25,7 +25,7 @@ public class WebDataService {
 
     @Cacheable(value = "versions", key = "'all'")
     public List<VersionData> getVersions() {
-        // Query game_versions table but only return versions that have executables
+        // Query game_versions table but only return versions that have binaries via binary_versions
         String sql = """
             SELECT DISTINCT
                 gv.id,
@@ -34,7 +34,7 @@ public class WebDataService {
                 gv.description,
                 gv.created_at
             FROM game_versions gv
-            INNER JOIN exetable e ON gv.id = e.game_version
+            INNER JOIN binary_versions bv ON gv.id = bv.game_version
             ORDER BY gv.id
         """;
 
