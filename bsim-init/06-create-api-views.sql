@@ -72,15 +72,29 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 -- EXETABLE DENORMALIZED VIEW (REQUIRED BY SPRING BOOT API)
 -- =========================================================================
 
--- Create denormalized view of exetable with game_versions joined
--- This view is required by the Spring Boot API for binary loading
+-- Create denormalized view of exetable with game_versions joined via binary_versions
+-- This view shows each binary for EACH version it appears in (not just canonical version)
+-- Required by the Spring Boot API for binary loading
 CREATE OR REPLACE VIEW exetable_denormalized AS
 SELECT
-    e.*,
+    e.id,
+    e.name_exec,
+    e.md5,
+    e.sha256,
+    e.architecture,
+    e.name_compiler,
+    e.ingest_date,
+    e.repository,
+    e.path,
+    e.is_reference,
+    bv.game_version,
+    gv.version_family,
     gv.version_string,
-    gv.description as version_description
+    gv.description as version_description,
+    bv.discovered_at as version_discovered_at
 FROM exetable e
-LEFT JOIN game_versions gv ON e.game_version = gv.id;
+JOIN binary_versions bv ON e.id = bv.executable_id
+JOIN game_versions gv ON bv.game_version = gv.id;
 
 -- =========================================================================
 -- API VIEWS FOR WEB INTERFACE
