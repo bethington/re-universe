@@ -1,0 +1,1 @@
+scripts/core/setup.ps1

@@ -1,0 +1,1 @@
+scripts/testing/test-suite.sh

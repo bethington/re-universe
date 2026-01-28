@@ -1,0 +1,1 @@
+scripts/testing/test-connectivity.ps1
