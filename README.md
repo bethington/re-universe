@@ -7,6 +7,8 @@
 [![Version](https://img.shields.io/badge/Version-v1.0.0-blue.svg)](VERSION)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
+> If you find this useful, please ⭐ star the repo — it helps others discover it!
+
 A comprehensive Docker-based platform for **Ghidra BSim (Binary Similarity)** analysis with PostgreSQL backend. This setup enables large-scale binary similarity analysis, malware family classification, and code reuse detection using Ghidra's official BSim tools with a production-ready PostgreSQL database.
 
 ## ✨ Key Features
@@ -634,6 +636,12 @@ curl "http://localhost:8081/api/health"
 - **Clean Installation**: Use `./clean-fresh-deployment.sh full`
 - **Naming Compliance**: Ensure all files follow unified convention
 - **Validation Required**: All data must pass naming validation before ingestion
+
+---
+
+## 📸 Screenshots
+
+> **TODO**: Add screenshots of the web frontend UI showing cross-version function comparison, BSim similarity search results, and the monitoring dashboard. If you have screenshots to contribute, please open a PR!
 
 ---
 
