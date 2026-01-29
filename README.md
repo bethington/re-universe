@@ -9,6 +9,8 @@
 
 > If you find this useful, please ⭐ star the repo — it helps others discover it!
 
+> **🌐 Live Demo:** [d2docs.xebyte.com](https://d2docs.xebyte.com) — Explore the BSim Analysis Portal with Diablo II binaries across 25 versions (1.00 → 1.14d)
+
 A comprehensive Docker-based platform for **Ghidra BSim (Binary Similarity)** analysis with PostgreSQL backend. This setup enables large-scale binary similarity analysis, malware family classification, and code reuse detection using Ghidra's official BSim tools with a production-ready PostgreSQL database.
 
 ## ✨ Key Features
@@ -641,7 +643,20 @@ curl "http://localhost:8081/api/health"
 
 ## 📸 Screenshots
 
-> **TODO**: Add screenshots of the web frontend UI showing cross-version function comparison, BSim similarity search results, and the monitoring dashboard. If you have screenshots to contribute, please open a PR!
+### BSim Analysis Portal — Home
+The portal landing page showing all 25 Diablo II versions (1.00 through 1.14d) with hash search.
+
+![BSim Portal Home](docs/screenshots/screenshot-portal-home.png)
+
+### Version Binary Browser
+Select a version to see all categorized binaries (Game Logic, Graphics, Audio, Network, Launcher, MPQ, Utility) with file hashes.
+
+![Version Binaries](docs/screenshots/screenshot-version-binaries.png)
+
+### Cross-Version Function Matrix
+The core feature — track every function across all 25 versions of a binary. See function addresses, detect changes, and identify which versions modified which code. Shown here: D2Lang.dll with 280 functions across all versions.
+
+![Cross Version Matrix](docs/screenshots/screenshot-cross-version-matrix.png)
 
 ---
 
