@@ -1,0 +1,1 @@
+scripts/core/stop.sh
