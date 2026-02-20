@@ -238,7 +238,7 @@ services:
     networks:
       - backend
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -278,6 +278,55 @@ services:
       timeout: 10s
       retries: 3
       start_period: 90s
+    restart: unless-stopped
+
+  # AI Orchestration Service - Multi-Model Intelligence Coordination
+  # Provides intelligent routing, cost controls, and orchestration across AI models
+  ai-orchestration:
+    build:
+      context: ./services/ai-orchestration
+      dockerfile: Dockerfile
+    image: ai-orchestration:latest
+    container_name: ai-orchestration
+    ports:
+      - "${AI_ORCHESTRATION_PORT:-8092}:8092"
+    env_file:
+      - .env
+    environment:
+      - AI_ORCHESTRATION_HOST=${AI_ORCHESTRATION_HOST:-ai-orchestration}
+      - AI_ORCHESTRATION_PORT=8092
+      - BSIM_DB_HOST=bsim-postgres
+      - BSIM_DB_PORT=5432
+      - BSIM_DB_NAME=${BSIM_DB_NAME:-bsim}
+      - BSIM_DB_USER=${BSIM_DB_USER:-ben}
+      - BSIM_DB_PASSWORD=${BSIM_DB_PASSWORD}
+      - REDIS_HOST=redis-cache
+      - REDIS_PORT=6379
+      - REDIS_DB=1
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - DAILY_BUDGET=${DAILY_BUDGET:-50.0}
+      - WARNING_THRESHOLD=${WARNING_THRESHOLD:-0.80}
+      - CRITICAL_THRESHOLD=${CRITICAL_THRESHOLD:-0.95}
+      - EMERGENCY_THRESHOLD=${EMERGENCY_THRESHOLD:-1.00}
+      - ENABLE_MODEL_ROUTING=${ENABLE_MODEL_ROUTING:-true}
+      - VECTOR_SEARCH_URL=http://vector-search:8090
+      - GHIDRA_MCP_URL=http://ghidra-mcp:8089
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG=${DEBUG:-False}
+    depends_on:
+      redis-cache:
+        condition: service_healthy
+      vector-search:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8092/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
 
 volumes:
