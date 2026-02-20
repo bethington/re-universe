@@ -516,17 +516,17 @@ See [bsim-schema-extension.sql](../bsim-init/bsim-schema-extension.sql) for the 
 
 ```bash
 # Step 1: Verify base schema exists
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "SELECT COUNT(*) FROM keyvaluetable;"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "SELECT COUNT(*) FROM keyvaluetable;"
 
 # Step 2: Create backup
 ./backup.sh -BackupName "pre-extension-$(date +%Y%m%d)"
 
 # Step 3: Apply schema extensions
-docker exec -i bsim-postgres psql -U bsim -d bsim < bsim-init/bsim-schema-extension.sql
+docker exec -i bsim-postgres psql -U ben -d bsim < bsim-init/bsim-schema-extension.sql
 
 # Step 4: Verify extension tables created
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "\dt func_*"
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "\dt version_equivalence"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "\dt func_*"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "\dt version_equivalence"
 
 # Step 5: Test Ghidra integration
 # Run test documentation export/import cycle

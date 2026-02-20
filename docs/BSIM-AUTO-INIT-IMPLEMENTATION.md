@@ -184,7 +184,7 @@ docker-compose up -d
 docker logs bsim-postgres -f
 
 # 4. Verify schema
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "\dt"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "\dt"
 ```
 
 **Expected Output**:
@@ -208,10 +208,10 @@ docker-compose up -d
 # 3. Manually create schema
 # Option A: Ghidra CLI
 cd /path/to/ghidra
-./support/bsim createdatabase postgresql://bsim:pass@localhost:5432/bsim medium_32
+./support/bsim createdatabase postgresql://ben:pass@localhost:5432/bsim medium_32
 
 # Option B: SQL file
-docker exec -i bsim-postgres psql -U bsim -d bsim < bsim-init/04-create-bsim-schema.sql
+docker exec -i bsim-postgres psql -U ben -d bsim < bsim-init/04-create-bsim-schema.sql
 ```
 
 ---
@@ -247,19 +247,19 @@ docker logs bsim-postgres | grep "BSim"
 # Expected: "BSim Complete Schema Installation" messages
 
 # 3. Verify tables exist
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "\dt"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "\dt"
 # Expected: 18 tables listed
 
 # 4. Verify configuration
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "SELECT * FROM keyvaluetable;"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "SELECT * FROM keyvaluetable;"
 # Expected: template='large_32', k='19', L='232'
 
 # 5. Verify helper functions
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "\df insert_vec"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "\df insert_vec"
 # Expected: insert_vec function exists
 
 # 6. Run connectivity test
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "SELECT bsim_connectivity_test();"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "SELECT bsim_connectivity_test();"
 # Expected: "BSim PostgreSQL database is ready for Ghidra integration"
 ```
 
@@ -309,7 +309,7 @@ docker-compose restart
 echo "AUTO_CREATE_BSIM_SCHEMA=false" >> .env
 docker-compose up -d
 cd /path/to/ghidra
-./support/bsim createdatabase postgresql://bsim:pass@localhost:5432/bsim medium_64
+./support/bsim createdatabase postgresql://ben:pass@localhost:5432/bsim medium_64
 ```
 
 ---
@@ -367,8 +367,8 @@ INSERT INTO keyvaluetable (key, value) VALUES
 # Enhanced healthcheck in docker-compose.yml
 healthcheck:
   test: |
-    pg_isready -U bsim -d bsim &&
-    psql -U bsim -d bsim -tAc "SELECT COUNT(*) FROM pg_tables WHERE tablename='exetable'" | grep -q 1
+    pg_isready -U ben -d bsim &&
+    psql -U ben -d bsim -tAc "SELECT COUNT(*) FROM pg_tables WHERE tablename='exetable'" | grep -q 1
 ```
 
 **Benefit**: Container only reports healthy after schema is fully initialized.
@@ -420,7 +420,7 @@ mv bsim-init/04-create-bsim-schema.sql bsim-init/create-bsim-complete.sql
 docker-compose up -d
 
 # 6. Manually create schema
-docker exec -i bsim-postgres psql -U bsim -d bsim < bsim-init/create-bsim-complete.sql
+docker exec -i bsim-postgres psql -U ben -d bsim < bsim-init/create-bsim-complete.sql
 ```
 
 ---

@@ -105,7 +105,7 @@ deploy_infrastructure() {
     log "Waiting for database to be ready..."
     local retries=30
     while [[ $retries -gt 0 ]]; do
-        if docker exec bsim-postgres pg_isready -U "${BSIM_DB_USER:-bsim}" >/dev/null 2>&1; then
+        if docker exec bsim-postgres pg_isready -U ben >/dev/null 2>&1; then
             break
         fi
         sleep 2
@@ -134,7 +134,7 @@ deploy_enhanced_schema() {
 
     # Add strict data quality constraints
     log "Adding data quality constraints..."
-    docker exec -i bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "
+    docker exec -i bsim-postgres psql -U ben -d bsim -c "
     -- Add version validation constraints for unified system
     ALTER TABLE exetable ADD CONSTRAINT IF NOT EXISTS require_game_version
     CHECK (game_version ~ '^1\.[0-9]+[a-z]?\$');

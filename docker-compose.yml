@@ -27,7 +27,7 @@ services:
     container_name: bsim-postgres
     environment:
       - POSTGRES_DB=${BSIM_DB_NAME:-bsim}
-      - POSTGRES_USER=${BSIM_DB_USER:-bsim}
+      - POSTGRES_USER=${BSIM_DB_USER:-ben}
       - POSTGRES_PASSWORD=${BSIM_DB_PASSWORD}
       - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
       - AUTO_CREATE_BSIM_SCHEMA=${AUTO_CREATE_BSIM_SCHEMA:-true}
@@ -55,7 +55,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U ${BSIM_DB_USER:-bsim} -d ${BSIM_DB_NAME:-bsim}",
+          "pg_isready -U ${BSIM_DB_USER:-ben} -d ${BSIM_DB_NAME:-bsim}",
         ]
       interval: 10s
       timeout: 5s
@@ -109,7 +109,7 @@ services:
       - DJANGO_SECURE_PROXY_SSL_HEADER=${DJANGO_SECURE_PROXY_SSL_HEADER:-False}
       - DJANGO_CSRF_TRUSTED_ORIGINS=${DJANGO_CSRF_TRUSTED_ORIGINS:-}
       - BSIM_DB_NAME=${BSIM_DB_NAME:-bsim}
-      - BSIM_DB_USER=${BSIM_DB_USER:-bsim}
+      - BSIM_DB_USER=${BSIM_DB_USER:-ben}
       - BSIM_DB_PASSWORD=${BSIM_DB_PASSWORD}
       - BSIM_DB_HOST=bsim-postgres
       - BSIM_DB_PORT=5432
@@ -125,14 +125,14 @@ services:
       # Traefik Configuration (enable by setting TRAEFIK_ENABLE=true in .env)
       - "traefik.enable=${TRAEFIK_ENABLE:-false}"
       # HTTPS router
-      - "traefik.http.routers.d2docs.rule=Host(`d2docs.example.com`) || Host(`d2docs.example.com`)"
+      - "traefik.http.routers.d2docs.rule=Host(`d2docs.xebyte.us`) || Host(`d2docs.xebyte.com`)"
       - "traefik.http.routers.d2docs.entrypoints=websecure"
       - "traefik.http.routers.d2docs.tls.certresolver=le"
-      - "traefik.http.routers.d2docs.tls.domains[0].main=d2docs.example.com"
-      - "traefik.http.routers.d2docs.tls.domains[1].main=d2docs.example.com"
+      - "traefik.http.routers.d2docs.tls.domains[0].main=d2docs.xebyte.us"
+      - "traefik.http.routers.d2docs.tls.domains[1].main=d2docs.xebyte.com"
       - "traefik.http.services.d2docs.loadbalancer.server.port=80"
       # HTTP router with redirect
-      - "traefik.http.routers.d2docs-http.rule=Host(`d2docs.example.com`) || Host(`d2docs.example.com`)"
+      - "traefik.http.routers.d2docs-http.rule=Host(`d2docs.xebyte.us`) || Host(`d2docs.xebyte.com`)"
       - "traefik.http.routers.d2docs-http.entrypoints=web"
       - "traefik.http.routers.d2docs-http.middlewares=redirect-to-https@file"
     healthcheck:
@@ -160,7 +160,7 @@ services:
       - BSIM_DB_HOST=bsim-postgres
       - BSIM_DB_PORT=5432
       - BSIM_DB_NAME=${BSIM_DB_NAME:-bsim}
-      - BSIM_DB_USER=${BSIM_DB_USER:-bsim}
+      - BSIM_DB_USER=${BSIM_DB_USER:-ben}
       - BSIM_DB_PASSWORD=${BSIM_DB_PASSWORD}
       - GHIDRA_SERVER_HOST=ghidra-server
       - GHIDRA_SERVER_PORT=13100
@@ -179,14 +179,14 @@ services:
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE:-false}"
       # HTTPS router
-      - "traefik.http.routers.d2api.rule=Host(`api.example.com`) || Host(`api.example.com`)"
+      - "traefik.http.routers.d2api.rule=Host(`api.xebyte.us`) || Host(`api.xebyte.com`)"
       - "traefik.http.routers.d2api.entrypoints=websecure"
       - "traefik.http.routers.d2api.tls.certresolver=le"
-      - "traefik.http.routers.d2api.tls.domains[0].main=api.example.com"
-      - "traefik.http.routers.d2api.tls.domains[1].main=api.example.com"
+      - "traefik.http.routers.d2api.tls.domains[0].main=api.xebyte.us"
+      - "traefik.http.routers.d2api.tls.domains[1].main=api.xebyte.com"
       - "traefik.http.services.d2api.loadbalancer.server.port=8080"
       # HTTP router with redirect
-      - "traefik.http.routers.d2api-http.rule=Host(`api.example.com`) || Host(`api.example.com`)"
+      - "traefik.http.routers.d2api-http.rule=Host(`api.xebyte.us`) || Host(`api.xebyte.com`)"
       - "traefik.http.routers.d2api-http.entrypoints=web"
       - "traefik.http.routers.d2api-http.middlewares=redirect-to-https@file"
     healthcheck:

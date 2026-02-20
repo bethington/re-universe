@@ -13,13 +13,13 @@
 ./deploy-enhanced-bsim.sh schema
 
 # 2. Verify base schema
-docker exec -i bsim-postgres psql -U bsim -d bsim -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';"
+docker exec -i bsim-postgres psql -U ben -d bsim -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';"
 ```
 
 ### Phase 2: Data Quality Setup
 ```bash
 # 3. Apply unified version schema
-docker exec -i bsim-postgres psql -U bsim -d bsim -f /tmp/updated-single-version-schema.sql
+docker exec -i bsim-postgres psql -U ben -d bsim -f /tmp/updated-single-version-schema.sql
 
 # 4. Version validation constraints (automatically applied by schema)
 # - game_version format validation

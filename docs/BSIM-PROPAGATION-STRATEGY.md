@@ -354,7 +354,7 @@ Scripts in `ghidra-scripts/` must be added to Ghidra's Script Manager:
 
 ```bash
 # Test PostgreSQL connectivity
-psql -h localhost -p 5432 -U bsim -d bsim_project -c "SELECT 1"
+psql -h localhost -p 5432 -U ben -d bsim_project -c "SELECT 1"
 
 # Check Docker container
 docker logs bsim-postgres

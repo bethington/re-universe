@@ -66,7 +66,7 @@ if [[ ! -d "$DATA_DIR/base" ]]; then
 
     # Wait for PostgreSQL to be ready
     echo "Waiting for PostgreSQL to be ready for initial setup..."
-    until pg_isready -h localhost -p 5432 -U "${POSTGRES_USER:-bsim}" 2>/dev/null; do
+    until pg_isready -h localhost -p 5432 -U "${POSTGRES_USER:-ben}" 2>/dev/null; do
         sleep 1
     done
 

@@ -62,7 +62,7 @@ get_container_stats() {
 # Function to get database size
 get_database_size() {
     if check_container_status; then
-        docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c "SELECT pg_size_pretty(pg_database_size('bsim'));" 2>/dev/null | xargs || echo "N/A"
+        docker exec $CONTAINER_NAME psql -U ben -d bsim -t -c "SELECT pg_size_pretty(pg_database_size('bsim'));" 2>/dev/null | xargs || echo "N/A"
     else
         echo "N/A"
     fi
@@ -71,7 +71,7 @@ get_database_size() {
 # Function to get database statistics
 get_database_stats() {
     if check_container_status; then
-        docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "SELECT * FROM bsim_statistics;" 2>/dev/null || echo "Statistics not available"
+        docker exec $CONTAINER_NAME psql -U ben -d bsim -c "SELECT * FROM bsim_statistics;" 2>/dev/null || echo "Statistics not available"
     else
         echo "Container not running"
     fi
@@ -80,7 +80,7 @@ get_database_stats() {
 # Function to get capacity utilization
 get_capacity_stats() {
     if check_container_status; then
-        docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "SELECT * FROM bsim_capacity_stats();" 2>/dev/null || echo "Capacity stats not available"
+        docker exec $CONTAINER_NAME psql -U ben -d bsim -c "SELECT * FROM bsim_capacity_stats();" 2>/dev/null || echo "Capacity stats not available"
     else
         echo "Container not running"
     fi
@@ -89,7 +89,7 @@ get_capacity_stats() {
 # Function to get connection count
 get_connection_count() {
     if check_container_status; then
-        docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c "SELECT count(*) FROM pg_stat_activity WHERE state = 'active';" 2>/dev/null | xargs || echo "N/A"
+        docker exec $CONTAINER_NAME psql -U ben -d bsim -t -c "SELECT count(*) FROM pg_stat_activity WHERE state = 'active';" 2>/dev/null | xargs || echo "N/A"
     else
         echo "N/A"
     fi
@@ -98,7 +98,7 @@ get_connection_count() {
 # Function to get recent activity
 get_recent_activity() {
     if check_container_status; then
-        docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "SELECT query_start, left(query, 80) as query FROM pg_stat_activity WHERE state = 'active' AND query NOT LIKE '%pg_stat_activity%' ORDER BY query_start DESC LIMIT 5;" 2>/dev/null || echo "No recent activity"
+        docker exec $CONTAINER_NAME psql -U ben -d bsim -c "SELECT query_start, left(query, 80) as query FROM pg_stat_activity WHERE state = 'active' AND query NOT LIKE '%pg_stat_activity%' ORDER BY query_start DESC LIMIT 5;" 2>/dev/null || echo "No recent activity"
     else
         echo "Container not running"
     fi
@@ -107,7 +107,7 @@ get_recent_activity() {
 # Function to get data quality metrics
 get_data_quality() {
     if check_container_status; then
-        docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c "
+        docker exec $CONTAINER_NAME psql -U ben -d bsim -t -c "
         WITH stats AS (
             SELECT
                 COUNT(DISTINCT d.name_func) as unique_functions,
@@ -143,7 +143,7 @@ show_basic_status() {
     fi
 
     # Database connectivity
-    if docker exec $CONTAINER_NAME pg_isready -U "${BSIM_DB_USER:-bsim}" -d bsim >/dev/null 2>&1; then
+    if docker exec $CONTAINER_NAME pg_isready -U ben -d bsim >/dev/null 2>&1; then
         print_success "Database Status: Connected"
     else
         print_warning "Database Status: Connection Issues"
@@ -215,11 +215,11 @@ show_performance() {
     print_header "=== PostgreSQL Performance ==="
     if check_container_status; then
         echo "Database Connections:"
-        docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "SELECT datname, numbackends, xact_commit, xact_rollback FROM pg_stat_database WHERE datname = 'bsim';" 2>/dev/null || echo "Performance data not available"
+        docker exec $CONTAINER_NAME psql -U ben -d bsim -c "SELECT datname, numbackends, xact_commit, xact_rollback FROM pg_stat_database WHERE datname = 'bsim';" 2>/dev/null || echo "Performance data not available"
 
         echo ""
         echo "Cache Hit Ratio:"
-        docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "SELECT schemaname, tablename, heap_blks_read, heap_blks_hit, CASE WHEN heap_blks_hit + heap_blks_read = 0 THEN 0 ELSE round((heap_blks_hit::float / (heap_blks_hit + heap_blks_read)) * 100, 2) END as hit_ratio FROM pg_statio_user_tables WHERE schemaname = 'public' ORDER BY hit_ratio DESC LIMIT 10;" 2>/dev/null || echo "Cache statistics not available"
+        docker exec $CONTAINER_NAME psql -U ben -d bsim -c "SELECT schemaname, tablename, heap_blks_read, heap_blks_hit, CASE WHEN heap_blks_hit + heap_blks_read = 0 THEN 0 ELSE round((heap_blks_hit::float / (heap_blks_hit + heap_blks_read)) * 100, 2) END as hit_ratio FROM pg_statio_user_tables WHERE schemaname = 'public' ORDER BY hit_ratio DESC LIMIT 10;" 2>/dev/null || echo "Cache statistics not available"
     fi
 }
 
@@ -265,11 +265,11 @@ show_config() {
 
     if check_container_status; then
         echo "BSim Configuration:"
-        docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "SELECT * FROM bsim_database_info();" 2>/dev/null || echo "Configuration not available"
+        docker exec $CONTAINER_NAME psql -U ben -d bsim -c "SELECT * FROM bsim_database_info();" 2>/dev/null || echo "Configuration not available"
 
         echo ""
         echo "PostgreSQL Configuration (key settings):"
-        docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "SELECT name, setting, unit FROM pg_settings WHERE name IN ('shared_buffers', 'effective_cache_size', 'maintenance_work_mem', 'checkpoint_completion_target', 'wal_buffers', 'default_statistics_target');" 2>/dev/null || echo "PostgreSQL config not available"
+        docker exec $CONTAINER_NAME psql -U ben -d bsim -c "SELECT name, setting, unit FROM pg_settings WHERE name IN ('shared_buffers', 'effective_cache_size', 'maintenance_work_mem', 'checkpoint_completion_target', 'wal_buffers', 'default_statistics_target');" 2>/dev/null || echo "PostgreSQL config not available"
     else
         print_error "Container not running"
     fi
@@ -289,34 +289,34 @@ check_alerts() {
 
     if check_container_status; then
         # Check database connectivity
-        if ! docker exec $CONTAINER_NAME pg_isready -U "${BSIM_DB_USER:-bsim}" -d bsim >/dev/null 2>&1; then
+        if ! docker exec $CONTAINER_NAME pg_isready -U ben -d bsim >/dev/null 2>&1; then
             print_error "CRITICAL: Database is not responding"
             ((alerts++))
         fi
 
         # Check disk space (if database is very large)
-        db_size_bytes=$(docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c "SELECT pg_database_size('bsim');" 2>/dev/null | xargs || echo "0")
+        db_size_bytes=$(docker exec $CONTAINER_NAME psql -U ben -d bsim -t -c "SELECT pg_database_size('bsim');" 2>/dev/null | xargs || echo "0")
         if [[ "$db_size_bytes" -gt 107374182400 ]]; then  # 100GB
             print_warning "WARNING: Database size is very large (>100GB)"
             ((alerts++))
         fi
 
         # Check capacity utilization
-        function_count=$(docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c "SELECT COUNT(*) FROM function;" 2>/dev/null | xargs || echo "0")
+        function_count=$(docker exec $CONTAINER_NAME psql -U ben -d bsim -t -c "SELECT COUNT(*) FROM function;" 2>/dev/null | xargs || echo "0")
         if [[ "$function_count" -gt 90000000 ]]; then  # 90M functions (90% of 100M capacity)
             print_warning "WARNING: Function count approaching capacity limit"
             ((alerts++))
         fi
 
         # Check for long-running queries
-        long_queries=$(docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c "SELECT count(*) FROM pg_stat_activity WHERE state = 'active' AND query_start < now() - interval '5 minutes';" 2>/dev/null | xargs || echo "0")
+        long_queries=$(docker exec $CONTAINER_NAME psql -U ben -d bsim -t -c "SELECT count(*) FROM pg_stat_activity WHERE state = 'active' AND query_start < now() - interval '5 minutes';" 2>/dev/null | xargs || echo "0")
         if [[ "$long_queries" -gt 0 ]]; then
             print_warning "WARNING: $long_queries long-running queries detected"
             ((alerts++))
         fi
 
         # Check SSL configuration
-        if ! docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c "SHOW ssl;" 2>/dev/null | grep -q "on"; then
+        if ! docker exec $CONTAINER_NAME psql -U ben -d bsim -t -c "SHOW ssl;" 2>/dev/null | grep -q "on"; then
             print_warning "WARNING: SSL is not enabled"
             ((alerts++))
         fi

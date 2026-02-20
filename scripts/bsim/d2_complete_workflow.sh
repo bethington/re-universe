@@ -36,7 +36,7 @@ exec_sql() {
         log "$description"
     fi
 
-    docker exec "$DB_CONTAINER" psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "$query" 2>&1 | tee -a "$LOG_DIR/sql_$(date +%Y%m%d).log"
+    docker exec "$DB_CONTAINER" psql -U ben -d bsim -c "$query" 2>&1 | tee -a "$LOG_DIR/sql_$(date +%Y%m%d).log"
 }
 
 # Function to analyze D2 database state
@@ -201,11 +201,11 @@ generate_final_report() {
         echo
 
         echo "DATABASE COVERAGE:"
-        docker exec "$DB_CONTAINER" psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c "SELECT * FROM d2_function_coverage ORDER BY coverage_percent DESC;"
+        docker exec "$DB_CONTAINER" psql -U ben -d bsim -t -c "SELECT * FROM d2_function_coverage ORDER BY coverage_percent DESC;"
         echo
 
         echo "FUNCTION STATISTICS:"
-        docker exec "$DB_CONTAINER" psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c "
+        docker exec "$DB_CONTAINER" psql -U ben -d bsim -t -c "
         SELECT
             'Total Named Functions: ' || COUNT(*),
             'Average Significance: ' || AVG(s.significance)::NUMERIC(5,3),

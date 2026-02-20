@@ -6,7 +6,7 @@ set -e
 
 DB_HOST=${DB_HOST:-localhost}
 DB_PORT=${DB_PORT:-5432}
-DB_USER=${DB_USER:-bsim}
+DB_USER=${DB_USER:-ben}
 DB_NAME=${DB_NAME:-bsim}
 PGPASSWORD=${PGPASSWORD:-${BSIM_DB_PASSWORD}}
 

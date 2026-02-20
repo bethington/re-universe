@@ -108,13 +108,13 @@ test_container_status() {
 
 test_database_connectivity() {
     print_status "Testing database connectivity..."
-    run_test "PostgreSQL responding" "docker exec $CONTAINER_NAME pg_isready -U "${BSIM_DB_USER:-bsim}" -d bsim"
-    run_test "Database connection" "docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c 'SELECT 1;'"
+    run_test "PostgreSQL responding" "docker exec $CONTAINER_NAME pg_isready -U ben -d bsim"
+    run_test "Database connection" "docker exec $CONTAINER_NAME psql -U ben -d bsim -c 'SELECT 1;'"
 }
 
 test_ssl_configuration() {
     print_status "Testing SSL configuration..."
-    run_test "SSL enabled" "docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c 'SHOW ssl;' | grep -q 'on'"
+    run_test "SSL enabled" "docker exec $CONTAINER_NAME psql -U ben -d bsim -t -c 'SHOW ssl;' | grep -q 'on'"
     run_test "SSL certificates exist" "docker exec $CONTAINER_NAME ls -la /etc/ssl/certs/server.crt"
 }
 
@@ -124,21 +124,21 @@ test_bsim_schema() {
     local required_tables=("keyvaluetable" "executable" "function" "signature" "vector" "callgraph" "feature")
 
     for table in "${required_tables[@]}"; do
-        run_test "Table: $table" "docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c '\\dt $table' | grep -q '$table'"
+        run_test "Table: $table" "docker exec $CONTAINER_NAME psql -U ben -d bsim -c '\\dt $table' | grep -q '$table'"
     done
 
     # Test key-value configuration
-    run_test "BSim configuration keys" "docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c \"SELECT COUNT(*) FROM keyvaluetable WHERE key IN ('k', 'L', 'template');\" | grep -q '3'"
+    run_test "BSim configuration keys" "docker exec $CONTAINER_NAME psql -U ben -d bsim -t -c \"SELECT COUNT(*) FROM keyvaluetable WHERE key IN ('k', 'L', 'template');\" | grep -q '3'"
 }
 
 test_lsh_extension() {
     print_status "Testing LSH extension..."
 
-    run_test "LSH extension installed" "docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c '\\dx lsh' | grep -q 'lsh'"
+    run_test "LSH extension installed" "docker exec $CONTAINER_NAME psql -U ben -d bsim -c '\\dx lsh' | grep -q 'lsh'"
 
     # Test LSH functions
-    if docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c '\dx lsh' | grep -q 'lsh'; then
-        run_test "LSH functions available" "docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c \"SELECT COUNT(*) FROM pg_proc WHERE proname LIKE 'lsh_%';\" | grep -q '[1-9]'"
+    if docker exec $CONTAINER_NAME psql -U ben -d bsim -c '\dx lsh' | grep -q 'lsh'; then
+        run_test "LSH functions available" "docker exec $CONTAINER_NAME psql -U ben -d bsim -t -c \"SELECT COUNT(*) FROM pg_proc WHERE proname LIKE 'lsh_%';\" | grep -q '[1-9]'"
     else
         print_warning "LSH extension not found - skipping function tests"
     fi
@@ -147,26 +147,26 @@ test_lsh_extension() {
 test_bsim_functions() {
     print_status "Testing BSim utility functions..."
 
-    run_test "BSim info function" "docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c 'SELECT * FROM bsim_database_info();'"
-    run_test "BSim capacity function" "docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c 'SELECT * FROM bsim_capacity_stats();'"
-    run_test "BSim statistics view" "docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c 'SELECT * FROM bsim_statistics;'"
+    run_test "BSim info function" "docker exec $CONTAINER_NAME psql -U ben -d bsim -c 'SELECT * FROM bsim_database_info();'"
+    run_test "BSim capacity function" "docker exec $CONTAINER_NAME psql -U ben -d bsim -c 'SELECT * FROM bsim_capacity_stats();'"
+    run_test "BSim statistics view" "docker exec $CONTAINER_NAME psql -U ben -d bsim -c 'SELECT * FROM bsim_statistics;'"
 }
 
 test_performance() {
     print_status "Testing database performance..."
 
     # Test query performance with EXPLAIN
-    run_test "Query planner working" "docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c 'EXPLAIN SELECT 1;'"
+    run_test "Query planner working" "docker exec $CONTAINER_NAME psql -U ben -d bsim -c 'EXPLAIN SELECT 1;'"
 
     # Test index usage
-    run_test "Indexes created" "docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c \"SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public';\" | grep -q '[1-9]'"
+    run_test "Indexes created" "docker exec $CONTAINER_NAME psql -U ben -d bsim -t -c \"SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public';\" | grep -q '[1-9]'"
 }
 
 test_backup_capability() {
     print_status "Testing backup capability..."
 
     run_test "pg_dump available" "docker exec $CONTAINER_NAME pg_dump --version"
-    run_test "Backup permissions" "docker exec $CONTAINER_NAME pg_dump -U "${BSIM_DB_USER:-bsim}" -d bsim --schema-only -f /tmp/test_backup.sql"
+    run_test "Backup permissions" "docker exec $CONTAINER_NAME pg_dump -U ben -d bsim --schema-only -f /tmp/test_backup.sql"
     run_test "Backup cleanup" "docker exec $CONTAINER_NAME rm -f /tmp/test_backup.sql"
 }
 
@@ -174,10 +174,10 @@ test_capacity_and_limits() {
     print_status "Testing capacity and limits..."
 
     # Check current usage
-    run_test_with_output "Database size check" "docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c \"SELECT pg_size_pretty(pg_database_size('bsim'));\"" ".*[0-9].*"
+    run_test_with_output "Database size check" "docker exec $CONTAINER_NAME psql -U ben -d bsim -t -c \"SELECT pg_size_pretty(pg_database_size('bsim'));\"" ".*[0-9].*"
 
     # Check configuration limits
-    run_test_with_output "Function capacity limit" "docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c \"SELECT capacity_limit FROM bsim_capacity_stats() WHERE metric = 'Functions';\"" "100000000"
+    run_test_with_output "Function capacity limit" "docker exec $CONTAINER_NAME psql -U ben -d bsim -t -c \"SELECT capacity_limit FROM bsim_capacity_stats() WHERE metric = 'Functions';\"" "100000000"
 }
 
 # Function to show usage

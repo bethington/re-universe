@@ -4,7 +4,7 @@
 # This script runs the Ghidra BSim population script on multiple binaries
 
 GHIDRA_DIR="./ghidra/Ghidra/RuntimeScripts/Linux/support"
-SCRIPT_DIR="/opt/re-universe/ghidra-scripts"
+SCRIPT_DIR="/home/ben/re-universe/ghidra-scripts"
 PROJECT_DIR="/tmp/ghidra_bsim_projects"
 PROJECT_NAME="BSim_CrossVersion_Analysis"
 BINARIES_DIR="/path/to/your/binaries"  # Update this path
@@ -106,7 +106,7 @@ check_prerequisites() {
     mkdir -p "$PROJECT_DIR"
 
     # Check database connectivity
-    if docker exec -i bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "SELECT 1;" > /dev/null 2>&1; then
+    if docker exec -i bsim-postgres psql -U ben -d bsim -c "SELECT 1;" > /dev/null 2>&1; then
         log_success "Database connection verified"
     else
         log_error "Cannot connect to BSim database"
@@ -120,7 +120,7 @@ check_prerequisites() {
 show_database_status() {
     log_info "Checking current BSim database status..."
 
-    docker exec -i bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "
+    docker exec -i bsim-postgres psql -U ben -d bsim -c "
         SELECT
             COUNT(*) as total_functions,
             COUNT(DISTINCT d.name_func) as unique_function_names,
@@ -136,7 +136,7 @@ show_database_status() {
 refresh_views() {
     log_info "Refreshing materialized views for cross-version analysis..."
 
-    docker exec -i bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "
+    docker exec -i bsim-postgres psql -U ben -d bsim -c "
         REFRESH MATERIALIZED VIEW cross_version_functions;
         REFRESH MATERIALIZED VIEW function_evolution;
         SELECT 'Views refreshed successfully' as status;

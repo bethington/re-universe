@@ -117,7 +117,7 @@ wait_for_database() {
     local attempt=0
 
     while [ $attempt -lt $max_attempts ]; do
-        if docker exec $CONTAINER_NAME pg_isready -U "${BSIM_DB_USER:-bsim}" -d bsim >/dev/null 2>&1; then
+        if docker exec $CONTAINER_NAME pg_isready -U ben -d bsim >/dev/null 2>&1; then
             print_success "Database is ready!"
             return 0
         fi
@@ -139,7 +139,7 @@ verify_bsim_setup() {
 
     # Check if BSim tables exist
     local tables_result
-    tables_result=$(docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('keyvaluetable', 'executable', 'function', 'signature');" 2>/dev/null || echo "0")
+    tables_result=$(docker exec $CONTAINER_NAME psql -U ben -d bsim -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('keyvaluetable', 'executable', 'function', 'signature');" 2>/dev/null || echo "0")
 
     if [[ "${tables_result// /}" -ge 4 ]]; then
         print_success "BSim tables found"
@@ -149,7 +149,7 @@ verify_bsim_setup() {
     fi
 
     # Check LSH extension
-    if docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c "SELECT 1 FROM pg_extension WHERE extname = 'lsh';" 2>/dev/null | grep -q "1"; then
+    if docker exec $CONTAINER_NAME psql -U ben -d bsim -t -c "SELECT 1 FROM pg_extension WHERE extname = 'lsh';" 2>/dev/null | grep -q "1"; then
         print_success "LSH extension is available"
     else
         print_warning "LSH extension not found"
@@ -159,7 +159,7 @@ verify_bsim_setup() {
 
     # Check SSL configuration
     local ssl_status
-    ssl_status=$(docker exec $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c "SHOW ssl;" 2>/dev/null || echo "off")
+    ssl_status=$(docker exec $CONTAINER_NAME psql -U ben -d bsim -t -c "SHOW ssl;" 2>/dev/null || echo "off")
 
     if [[ "${ssl_status// /}" == "on" ]]; then
         print_success "SSL is enabled"
@@ -178,16 +178,16 @@ show_connection_info() {
     echo "  Database: bsim"
     echo "  User:     ben"
     echo "  Password: bsim"
-    echo "  URL:      postgresql://bsim:bsim@localhost:5432/bsim"
+    echo "  URL:      postgresql://ben:bsim@localhost:5432/bsim"
     echo ""
     echo "Ghidra BSim Connection:"
     echo "  1. Open Ghidra → Tools → BSim Search"
-    echo "  2. Server: postgresql://bsim:bsim@localhost:5432/bsim"
+    echo "  2. Server: postgresql://ben:bsim@localhost:5432/bsim"
     echo "  3. Enable 'Use SSL'"
     echo ""
     echo "Useful Commands:"
     echo "  Monitor logs:    docker logs -f $CONTAINER_NAME"
-    echo "  Connect to DB:   docker exec -it $CONTAINER_NAME psql -U "${BSIM_DB_USER:-bsim}" -d bsim"
+    echo "  Connect to DB:   docker exec -it $CONTAINER_NAME psql -U ben -d bsim"
     echo "  Stop container:  ./stop-bsim.sh"
     echo "  Monitor status:  ./monitor-bsim.sh"
 }

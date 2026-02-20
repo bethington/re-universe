@@ -112,13 +112,13 @@ The database is automatically initialized on first startup with:
 ./test-bsim-setup.sh
 
 # Check BSim configuration
-docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT * FROM bsim_database_info();"
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT * FROM bsim_database_info();"
 ```
 
 ## 🔗 Database Connection
 
 ### Connection Details
-- **URL**: `postgresql://bsim:bsim@localhost:5432/bsim`
+- **URL**: `postgresql://ben:bsim@localhost:5432/bsim`
 - **Host**: `localhost`
 - **Port**: `5432`
 - **Database**: `bsim`
@@ -130,7 +130,7 @@ docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT * FROM bsim_database_i
 1. Open Ghidra
 2. Go to **Tools** → **Binary Similarity** → **BSim**
 3. Create new server configuration:
-   - **URL**: `postgresql://bsim:bsim@localhost:5432/bsim`
+   - **URL**: `postgresql://ben:bsim@localhost:5432/bsim`
    - **SSL**: Enable "Use SSL"
    - Test connection
 
@@ -234,7 +234,7 @@ The database is pre-configured for large-scale analysis:
 ./monitor-bsim.sh --performance
 
 # View active queries
-docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT * FROM pg_stat_activity WHERE state = 'active';"
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT * FROM pg_stat_activity WHERE state = 'active';"
 ```
 
 ## 🔍 Troubleshooting
@@ -247,7 +247,7 @@ docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT * FROM pg_stat_activit
 docker ps | grep bsim-postgres
 
 # Verify database exists
-docker exec bsim-postgres psql -U bsim -l | grep bsim
+docker exec bsim-postgres psql -U ben -l | grep bsim
 
 # Reinitialize if needed
 docker-compose down
@@ -258,16 +258,16 @@ docker-compose up -d bsim-postgres
 #### 2. "Could not fetch key value: name"
 ```bash
 # Check BSim configuration
-docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT * FROM keyvaluetable;"
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT * FROM keyvaluetable;"
 
 # Reinitialize schema if missing
-docker exec bsim-postgres psql -U bsim -d bsim -f /docker-entrypoint-initdb.d/create-bsim-schema.sql
+docker exec bsim-postgres psql -U ben -d bsim -f /docker-entrypoint-initdb.d/create-bsim-schema.sql
 ```
 
 #### 3. "The server does not support SSL"
 ```bash
 # Verify SSL configuration
-docker exec bsim-postgres psql -U bsim -d bsim -c "SHOW ssl;"
+docker exec bsim-postgres psql -U ben -d bsim -c "SHOW ssl;"
 
 # Check certificate files
 ls -la ssl/
@@ -276,7 +276,7 @@ ls -la ssl/
 #### 4. "LSH functions not found"
 ```bash
 # Check LSH extension
-docker exec bsim-postgres psql -U bsim -d bsim -c "\dx lsh"
+docker exec bsim-postgres psql -U ben -d bsim -c "\dx lsh"
 
 # Rebuild if needed
 cd ghidra/Ghidra/Features/BSim/src/lshvector
@@ -288,23 +288,23 @@ make clean && make && sudo make install
 # This error indicates schema compatibility issues
 # The database schema has been updated to include all required tables
 # Verify the schema includes official Ghidra BSim tables
-docker exec bsim-postgres psql -U bsim -d bsim -c "\dt"
+docker exec bsim-postgres psql -U ben -d bsim -c "\dt"
 
 # Check if exetable has architecture column
-docker exec bsim-postgres psql -U bsim -d bsim -c "\d exetable" | grep architecture
+docker exec bsim-postgres psql -U ben -d bsim -c "\d exetable" | grep architecture
 ```
 
 #### 6. "Table 'exetable' does not exist"
 ```bash
 # This indicates the schema wasn't properly initialized
 # Reinitialize with the updated schema
-docker exec bsim-postgres psql -U bsim -d bsim -f /docker-entrypoint-initdb.d/create-bsim-schema.sql
+docker exec bsim-postgres psql -U ben -d bsim -f /docker-entrypoint-initdb.d/create-bsim-schema.sql
 ```
 
 #### 7. Performance Issues
 ```bash
 # Check database size
-docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT * FROM bsim_statistics;"
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT * FROM bsim_statistics;"
 
 # Monitor resource usage
 docker stats bsim-postgres
@@ -387,7 +387,7 @@ docker exec bsim-postgres tail -f /var/log/postgresql/postgresql-15-main.log
 ### Manual Validation
 ```bash
 # Verify LSH extension
-docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT lsh_compare('{1,2,3}', '{1,2,4}');"
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT lsh_compare('{1,2,3}', '{1,2,4}');"
 
 # Test similarity matching
 ./validate-similarity.sh --test-binary /path/to/known/binary

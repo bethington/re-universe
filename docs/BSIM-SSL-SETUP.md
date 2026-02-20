@@ -26,7 +26,7 @@ services:
     image: postgres:15
     environment:
       - POSTGRES_DB=${BSIM_DB_NAME:-bsim}
-      - POSTGRES_USER=${BSIM_DB_USER:-bsim}
+      - POSTGRES_USER=${BSIM_DB_USER:-ben}
       - POSTGRES_PASSWORD=${BSIM_DB_PASSWORD}
     command: >
       postgres
@@ -54,7 +54,7 @@ PostgreSQL automatically generates self-signed SSL certificates when `ssl=on` is
 Verify SSL is enabled in PostgreSQL:
 
 ```bash
-docker exec bsim-postgres psql -U bsim -d bsim -c "SHOW ssl;"
+docker exec bsim-postgres psql -U ben -d bsim -c "SHOW ssl;"
 ```
 
 Expected output:
@@ -69,7 +69,7 @@ Expected output:
 Test that the BSim database is accessible:
 
 ```bash
-docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT 'SSL enabled and working' as status;"
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT 'SSL enabled and working' as status;"
 ```
 
 ### 3. Verify BSim Configuration
@@ -77,7 +77,7 @@ docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT 'SSL enabled and worki
 Check BSim database configuration:
 
 ```bash
-docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT * FROM bsim_database_info();"
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT * FROM bsim_database_info();"
 ```
 
 ## Troubleshooting SSL Issues
@@ -164,13 +164,13 @@ The BSim database includes the required `lshvector` extension for locality-sensi
 ### Check Extension Status
 ```bash
 # Verify lshvector extension is installed
-docker exec bsim-postgres psql -U bsim -d bsim -c "\dx lshvector"
+docker exec bsim-postgres psql -U ben -d bsim -c "\dx lshvector"
 
 # Check lshvector data type availability
-docker exec bsim-postgres psql -U bsim -d bsim -c "\dT lshvector"
+docker exec bsim-postgres psql -U ben -d bsim -c "\dT lshvector"
 
 # Verify BSim tables with LSHVECTOR columns exist
-docker exec bsim-postgres psql -U bsim -d bsim -c "\d vectable"
+docker exec bsim-postgres psql -U ben -d bsim -c "\d vectable"
 ```
 
 ### Extension Details

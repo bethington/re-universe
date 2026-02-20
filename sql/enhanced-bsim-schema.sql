@@ -462,17 +462,17 @@ COMMENT ON TABLE cross_version_function_mappings IS 'Version-specific function m
 -- PERMISSIONS FOR GHIDRA SCRIPTS TABLES
 -- ============================================================================
 
-GRANT ALL PRIVILEGES ON function_analysis TO bsim;
-GRANT ALL PRIVILEGES ON function_tags TO bsim;
-GRANT ALL PRIVILEGES ON string_references TO bsim;
-GRANT ALL PRIVILEGES ON cross_references TO bsim;
-GRANT ALL PRIVILEGES ON import_export_mappings TO bsim;
-GRANT ALL PRIVILEGES ON cross_version_function_mappings TO bsim;
+GRANT ALL PRIVILEGES ON function_analysis TO ben;
+GRANT ALL PRIVILEGES ON function_tags TO ben;
+GRANT ALL PRIVILEGES ON string_references TO ben;
+GRANT ALL PRIVILEGES ON cross_references TO ben;
+GRANT ALL PRIVILEGES ON import_export_mappings TO ben;
+GRANT ALL PRIVILEGES ON cross_version_function_mappings TO ben;
 
-GRANT USAGE, SELECT ON SEQUENCE function_analysis_id_seq TO bsim;
-GRANT USAGE, SELECT ON SEQUENCE function_tags_id_seq TO bsim;
-GRANT USAGE, SELECT ON SEQUENCE string_references_id_seq TO bsim;
-GRANT USAGE, SELECT ON SEQUENCE cross_references_id_seq TO bsim;
-GRANT USAGE, SELECT ON SEQUENCE import_export_mappings_id_seq TO bsim;
-GRANT USAGE, SELECT ON SEQUENCE cross_version_function_mappings_id_seq TO bsim;
+GRANT USAGE, SELECT ON SEQUENCE function_analysis_id_seq TO ben;
+GRANT USAGE, SELECT ON SEQUENCE function_tags_id_seq TO ben;
+GRANT USAGE, SELECT ON SEQUENCE string_references_id_seq TO ben;
+GRANT USAGE, SELECT ON SEQUENCE cross_references_id_seq TO ben;
+GRANT USAGE, SELECT ON SEQUENCE import_export_mappings_id_seq TO ben;
+GRANT USAGE, SELECT ON SEQUENCE cross_version_function_mappings_id_seq TO ben;
 
