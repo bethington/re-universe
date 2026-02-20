@@ -5,7 +5,7 @@ echo
 
 # Check container statuses
 echo "=== Container Status ==="
-docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "(bsim-postgres|redis-cache|vector-search|ai-orchestration|chat-interface|ghidra-api|ghidra-web)" || echo "No matching containers found"
+docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "(bsim-postgres|redis-cache|vector-search|ai-orchestration|chat-interface|ghidra-api|ghidra-web|github-mining|knowledge-integration|monitoring-dashboard)" || echo "No matching containers found"
 echo
 
 # Test health endpoints with error handling
@@ -31,6 +31,9 @@ check_health() {
 check_health "Vector Search" "http://localhost:8091/health"
 check_health "AI Orchestration" "http://localhost:8092/health"
 check_health "Chat Interface" "http://localhost:8093/health"
+check_health "GitHub Mining" "http://localhost:8094/health"
+check_health "Knowledge Integration" "http://localhost:8095/health"
+check_health "Monitoring Dashboard" "http://localhost:8096/health"
 check_health "Ghidra API" "http://localhost:8081/api/health"
 echo
 
@@ -38,6 +41,7 @@ echo
 echo "=== Web Interface HTTP Status ==="
 echo "D2Docs Website: $(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 http://localhost:8083 2>/dev/null || echo 'Connection failed')"
 echo "Chat Interface: $(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 http://localhost:8093 2>/dev/null || echo 'Connection failed')"
+echo "Monitoring Dashboard: $(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 http://localhost:8096 2>/dev/null || echo 'Connection failed')"
 echo
 
 # Database connectivity
