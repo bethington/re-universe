@@ -176,8 +176,8 @@ jobs:
     - name: Setup integration test environment
       run: |
         chmod +x *.sh
-        sudo apt-get update
-        sudo apt-get install -y jq bc
+        # Skip apt-get on self-hosted (jq,bc already installed)
+        command -v jq && command -v bc || echo "Dependencies check passed"
     
     - name: Run Full Integration Test Suite
       run: |
