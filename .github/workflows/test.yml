@@ -181,7 +181,7 @@ jobs:
     
     - name: Run Full Integration Test Suite
       run: |
-        ./integration-test.sh
+        cd ~/re-universe && ./integration-test.sh
     
     - name: Upload integration test artifacts
       if: always()
@@ -189,9 +189,9 @@ jobs:
       with:
         name: integration-test-results
         path: |
-          *.log
-          backups/
-          sync-logs/
+          /home/ben/re-universe/*.log
+          /home/ben/re-universe/backups/
+          /home/ben/re-universe/sync-logs/
 
   documentation-test:
     runs-on: ubuntu-latest
