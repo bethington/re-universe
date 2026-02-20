@@ -1,7 +1,7 @@
 """Configuration for Knowledge Integration Service."""
 
 import os
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, AliasChoices
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -18,11 +18,11 @@ class Settings(BaseSettings):
     port: int = 8095
 
     # Database configuration
-    db_host: str = Field(default="bsim-postgres", env="BSIM_DB_HOST")
-    db_port: int = Field(default=5432, env="BSIM_DB_PORT")
-    db_name: str = Field(default="bsim", env="BSIM_DB_NAME")
-    db_user: str = Field(default="ben", env="BSIM_DB_USER")
-    db_password: str = Field(default="goodyx12", env="BSIM_DB_PASSWORD")
+    db_host: str = Field(default="bsim-postgres", validation_alias=AliasChoices("BSIM_DB_HOST", "db_host"))
+    db_port: int = Field(default=5432, validation_alias=AliasChoices("BSIM_DB_PORT", "db_port"))
+    db_name: str = Field(default="bsim", validation_alias=AliasChoices("BSIM_DB_NAME", "db_name"))
+    db_user: str = Field(default="ben", validation_alias=AliasChoices("BSIM_DB_USER", "db_user"))
+    db_password: str = Field(default="goodyx12", validation_alias=AliasChoices("BSIM_DB_PASSWORD", "db_password"))
 
     # Redis configuration
     redis_host: str = "redis-cache"
