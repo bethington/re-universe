@@ -9,7 +9,7 @@
 -- This just ensures proper permissions
 
 -- Grant database creation privileges to the user for BSim management
-ALTER USER bsim CREATEDB;
+ALTER USER ben CREATEDB;
 
 -- Create a simple test function to verify database connectivity
 CREATE OR REPLACE FUNCTION bsim_connectivity_test()
@@ -20,7 +20,7 @@ AS $$
 $$;
 
 -- Grant execute permission on the test function
-GRANT EXECUTE ON FUNCTION bsim_connectivity_test() TO bsim;
+GRANT EXECUTE ON FUNCTION bsim_connectivity_test() TO ben;
 
 -- Log successful initialization
 SELECT bsim_connectivity_test() AS initialization_status;
@@ -29,4 +29,4 @@ SELECT bsim_connectivity_test() AS initialization_status;
 \echo 'Next steps:'
 \echo '  1. Ensure Ghidra is installed with BSim extension built (make-postgres.sh)'
 \echo '  2. Use Ghidra bsim createdatabase command to create the actual BSim schema'
-\echo '  3. Example: ./bsim createdatabase postgresql://bsim:bsim@localhost:5432/bsim medium_32'
+\echo '  3. Example: ./bsim createdatabase postgresql://ben:bsim@localhost:5432/bsim medium_32'

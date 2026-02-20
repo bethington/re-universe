@@ -25,7 +25,7 @@ except ImportError:
                 for i, param in enumerate(params):
                     query = query.replace(f"${i+1}", f"'{param}'", 1)
 
-            cmd = ['docker', 'exec', 'bsim-postgres', 'psql', '-U', 'bsim', '-d', 'bsim', '-c', query]
+            cmd = ['docker', 'exec', 'bsim-postgres', 'psql', '-U', 'ben', '-d', 'bsim', '-c', query]
             self._result = subprocess.run(cmd, capture_output=True, text=True)
 
         def fetchall(self):
@@ -258,7 +258,7 @@ def main():
                        help='Apply name changes (default: dry run)')
     parser.add_argument('--export-json', help='Export matches to JSON file')
     parser.add_argument('--db-connection',
-                       default='postgresql://bsim:changeme@localhost:5432/bsim',
+                       default='postgresql://ben:goodyx12@localhost:5432/bsim',
                        help='Database connection string')
 
     args = parser.parse_args()

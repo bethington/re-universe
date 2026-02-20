@@ -103,7 +103,7 @@ Tools.BSim.
 ## ✅ **Database Configuration**
 
 All scripts are configured for remote database connectivity:
-- **Database**: `postgresql://YOUR_SERVER_IP:5432/bsim`
+- **Database**: `postgresql://10.0.0.30:5432/bsim`
 - **User**: `ben`
 - **Schema**: Unified version system compatible
 

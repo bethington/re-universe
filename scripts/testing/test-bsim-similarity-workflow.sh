@@ -9,7 +9,7 @@ API_BASE="http://localhost:8081"
 
 echo ""
 echo "1. Testing enhanced database schema..."
-docker exec -i bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "
+docker exec -i bsim-postgres psql -U ben -d bsim -c "
 SELECT
     'enhanced_signatures' as table_name,
     COUNT(*) as row_count
@@ -34,13 +34,13 @@ ORDER BY table_name;
 
 echo ""
 echo "2. Testing cross-version statistics view..."
-docker exec -i bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "
+docker exec -i bsim-postgres psql -U ben -d bsim -c "
 SELECT * FROM cross_version_statistics;
 "
 
 echo ""
 echo "3. Testing enhanced cross-version functions view..."
-docker exec -i bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "
+docker exec -i bsim-postgres psql -U ben -d bsim -c "
 SELECT
     name_func,
     game_type,
@@ -82,7 +82,7 @@ fi
 
 echo ""
 echo "5. Checking for sample BSim similarity data..."
-docker exec -i bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "
+docker exec -i bsim-postgres psql -U ben -d bsim -c "
 -- Look for functions that would benefit from similarity matching
 SELECT
     name_func,

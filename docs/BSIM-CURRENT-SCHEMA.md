@@ -77,7 +77,7 @@ docker-compose up -d
 docker logs bsim-postgres -f
 
 # 4. Verify BSim schema is ready
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "\dt"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "\dt"
 ```
 
 **Result**: Full BSim schema auto-created, ready for Ghidra integration immediately.
@@ -149,12 +149,12 @@ ssl_key_file = '/var/lib/postgresql/data/server.key'
 
 ```sql
 -- Grant database creation privileges to the user
-ALTER USER bsim CREATEDB;
+ALTER USER ben CREATEDB;
 
 -- Create connectivity test function
 ```sql
 -- Grant database creation privileges to the user
-ALTER USER bsim CREATEDB;
+ALTER USER ben CREATEDB;
 
 -- Create connectivity test function
 CREATE OR REPLACE FUNCTION bsim_connectivity_test()
@@ -288,7 +288,7 @@ Same as legacy behavior (minimal initialization only):
 
 ❌ **Not Created** - BSim tables must be created manually via:
 - Ghidra: `./bsim createdatabase postgresql://user:pass@localhost:5432/bsim medium_32`
-- Manual SQL: `psql -U bsim -d bsim < bsim-init/04-create-bsim-schema.sql`
+- Manual SQL: `psql -U ben -d bsim < bsim-init/04-create-bsim-schema.sql`
 
 ---
 
@@ -358,7 +358,7 @@ These methods are only needed if `AUTO_CREATE_BSIM_SCHEMA=false`:
 
 ```bash
 # Using Ghidra's bsim command-line tool
-./bsim createdatabase postgresql://bsim:bsim@localhost:5432/bsim medium_32
+./bsim createdatabase postgresql://ben:bsim@localhost:5432/bsim medium_32
 # Options: medium_32 (10M functions), large_32 (100M), medium_64 (10M 64-bit)
 ```
 
@@ -366,7 +366,7 @@ These methods are only needed if `AUTO_CREATE_BSIM_SCHEMA=false`:
 
 ```bash
 # Execute the consolidated schema file
-docker exec -i bsim-postgres psql -U bsim -d bsim < bsim-init/04-create-bsim-schema.sql
+docker exec -i bsim-postgres psql -U ben -d bsim < bsim-init/04-create-bsim-schema.sql
 ```
 
 ### Method 3: Ghidra Script
@@ -399,7 +399,7 @@ template = "medium_32"  // 32-bit x86 optimized
 
 ```bash
 # From Ghidra installation directory
-./bsim createdatabase postgresql://bsim:bsim@***REMOVED***:5432/bsim medium_32
+./bsim createdatabase postgresql://ben:bsim@***REMOVED***:5432/bsim medium_32
 ```
 
 **Advantages**:
@@ -411,10 +411,10 @@ template = "medium_32"  // 32-bit x86 optimized
 
 ```bash
 # Apply base schema manually
-docker exec -i bsim-postgres psql -U bsim -d bsim < create-bsim-schema.sql
+docker exec -i bsim-postgres psql -U ben -d bsim < create-bsim-schema.sql
 
 # Apply helper functions
-docker exec -i bsim-postgres psql -U bsim -d bsim < create-bsim-functions.sql
+docker exec -i bsim-postgres psql -U ben -d bsim < create-bsim-functions.sql
 ```
 
 **Advantages**:
@@ -435,7 +435,7 @@ docker exec -i bsim-postgres psql -U bsim -d bsim < create-bsim-functions.sql
 
 ```bash
 # Test from host machine
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "SELECT bsim_connectivity_test();"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "SELECT bsim_connectivity_test();"
 ```
 
 **Expected Output**:
@@ -448,7 +448,7 @@ docker exec -it bsim-postgres psql -U bsim -d bsim -c "SELECT bsim_connectivity_
 ### Check LSH Extension
 
 ```bash
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "SELECT * FROM pg_available_extensions WHERE name = 'lshvector';"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "SELECT * FROM pg_available_extensions WHERE name = 'lshvector';"
 ```
 
 **Expected Output**:
@@ -461,7 +461,7 @@ docker exec -it bsim-postgres psql -U bsim -d bsim -c "SELECT * FROM pg_availabl
 ### Check SSL Status
 
 ```bash
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "SHOW ssl;"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "SHOW ssl;"
 ```
 
 **Expected Output**:
@@ -475,7 +475,7 @@ docker exec -it bsim-postgres psql -U bsim -d bsim -c "SHOW ssl;"
 
 ```bash
 # Check if BSim tables exist
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "\dt"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "\dt"
 ```
 
 **Expected Output (Before Schema Application)**:
@@ -500,7 +500,7 @@ Did not find any relations.
 ### Check BSim Configuration (After Schema Applied)
 
 ```bash
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "SELECT * FROM keyvaluetable WHERE key IN ('template', 'k', 'L');"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "SELECT * FROM keyvaluetable WHERE key IN ('template', 'k', 'L');"
 ```
 
 **Expected Output**:
@@ -520,20 +520,20 @@ docker exec -it bsim-postgres psql -U bsim -d bsim -c "SELECT * FROM keyvaluetab
 
 ```bash
 # PostgreSQL standard connection
-postgresql://bsim:bsim@localhost:5432/bsim
+postgresql://ben:bsim@localhost:5432/bsim
 
 # With SSL
-postgresql://bsim:bsim@localhost:5432/bsim?sslmode=require
+postgresql://ben:bsim@localhost:5432/bsim?sslmode=require
 
 # Ghidra BSim format
-ghidra://bsim:bsim@localhost:5432/bsim
+ghidra://ben:bsim@localhost:5432/bsim
 ```
 
 ### From Docker Network
 
 ```bash
 # Container-to-container communication
-postgresql://bsim:bsim@bsim-postgres:5432/bsim
+postgresql://ben:bsim@bsim-postgres:5432/bsim
 ```
 
 ### Environment Variables
@@ -668,8 +668,8 @@ docker logs --tail 100 bsim-postgres
 
 ```bash
 # Enable query logging (temporary)
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "ALTER SYSTEM SET log_statement = 'all';"
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "SELECT pg_reload_conf();"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "ALTER SYSTEM SET log_statement = 'all';"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "SELECT pg_reload_conf();"
 
 # View logs
 docker exec -it bsim-postgres cat /var/log/postgresql/postgresql-15-main.log
@@ -679,10 +679,10 @@ docker exec -it bsim-postgres cat /var/log/postgresql/postgresql-15-main.log
 
 ```bash
 # Database size
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "SELECT pg_size_pretty(pg_database_size('bsim'));"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "SELECT pg_size_pretty(pg_database_size('bsim'));"
 
 # Table sizes (after schema applied)
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "SELECT schemaname, tablename, pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size FROM pg_tables WHERE schemaname = 'public' ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "SELECT schemaname, tablename, pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size FROM pg_tables WHERE schemaname = 'public' ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;"
 ```
 
 ---
@@ -733,7 +733,7 @@ docker-compose up -d bsim-postgres
 
 ```bash
 # Check SSL status
-docker exec -it bsim-postgres psql -U bsim -d bsim -c "SHOW ssl;"
+docker exec -it bsim-postgres psql -U ben -d bsim -c "SHOW ssl;"
 
 # Regenerate certificates
 docker exec -it bsim-postgres bash /docker-entrypoint-initdb.d/00-ssl-setup.sh

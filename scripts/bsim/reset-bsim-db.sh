@@ -26,7 +26,7 @@ if [[ -f "$SCRIPT_DIR/.env" ]]; then
 fi
 
 # Set defaults if not in .env
-BSIM_DB_USER="${BSIM_DB_USER:-bsim}"
+BSIM_DB_USER="${BSIM_DB_USER:-ben}"
 BSIM_DB_NAME="${BSIM_DB_NAME:-bsim}"
 
 # Parse arguments

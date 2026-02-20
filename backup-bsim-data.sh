@@ -19,12 +19,12 @@ set -e  # Exit on any error
 DB_HOST="localhost"
 DB_PORT="5432"
 DB_NAME="bsim"
-DB_USER="${BSIM_DB_USER:-bsim}"
-export PGPASSWORD="changeme"
+DB_USER="ben"
+export PGPASSWORD="goodyx12"
 
 # Get backup name from argument or generate timestamp-based name
 BACKUP_NAME="${1:-bsim-post-step1-$(date +%Y%m%d_%H%M%S)}"
-BACKUP_DIR="/opt/re-universe/backups"
+BACKUP_DIR="/home/ben/re-universe/backups"
 BACKUP_FILE="${BACKUP_DIR}/${BACKUP_NAME}.sql"
 
 # Create backup directory if it doesn't exist

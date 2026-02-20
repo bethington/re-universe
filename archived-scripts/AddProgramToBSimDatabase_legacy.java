@@ -19,9 +19,9 @@ import java.sql.*;
 public class AddProgramToBSimDatabase extends GhidraScript {
 
     // Default BSim database configuration
-    private static final String DEFAULT_DB_URL = "jdbc:postgresql://localhost:5432/bsim";
-    private static final String DEFAULT_DB_USER = "bsim";
-    private static final String DEFAULT_DB_PASS = "changeme";
+    private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
+    private static final String DEFAULT_DB_USER = "ben";
+    private static final String DEFAULT_DB_PASS = "goodyx12";
 
     // Processing mode
     private static final String MODE_SINGLE = "Single Program (current)";

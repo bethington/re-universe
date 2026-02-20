@@ -11,8 +11,8 @@ set -e
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
 DB_NAME="${DB_NAME:-bsim}"
-DB_USER="${DB_USER:-bsim}"
-DB_PASSWORD="${DB_PASSWORD:-changeme}"
+DB_USER="${DB_USER:-ben}"
+DB_PASSWORD="${DB_PASSWORD:-goodyx12}"
 
 # Colors for output
 RED='\033[0;31m'

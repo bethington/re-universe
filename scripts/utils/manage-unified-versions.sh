@@ -10,7 +10,7 @@ set -e
 # Configuration
 DB_CONTAINER="${DB_CONTAINER:-bsim-postgres}"
 DB_NAME="${DB_NAME:-bsim}"
-DB_USER="${DB_USER:-bsim}"
+DB_USER="${DB_USER:-ben}"
 
 # Colors for output
 RED='\033[0;31m'

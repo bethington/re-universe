@@ -42,7 +42,7 @@ Once you have Ghidra installed on your Windows machine:
 
 # This will execute:
 # cd C:/path/to/ghidra/support
-# ./bsim createdatabase postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim large_32 --user bsim
+# ./bsim createdatabase postgresql://ben:goodyx12@localhost:5432/bsim large_32 --user ben
 ```
 
 ### Manual Database Creation
@@ -55,16 +55,16 @@ cd "C:/path/to/ghidra/support"
 
 # Create BSim database with large_32 template
 ./bsim createdatabase \
-  "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim?ssl=true&sslmode=require" \
+  "postgresql://ben:goodyx12@localhost:5432/bsim?ssl=true&sslmode=require" \
   large_32 \
-  --user bsim
+  --user ben
 
 # Add executable categories for organization
-./bsim addexecategory "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" UNKNOWN
-./bsim addexecategory "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" LIBRARY
-./bsim addexecategory "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" EXECUTABLE
-./bsim addexecategory "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" DRIVER
-./bsim addexecategory "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" MALWARE
+./bsim addexecategory "postgresql://ben:goodyx12@localhost:5432/bsim" UNKNOWN
+./bsim addexecategory "postgresql://ben:goodyx12@localhost:5432/bsim" LIBRARY
+./bsim addexecategory "postgresql://ben:goodyx12@localhost:5432/bsim" EXECUTABLE
+./bsim addexecategory "postgresql://ben:goodyx12@localhost:5432/bsim" DRIVER
+./bsim addexecategory "postgresql://ben:goodyx12@localhost:5432/bsim" MALWARE
 ```
 
 ## Step 3: Verify Database Creation
@@ -73,13 +73,13 @@ After creation, verify the database schema:
 
 ```bash
 # Check database tables
-docker exec bsim-postgres psql -U bsim -d bsim -c "\\dt"
+docker exec bsim-postgres psql -U ben -d bsim -c "\\dt"
 
 # Check BSim configuration
-docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT * FROM executable_category;"
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT * FROM executable_category;"
 
 # Check database size and capacity
-docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT schemaname,tablename,attname,n_distinct,correlation FROM pg_stats WHERE tablename LIKE '%bsim%';"
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT schemaname,tablename,attname,n_distinct,correlation FROM pg_stats WHERE tablename LIKE '%bsim%';"
 ```
 
 ## Step 4: Database Schema for large_32
@@ -135,11 +135,11 @@ cd "C:/path/to/ghidra/support"
 ./bsim generatesigs \
   "ghidra:///path/to/ghidra-projects/large-binary-project" \
   /tmp/bsim-signatures \
-  --database "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim"
+  --database "postgresql://ben:goodyx12@localhost:5432/bsim"
 
 # Commit signatures to database (batch processing)
 ./bsim commitsigs \
-  "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" \
+  "postgresql://ben:goodyx12@localhost:5432/bsim" \
   /tmp/bsim-signatures
 ```
 
@@ -243,7 +243,7 @@ After successful creation:
 
 Once created, connect to your large BSim database:
 
-- **URL**: `postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim?ssl=true&sslmode=require`
+- **URL**: `postgresql://ben:goodyx12@localhost:5432/bsim?ssl=true&sslmode=require`
 - **Template**: `large_32`
 - **Capacity**: 100M+ functions
 - **Architecture**: 32-bit optimized

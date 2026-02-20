@@ -7,6 +7,10 @@
 [![Version](https://img.shields.io/badge/Version-v1.0.0-blue.svg)](VERSION)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
+> If you find this useful, please ⭐ star the repo — it helps others discover it!
+
+> **🌐 Live Demo:** [d2docs.xebyte.com](https://d2docs.xebyte.com) — Explore the BSim Analysis Portal with Diablo II binaries across 25 versions (1.00 → 1.14d)
+
 A comprehensive Docker-based platform for **Ghidra BSim (Binary Similarity)** analysis with PostgreSQL backend. This setup enables large-scale binary similarity analysis, malware family classification, and code reuse detection using Ghidra's official BSim tools with a production-ready PostgreSQL database.
 
 ## ✨ Key Features
@@ -111,7 +115,7 @@ sudo make install
 docker-compose up -d bsim-postgres
 
 # Verify SSL is enabled (required for Ghidra BSim)
-docker exec bsim-postgres psql -U bsim -d bsim -c "SHOW ssl;"
+docker exec bsim-postgres psql -U ben -d bsim -c "SHOW ssl;"
 
 # Verify installation
 ./test-bsim-setup.sh --comprehensive
@@ -273,16 +277,16 @@ crontab -l | grep bsim
 ### Manual Validation
 ```bash
 # Test database connection
-docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT version();"
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT version();"
 
 # Verify BSim schema
-docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT * FROM bsim_database_info();"
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT * FROM bsim_database_info();"
 
 # Check LSH extension
-docker exec bsim-postgres psql -U bsim -d bsim -c "\dx lsh"
+docker exec bsim-postgres psql -U ben -d bsim -c "\dx lsh"
 
 # Test LSH functions
-docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT lsh_compare('{1,2,3}', '{1,2,4}');"
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT lsh_compare('{1,2,3}', '{1,2,4}');"
 ```
 
 ---
@@ -308,7 +312,7 @@ docker-compose up -d bsim-postgres
 #### 2. "LSH functions not found"
 ```bash
 # Check if LSH extension is installed
-docker exec bsim-postgres psql -U bsim -d bsim -c "\dx lsh"
+docker exec bsim-postgres psql -U ben -d bsim -c "\dx lsh"
 
 # Rebuild LSH extension if needed
 cd ghidra/Ghidra/Features/BSim/src/lshvector
@@ -321,14 +325,14 @@ make clean && make && sudo make install
 # ERROR: Cannot create PoolableConnectionFactory (The server does not support SSL.)
 
 # Check SSL status
-docker exec bsim-postgres psql -U bsim -d bsim -c "SHOW ssl;"
+docker exec bsim-postgres psql -U ben -d bsim -c "SHOW ssl;"
 
 # If SSL is off, enable it in docker-compose.yml:
 # Add "-c ssl=on" to postgres command and restart:
 docker-compose restart bsim-postgres
 
 # Verify SSL is working
-docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT 'SSL enabled' as status;"
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT 'SSL enabled' as status;"
 
 # See BSIM-SSL-SETUP.md for detailed SSL configuration guide
 ```
@@ -634,6 +638,25 @@ curl "http://localhost:8081/api/health"
 - **Clean Installation**: Use `./clean-fresh-deployment.sh full`
 - **Naming Compliance**: Ensure all files follow unified convention
 - **Validation Required**: All data must pass naming validation before ingestion
+
+---
+
+## 📸 Screenshots
+
+### BSim Analysis Portal — Home
+The portal landing page showing all 25 Diablo II versions (1.00 through 1.14d) with hash search.
+
+![BSim Portal Home](docs/screenshots/screenshot-portal-home.png)
+
+### Version Binary Browser
+Select a version to see all categorized binaries (Game Logic, Graphics, Audio, Network, Launcher, MPQ, Utility) with file hashes.
+
+![Version Binaries](docs/screenshots/screenshot-version-binaries.png)
+
+### Cross-Version Function Matrix
+The core feature — track every function across all 25 versions of a binary. See function addresses, detect changes, and identify which versions modified which code. Shown here: D2Lang.dll with 280 functions across all versions.
+
+![Cross Version Matrix](docs/screenshots/screenshot-cross-version-matrix.png)
 
 ---
 

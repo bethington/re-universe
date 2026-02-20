@@ -67,12 +67,12 @@ echo "LSH extension files installed successfully!"
 
 # Create extension in database
 echo "Creating LSH extension in BSim database..."
-if docker exec bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "CREATE EXTENSION IF NOT EXISTS lsh;"; then
+if docker exec bsim-postgres psql -U ben -d bsim -c "CREATE EXTENSION IF NOT EXISTS lsh;"; then
     echo "✓ LSH extension created successfully!"
 
     # Test LSH functions
     echo "Testing LSH functionality..."
-    if docker exec bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "SELECT lsh_load();" 2>/dev/null; then
+    if docker exec bsim-postgres psql -U ben -d bsim -c "SELECT lsh_load();" 2>/dev/null; then
         echo "✓ LSH extension is working!"
         echo "🎉 BSim database is now fully functional!"
     else

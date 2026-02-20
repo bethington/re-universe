@@ -51,7 +51,7 @@ if [[ -f ".env.production" ]]; then
         check_fail "Database password is too weak"
     fi
 
-    if [[ "$BSIM_DB_USER" != "bsim" ]]; then
+    if [[ "$BSIM_DB_USER" != "ben" && "$BSIM_DB_USER" != "bsim" ]]; then
         check_pass "Database user is not default"
     else
         check_fail "Using default database user"
@@ -139,7 +139,7 @@ fi
 # Check for development passwords in production
 if [[ -f ".env.production" ]]; then
     source .env.production
-    if echo "$BSIM_DB_PASSWORD" | grep -qE "(changeme|bsim|password|changeme)"; then
+    if echo "$BSIM_DB_PASSWORD" | grep -qE "(goodyx12|bsim|password|changeme)"; then
         check_fail "Production uses weak/default password"
     else
         check_pass "Production password is not a default value"

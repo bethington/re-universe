@@ -17,8 +17,8 @@ set -e  # Exit on any error
 DB_HOST="localhost"
 DB_PORT="5432"
 DB_NAME="bsim"
-DB_USER="${BSIM_DB_USER:-bsim}"
-export PGPASSWORD="changeme"
+DB_USER="ben"
+export PGPASSWORD="goodyx12"
 
 # Check for backup name argument
 if [ -z "$1" ]; then
@@ -27,12 +27,12 @@ if [ -z "$1" ]; then
     echo "Usage: $0 <backup_name>"
     echo ""
     echo "Available backups:"
-    ls -la /opt/re-universe/backups/*.sql 2>/dev/null | awk '{print "  " $9}' | sed 's|.*/||' | sed 's|\.sql||' || echo "  No backups found"
+    ls -la /home/ben/re-universe/backups/*.sql 2>/dev/null | awk '{print "  " $9}' | sed 's|.*/||' | sed 's|\.sql||' || echo "  No backups found"
     exit 1
 fi
 
 BACKUP_NAME="$1"
-BACKUP_DIR="/opt/re-universe/backups"
+BACKUP_DIR="/home/ben/re-universe/backups"
 BACKUP_FILE="${BACKUP_DIR}/${BACKUP_NAME}.sql"
 
 echo "=========================================="

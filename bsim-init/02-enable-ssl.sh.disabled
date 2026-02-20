@@ -8,7 +8,7 @@ set -e
 echo "=== Enabling SSL for BSim PostgreSQL ==="
 
 # Wait for PostgreSQL to be ready
-until pg_isready -h localhost -p 5432 -U "${POSTGRES_USER:-bsim}"; do
+until pg_isready -h localhost -p 5432 -U "${POSTGRES_USER:-ben}"; do
     echo "Waiting for PostgreSQL to be ready..."
     sleep 2
 done

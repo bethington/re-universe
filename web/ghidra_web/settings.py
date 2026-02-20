@@ -92,7 +92,7 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.getenv("BSIM_DB_NAME", "bsim"),
-        "USER": os.getenv("BSIM_DB_USER", "bsim"),
+        "USER": os.getenv("BSIM_DB_USER", "ben"),
         "PASSWORD": os.getenv("BSIM_DB_PASSWORD", ""),
         "HOST": os.getenv("BSIM_DB_HOST", "bsim-postgres"),
         "PORT": os.getenv("BSIM_DB_PORT", "5432"),

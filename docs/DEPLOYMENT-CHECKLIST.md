@@ -52,7 +52,7 @@ This checklist ensures all components are properly configured for production use
   ./security-check.sh
 
   # Verify no hardcoded passwords remain
-  grep -r "YOUR_PASSWORD\|bsim\|changeme" . --exclude-dir=.git || echo "No hardcoded passwords found"
+  grep -r "goodyx12\|bsim\|changeme" . --exclude-dir=.git || echo "No hardcoded passwords found"
   ```
 
 ### ✅ **Production Deployment**

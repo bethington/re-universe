@@ -23,7 +23,7 @@
 // - Applies comprehensive function tagging (library, game logic, utility)
 // - Analyzes function complexity, calling patterns, and architectural features
 // - Populates all base tables required for BSim similarity operations
-// - Uses remote PostgreSQL database (localhost:5432) for enterprise deployment
+// - Uses remote PostgreSQL database (10.0.0.30:5432) for enterprise deployment
 //
 // WORKFLOW POSITION: Complete ingestion - directly enables Step3+ operations
 // NOTE: Step2_GenerateBSimSignatures is now DEPRECATED - signatures are generated
@@ -49,9 +49,9 @@ import java.util.regex.*;
 public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
     // Default BSim database configuration (updated for authentic schema)
-    private static final String DEFAULT_DB_URL = "jdbc:postgresql://localhost:5432/bsim";
-    private static final String DEFAULT_DB_USER = "bsim";
-    private static final String DEFAULT_DB_PASS = "changeme";
+    private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
+    private static final String DEFAULT_DB_USER = "ben";
+    private static final String DEFAULT_DB_PASS = "goodyx12";
 
     // Version code mapping: version string -> numeric code
     // Format: major*1000 + minor*10 + patch_letter_offset

@@ -16,7 +16,7 @@ public class TestStep2Compilation {
             }
 
             // Compile the script
-            String scriptPath = "/opt/re-universe/ghidra-scripts/Step2_GenerateBSimSignatures.java";
+            String scriptPath = "/home/ben/re-universe/ghidra-scripts/Step2_GenerateBSimSignatures.java";
             int result = compiler.run(null, null, null, "-cp", "/opt/ghidra/Ghidra/Framework/Docking/lib/docking.jar:/opt/ghidra/Ghidra/Framework/SoftwareModeling/lib/SoftwareModeling.jar:/opt/ghidra/Ghidra/Features/Base/lib/Base.jar", scriptPath);
 
             if (result == 0) {

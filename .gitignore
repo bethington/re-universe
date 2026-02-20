@@ -55,7 +55,6 @@ ghidra/
 postgres-ssl/
 
 # Build artifacts and temporary development files
-**/target/
 ssl/
 bsim-init-backup/
 credential-backups/

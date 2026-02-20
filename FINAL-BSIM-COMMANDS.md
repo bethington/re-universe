@@ -16,17 +16,17 @@ Open **Command Prompt as Administrator** and run:
 ```cmd
 cd "C:\Program Files\ghidra_11.4.2_PUBLIC\support"
 
-bsim createdatabase "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim?ssl=true&sslmode=require" large_32 --user bsim
+bsim createdatabase "postgresql://ben:goodyx12@localhost:5432/bsim?ssl=true&sslmode=require" large_32 --user ben
 ```
 
 ## 📋 **Step 2: Add Categories (Run on Windows)**
 
 ```cmd
-bsim addexecategory "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" UNKNOWN
-bsim addexecategory "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" LIBRARY
-bsim addexecategory "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" EXECUTABLE
-bsim addexecategory "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" DRIVER
-bsim addexecategory "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" MALWARE
+bsim addexecategory "postgresql://ben:goodyx12@localhost:5432/bsim" UNKNOWN
+bsim addexecategory "postgresql://ben:goodyx12@localhost:5432/bsim" LIBRARY
+bsim addexecategory "postgresql://ben:goodyx12@localhost:5432/bsim" EXECUTABLE
+bsim addexecategory "postgresql://ben:goodyx12@localhost:5432/bsim" DRIVER
+bsim addexecategory "postgresql://ben:goodyx12@localhost:5432/bsim" MALWARE
 ```
 
 ## 📋 **Step 3: Monitor Progress (Run on Linux)**
@@ -47,7 +47,7 @@ bsim addexecategory "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" MALWAR
 1. **Open Ghidra**
 2. **Tools** → **Binary Similarity** → **BSim**
 3. **Create New Server**:
-   - **URL**: `postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim?ssl=true&sslmode=require`
+   - **URL**: `postgresql://ben:goodyx12@localhost:5432/bsim?ssl=true&sslmode=require`
    - **Test Connection** ✅
 
 ---
@@ -88,4 +88,4 @@ bsim addexecategory "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" MALWAR
 
 **Your database is ready to create!** Just run the `bsim createdatabase` command from your Windows Ghidra installation and you'll have a production-ready BSim database for 100M+ functions.
 
-**Connection URL**: `postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim?ssl=true&sslmode=require`
+**Connection URL**: `postgresql://ben:goodyx12@localhost:5432/bsim?ssl=true&sslmode=require`

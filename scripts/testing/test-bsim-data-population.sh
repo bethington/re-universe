@@ -4,10 +4,10 @@
 # Validates all BSim population scripts and database integration
 
 GHIDRA_DIR="./ghidra/Ghidra/RuntimeScripts/Linux/support"
-SCRIPT_DIR="/opt/re-universe/ghidra-scripts"
+SCRIPT_DIR="/home/ben/re-universe/ghidra-scripts"
 PROJECT_DIR="/tmp/ghidra_test_projects"
 TEST_BINARY_DIR="/tmp/bsim_test_binaries"
-DB_URL="postgresql://bsim:changeme@localhost:5432/bsim"
+DB_URL="postgresql://ben:goodyx12@localhost:5432/bsim"
 
 # Colors for output
 RED='\033[0;31m'
@@ -35,7 +35,7 @@ log_error() {
 test_database_connection() {
     log_info "Testing database connection..."
 
-    if docker exec -i bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "SELECT 1;" > /dev/null 2>&1; then
+    if docker exec -i bsim-postgres psql -U ben -d bsim -c "SELECT 1;" > /dev/null 2>&1; then
         log_success "Database connection successful"
         return 0
     else
@@ -222,17 +222,17 @@ test_database_data() {
     log_info "Testing database data integrity..."
 
     # Check if data was populated
-    local function_count=$(docker exec -i bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c "SELECT COUNT(*) FROM desctable;" 2>/dev/null | tr -d ' ')
-    local executable_count=$(docker exec -i bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c "SELECT COUNT(*) FROM exetable;" 2>/dev/null | tr -d ' ')
+    local function_count=$(docker exec -i bsim-postgres psql -U ben -d bsim -t -c "SELECT COUNT(*) FROM desctable;" 2>/dev/null | tr -d ' ')
+    local executable_count=$(docker exec -i bsim-postgres psql -U ben -d bsim -t -c "SELECT COUNT(*) FROM exetable;" 2>/dev/null | tr -d ' ')
 
     if [[ "$function_count" =~ ^[0-9]+$ ]] && [[ "$executable_count" =~ ^[0-9]+$ ]]; then
         log_success "Database contains $function_count functions across $executable_count executables"
 
         # Test if our extended tables exist
-        local signature_table_exists=$(docker exec -i bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'function_signatures';" 2>/dev/null | tr -d ' ')
+        local signature_table_exists=$(docker exec -i bsim-postgres psql -U ben -d bsim -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'function_signatures';" 2>/dev/null | tr -d ' ')
 
         if [[ "$signature_table_exists" == "1" ]]; then
-            local signature_count=$(docker exec -i bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c "SELECT COUNT(*) FROM function_signatures;" 2>/dev/null | tr -d ' ')
+            local signature_count=$(docker exec -i bsim-postgres psql -U ben -d bsim -t -c "SELECT COUNT(*) FROM function_signatures;" 2>/dev/null | tr -d ' ')
             log_success "Extended schema found with $signature_count function signatures"
         else
             log_warning "Extended schema not found (function_signatures table missing)"
@@ -248,9 +248,9 @@ test_database_data() {
 test_automation_script() {
     log_info "Testing automation script functionality..."
 
-    if [[ -f "/opt/re-universe/automate-ghidra-bsim-population.sh" ]]; then
+    if [[ -f "/home/ben/re-universe/automate-ghidra-bsim-population.sh" ]]; then
         # Test status command
-        if bash /opt/re-universe/automate-ghidra-bsim-population.sh status > /tmp/test_automation.log 2>&1; then
+        if bash /home/ben/re-universe/automate-ghidra-bsim-population.sh status > /tmp/test_automation.log 2>&1; then
             log_success "Automation script status check passed"
             return 0
         else

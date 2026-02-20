@@ -17,7 +17,7 @@ PROJECT_DIR="./ghidra-projects"
 BINARIES_DIR="./binaries"  # You'll need to specify where your binaries are
 
 # BSim configuration
-BSIM_URL="postgresql://bsim:changeme@localhost:5432/bsim"
+BSIM_URL="postgresql://ben:goodyx12@localhost:5432/bsim"
 
 echo -e "${CYAN}========================================${NC}"
 echo -e "${CYAN}BSim Database Population Workflow${NC}"
@@ -43,7 +43,7 @@ if [ ! -f "$GHIDRA_DIR/Ghidra/RuntimeScripts/Linux/support/analyzeHeadless" ]; t
 fi
 
 # Check database connectivity
-if ! docker exec bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "SELECT 1" > /dev/null 2>&1; then
+if ! docker exec bsim-postgres psql -U ben -d bsim -c "SELECT 1" > /dev/null 2>&1; then
     echo -e "${RED}❌ Cannot connect to BSim database${NC}"
     exit 1
 fi
@@ -107,7 +107,7 @@ run_ghidra_script "Step5_CompleteSimilarityWorkflow.java" "Step 5: Completing si
 echo -e "${CYAN}📊 Verifying database population...${NC}"
 
 # Check database statistics
-DB_STATS=$(docker exec bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -t -c "
+DB_STATS=$(docker exec bsim-postgres psql -U ben -d bsim -t -c "
 SELECT
     COUNT(*) as total_functions,
     COUNT(DISTINCT name_func) as unique_functions,
@@ -130,5 +130,5 @@ echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "Next steps:"
 echo "1. Clear API cache: curl -X POST localhost:8081/api/cache/clear"
-echo "2. Test website functionality: https://d2docs.example.com/"
+echo "2. Test website functionality: https://d2docs.xebyte.com/"
 echo "3. Monitor performance: ./monitor-bsim.sh"

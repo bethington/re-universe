@@ -10,8 +10,8 @@ GHIDRA_INSTALL_DIR=""
 DB_HOST="localhost"
 DB_PORT="5432"
 DB_NAME="bsim"
-DB_USER="${BSIM_DB_USER:-bsim}"
-DB_PASSWORD="changeme"
+DB_USER="ben"
+DB_PASSWORD="goodyx12"
 DB_TEMPLATE="large_32"
 OPTIMIZE_DB=true
 VERBOSE=false
@@ -136,20 +136,20 @@ optimize_postgresql() {
     log "  - maintenance_work_mem: ${maintenance_work_mem}MB"
 
     # Apply optimizations
-    docker exec bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "ALTER SYSTEM SET shared_buffers = '${shared_buffers}MB';" || true
-    docker exec bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "ALTER SYSTEM SET effective_cache_size = '${effective_cache}MB';" || true
-    docker exec bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "ALTER SYSTEM SET maintenance_work_mem = '${maintenance_work_mem}MB';" || true
-    docker exec bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "ALTER SYSTEM SET checkpoint_completion_target = 0.9;" || true
-    docker exec bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "ALTER SYSTEM SET wal_buffers = '16MB';" || true
-    docker exec bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "ALTER SYSTEM SET default_statistics_target = 100;" || true
-    docker exec bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "ALTER SYSTEM SET random_page_cost = 1.1;" || true
+    docker exec bsim-postgres psql -U ben -d bsim -c "ALTER SYSTEM SET shared_buffers = '${shared_buffers}MB';" || true
+    docker exec bsim-postgres psql -U ben -d bsim -c "ALTER SYSTEM SET effective_cache_size = '${effective_cache}MB';" || true
+    docker exec bsim-postgres psql -U ben -d bsim -c "ALTER SYSTEM SET maintenance_work_mem = '${maintenance_work_mem}MB';" || true
+    docker exec bsim-postgres psql -U ben -d bsim -c "ALTER SYSTEM SET checkpoint_completion_target = 0.9;" || true
+    docker exec bsim-postgres psql -U ben -d bsim -c "ALTER SYSTEM SET wal_buffers = '16MB';" || true
+    docker exec bsim-postgres psql -U ben -d bsim -c "ALTER SYSTEM SET default_statistics_target = 100;" || true
+    docker exec bsim-postgres psql -U ben -d bsim -c "ALTER SYSTEM SET random_page_cost = 1.1;" || true
 
     # Enable query performance tracking
-    docker exec bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements';" || true
-    docker exec bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "ALTER SYSTEM SET track_activity_query_size = 2048;" || true
+    docker exec bsim-postgres psql -U ben -d bsim -c "ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements';" || true
+    docker exec bsim-postgres psql -U ben -d bsim -c "ALTER SYSTEM SET track_activity_query_size = 2048;" || true
 
     # Reload configuration
-    docker exec bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "SELECT pg_reload_conf();" || true
+    docker exec bsim-postgres psql -U ben -d bsim -c "SELECT pg_reload_conf();" || true
 
     log "PostgreSQL optimization complete. Restart container to apply all changes." "SUCCESS"
 }
@@ -158,7 +158,7 @@ optimize_postgresql() {
 create_monitoring_views() {
     log "Creating performance monitoring views..."
 
-    docker exec bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim <<-EOSQL || true
+    docker exec bsim-postgres psql -U ben -d bsim <<-EOSQL || true
         -- Create extension for query statistics (if not exists)
         CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 
@@ -218,7 +218,7 @@ main() {
     check_system_resources
 
     # Check if database is ready
-    if ! docker exec bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c "SELECT version();" > /dev/null 2>&1; then
+    if ! docker exec bsim-postgres psql -U ben -d bsim -c "SELECT version();" > /dev/null 2>&1; then
         log "BSim database container is not running or not accessible" "ERROR"
         log "Please run: docker-compose up -d bsim-postgres" "ERROR"
         exit 1
@@ -253,8 +253,8 @@ main() {
     echo -e "${WHITE}Architecture: 32-bit optimized${NC}"
     echo ""
     echo -e "${CYAN}=== Performance Monitoring ===${NC}"
-    echo -e "${WHITE}View table sizes: docker exec bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c \"SELECT * FROM bsim_table_sizes;\"${NC}"
-    echo -e "${WHITE}View statistics: docker exec bsim-postgres psql -U "${BSIM_DB_USER:-bsim}" -d bsim -c \"SELECT * FROM bsim_statistics;\"${NC}"
+    echo -e "${WHITE}View table sizes: docker exec bsim-postgres psql -U ben -d bsim -c \"SELECT * FROM bsim_table_sizes;\"${NC}"
+    echo -e "${WHITE}View statistics: docker exec bsim-postgres psql -U ben -d bsim -c \"SELECT * FROM bsim_statistics;\"${NC}"
     echo ""
     echo -e "${CYAN}=== Next Steps ===${NC}"
     echo -e "${WHITE}1. Import large binary collections using Ghidra headless analysis${NC}"

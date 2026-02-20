@@ -47,7 +47,7 @@ if (Test-Path $EnvFile) {
 }
 
 # Set defaults if not in .env
-$BSimDbUser = if ($env:BSIM_DB_USER) { $env:BSIM_DB_USER } else { "bsim" }
+$BSimDbUser = if ($env:BSIM_DB_USER) { $env:BSIM_DB_USER } else { "ben" }
 $BSimDbName = if ($env:BSIM_DB_NAME) { $env:BSIM_DB_NAME } else { "bsim" }
 
 Write-Host "=========================================" -ForegroundColor Cyan

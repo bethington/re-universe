@@ -24,7 +24,7 @@ cd "C:\Program Files\ghidra_11.4.2_PUBLIC\support"
 Run the following command to create your large BSim database:
 
 ```cmd
-bsim createdatabase "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim?ssl=true&sslmode=require" large_32 --user bsim
+bsim createdatabase "postgresql://ben:goodyx12@localhost:5432/bsim?ssl=true&sslmode=require" large_32 --user ben
 ```
 
 ### Expected Output:
@@ -42,11 +42,11 @@ Database creation complete!
 Add categories to organize your binaries:
 
 ```cmd
-bsim addexecategory "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" UNKNOWN
-bsim addexecategory "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" LIBRARY
-bsim addexecategory "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" EXECUTABLE
-bsim addexecategory "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" DRIVER
-bsim addexecategory "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" MALWARE
+bsim addexecategory "postgresql://ben:goodyx12@localhost:5432/bsim" UNKNOWN
+bsim addexecategory "postgresql://ben:goodyx12@localhost:5432/bsim" LIBRARY
+bsim addexecategory "postgresql://ben:goodyx12@localhost:5432/bsim" EXECUTABLE
+bsim addexecategory "postgresql://ben:goodyx12@localhost:5432/bsim" DRIVER
+bsim addexecategory "postgresql://ben:goodyx12@localhost:5432/bsim" MALWARE
 ```
 
 ## Step 5: Verify Database Creation
@@ -54,7 +54,7 @@ bsim addexecategory "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" MALWAR
 Check that your database was created successfully:
 
 ```cmd
-bsim listdbs "postgresql://bsim:YOUR_PASSWORD@localhost:5432/"
+bsim listdbs "postgresql://ben:goodyx12@localhost:5432/"
 ```
 
 ## Step 6: Test Connection in Ghidra
@@ -63,7 +63,7 @@ bsim listdbs "postgresql://bsim:YOUR_PASSWORD@localhost:5432/"
 2. **Go to Tools → Binary Similarity → BSim**
 3. **Create New Server Configuration:**
    - **Name**: `Large BSim Database`
-   - **URL**: `postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim?ssl=true&sslmode=require`
+   - **URL**: `postgresql://ben:goodyx12@localhost:5432/bsim?ssl=true&sslmode=require`
    - **Test Connection** - Should show success
 
 ## Large Database Specifications
@@ -101,10 +101,10 @@ Then generate and commit signatures:
 bsim generatesigs ^
   "ghidra://localhost/LargeBinaryProject" ^
   "C:\temp\bsim_signatures" ^
-  --database "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim"
+  --database "postgresql://ben:goodyx12@localhost:5432/bsim"
 
 bsim commitsigs ^
-  "postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim" ^
+  "postgresql://ben:goodyx12@localhost:5432/bsim" ^
   "C:\temp\bsim_signatures"
 ```
 
@@ -114,13 +114,13 @@ Monitor your large database from Linux:
 
 ```bash
 # View database size
-docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT pg_size_pretty(pg_database_size('bsim'));"
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT pg_size_pretty(pg_database_size('bsim'));"
 
 # View table sizes
-docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT schemaname, tablename, pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) FROM pg_tables WHERE schemaname='public' ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;"
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT schemaname, tablename, pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) FROM pg_tables WHERE schemaname='public' ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;"
 
 # Count functions and signatures
-docker exec bsim-postgres psql -U bsim -d bsim -c "SELECT 'Functions' as type, COUNT(*) as count FROM function UNION SELECT 'Signatures', COUNT(*) FROM signature;"
+docker exec bsim-postgres psql -U ben -d bsim -c "SELECT 'Functions' as type, COUNT(*) as count FROM function UNION SELECT 'Signatures', COUNT(*) FROM signature;"
 ```
 
 ## Troubleshooting
@@ -166,7 +166,7 @@ With the `large_32` template and optimizations:
 - **Port**: 5432
 - **Database**: bsim
 - **Username**: ben
-- **Password**: YOUR_PASSWORD
+- **Password**: goodyx12
 - **SSL**: Required
 - **Template**: large_32
 - **Capacity**: 100M+ functions

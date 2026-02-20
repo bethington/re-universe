@@ -11,7 +11,7 @@ The Ghidra scripts have been updated to support the unified version system that 
 1. **`AddProgramToBSimDatabase.java`** ✅ **UPDATED**
    - **Changes**: Added unified naming convention parsing
    - **New Features**: Supports both `1.03_D2Game.dll` and `Classic_1.03_Game.exe` formats
-   - **Database**: Uses YOUR_SERVER_IP:5432 for remote database connectivity
+   - **Database**: Uses 10.0.0.30:5432 for remote database connectivity
    - **Compatibility**: Works with both old path-based parsing and new executable name parsing
 
 2. **`AddProgramToBSimDatabase_Unified.java`** ✅ **NEW**
@@ -32,27 +32,27 @@ The Ghidra scripts have been updated to support the unified version system that 
 ### 🔧 **Scripts Requiring Minor Updates**
 
 4. **`GenerateBSimSignatures.java`** ✅ **COMPATIBLE**
-   - **Status**: Uses correct database URL (YOUR_SERVER_IP:5432)
+   - **Status**: Uses correct database URL (10.0.0.30:5432)
    - **Compatibility**: Works with existing unified schema
 
 5. **`PopulateCommentsIntoBSim.java`** ✅ **COMPATIBLE**
-   - **Status**: Uses correct database URL (YOUR_SERVER_IP:5432)
+   - **Status**: Uses correct database URL (10.0.0.30:5432)
    - **Compatibility**: No schema changes needed
 
 6. **`PopulateCrossReferences.java`** ✅ **COMPATIBLE**
-   - **Status**: Uses correct database URL (YOUR_SERVER_IP:5432)
+   - **Status**: Uses correct database URL (10.0.0.30:5432)
    - **Compatibility**: No schema changes needed
 
 7. **`PopulateFunctionSignatures.java`** ✅ **COMPATIBLE**
-   - **Status**: Uses correct database URL (YOUR_SERVER_IP:5432)
+   - **Status**: Uses correct database URL (10.0.0.30:5432)
    - **Compatibility**: No schema changes needed
 
 8. **`PopulateImportExports.java`** ✅ **COMPATIBLE**
-   - **Status**: Uses correct database URL (YOUR_SERVER_IP:5432)
+   - **Status**: Uses correct database URL (10.0.0.30:5432)
    - **Compatibility**: No schema changes needed
 
 9. **`PopulateStringReferences.java`** ✅ **COMPATIBLE**
-   - **Status**: Uses correct database URL (YOUR_SERVER_IP:5432)
+   - **Status**: Uses correct database URL (10.0.0.30:5432)
    - **Compatibility**: No schema changes needed
 
 ### ✅ **Scripts Already Compatible**
@@ -69,9 +69,9 @@ All scripts are configured to use the remote database:
 
 ```java
 // Remote database connection for Ghidra scripts
-private static final String DEFAULT_DB_URL = "jdbc:postgresql://YOUR_SERVER_IP:5432/bsim";
-private static final String DEFAULT_DB_USER = "bsim";
-private static final String DEFAULT_DB_PASS = "YOUR_PASSWORD";
+private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
+private static final String DEFAULT_DB_USER = "ben";
+private static final String DEFAULT_DB_PASS = "goodyx12";
 ```
 
 ### **Advanced Unified Support**
@@ -115,14 +115,14 @@ Scripts 1-3 have been updated with full unified version system support including
    - Enhanced compatibility with unified materialized views
 
 3. **Use existing scripts** for supplementary data (comments, imports, etc.)
-   - All scripts use correct remote database URL (YOUR_SERVER_IP:5432)
+   - All scripts use correct remote database URL (10.0.0.30:5432)
    - No schema compatibility issues
 
 ### **Migration from Old Scripts**
 
 - **Backward Compatible**: Old scripts will continue to work with updated schema
 - **Recommended**: Switch to `*_Unified.java` versions for new projects
-- **Database**: All scripts use `YOUR_SERVER_IP:5432` for remote connectivity
+- **Database**: All scripts use `10.0.0.30:5432` for remote connectivity
 
 ## 📊 Unified System Benefits in Scripts
 
@@ -144,7 +144,7 @@ Scripts 1-3 have been updated with full unified version system support including
 ## 📋 Next Steps
 
 1. **All Scripts Ready** ✅
-   - All database URLs correctly configured for remote connection (YOUR_SERVER_IP:5432)
+   - All database URLs correctly configured for remote connection (10.0.0.30:5432)
    - No additional updates needed
 
 2. **Use Enhanced Unified Scripts** (Ready to use)

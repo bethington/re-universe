@@ -78,7 +78,7 @@ Convenience script to create a timestamped backup immediately after ingestion co
 
 ## Backup Details
 
-- **Storage Location:** `/opt/re-universe/backups/`
+- **Storage Location:** `/home/ben/re-universe/backups/`
 - **File Format:** Plain SQL dump with schema and data
 - **Typical Size:** ~258MB for current dataset
 - **Contents:** Complete table schemas and all data

@@ -6,7 +6,7 @@ The BSim PostgreSQL database is now configured with SSL support to resolve the "
 
 Use this connection URL in Ghidra BSim:
 ```
-postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim?ssl=true&sslmode=require
+postgresql://ben:goodyx12@localhost:5432/bsim?ssl=true&sslmode=require
 ```
 
 ## SSL Configuration Details
@@ -21,7 +21,7 @@ postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim?ssl=true&sslmode=require
 
 #### Option 1: SSL Required (Recommended)
 ```
-postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim?ssl=true&sslmode=require
+postgresql://ben:goodyx12@localhost:5432/bsim?ssl=true&sslmode=require
 ```
 - ✅ Secure connection
 - ✅ Works with self-signed certificates
@@ -30,12 +30,12 @@ postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim?ssl=true&sslmode=require
 #### Option 2: SSL with Certificate Verification
 If you need to verify the certificate (advanced users):
 ```
-postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim?ssl=true&sslmode=verify-ca&sslrootcert=./ssl/ca.crt
+postgresql://ben:goodyx12@localhost:5432/bsim?ssl=true&sslmode=verify-ca&sslrootcert=./ssl/ca.crt
 ```
 
 #### Option 3: SSL Disabled (For Testing Only)
 ```
-postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim?ssl=false&sslmode=disable
+postgresql://ben:goodyx12@localhost:5432/bsim?ssl=false&sslmode=disable
 ```
 - ⚠️ **Not recommended for production**
 - Use only for testing if SSL causes issues
@@ -51,7 +51,7 @@ postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim?ssl=false&sslmode=disable
 
 2. **Verify SSL is Enabled**:
    ```bash
-   docker exec bsim-postgres psql -U bsim -d bsim -c "SHOW ssl;"
+   docker exec bsim-postgres psql -U ben -d bsim -c "SHOW ssl;"
    ```
 
 3. **Check Certificate Files**:
@@ -64,7 +64,7 @@ postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim?ssl=false&sslmode=disable
 
 1. **Try SSL Required Mode First**:
    ```
-   postgresql://bsim:YOUR_PASSWORD@localhost:5432/bsim?ssl=true&sslmode=require
+   postgresql://ben:goodyx12@localhost:5432/bsim?ssl=true&sslmode=require
    ```
 
 2. **Check Java SSL Configuration** (if needed):

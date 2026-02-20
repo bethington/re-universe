@@ -10,9 +10,9 @@ import java.util.*;
 
 public class Compute_EnhancedSimilarityMatrix extends GhidraScript {
 
-    private static final String DB_URL = "jdbc:postgresql://localhost:5432/bsim";
-    private static final String DB_USER = "bsim";
-    private static final String DB_PASS = "changeme";
+    private static final String DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
+    private static final String DB_USER = "ben";
+    private static final String DB_PASS = "goodyx12";
 
     // Similarity thresholds
     private static final float EXACT_MATCH_THRESHOLD = 0.95f;

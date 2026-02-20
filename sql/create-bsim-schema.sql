@@ -401,9 +401,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Grant all permissions to the BSim user
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO bsim;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO bsim;
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO bsim;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ben;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ben;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO ben;
 
 -- Create BSim LSH functions that Ghidra expects
 CREATE OR REPLACE FUNCTION insert_vec(vector_data lshvector)

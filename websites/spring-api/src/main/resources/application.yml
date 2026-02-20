@@ -6,8 +6,8 @@ spring:
     name: ghidra-analysis-api
   datasource:
     url: jdbc:postgresql://${BSIM_DB_HOST:bsim-postgres}:${BSIM_DB_PORT:5432}/${BSIM_DB_NAME:bsim}
-    username: ${BSIM_DB_USER:bsim}
-    password: ${BSIM_DB_PASSWORD:changeme}
+    username: ${BSIM_DB_USER:ben}
+    password: ${BSIM_DB_PASSWORD:goodyx12}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -33,8 +33,8 @@ ghidra:
   server:
     host: ${GHIDRA_SERVER_HOST:ghidra-server}
     port: ${GHIDRA_SERVER_PORT:13100}
-    ip: ${GHIDRA_IP:localhost}
-    username: ${GHIDRA_USERS:admin}
+    ip: ${GHIDRA_IP:10.0.0.30}
+    username: ${GHIDRA_USERS:benam}
     password: changeme
   projects:
     path: ${GHIDRA_PROJECTS_PATH:/repos}
@@ -47,8 +47,8 @@ bsim:
     host: ${BSIM_DB_HOST:bsim-postgres}
     port: ${BSIM_DB_PORT:5432}
     name: ${BSIM_DB_NAME:bsim}
-    user: ${BSIM_DB_USER:bsim}
-    password: ${BSIM_DB_PASSWORD:changeme}
+    user: ${BSIM_DB_USER:ben}
+    password: ${BSIM_DB_PASSWORD:goodyx12}
 
 # Logging
 logging:

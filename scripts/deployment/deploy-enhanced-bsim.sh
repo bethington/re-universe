@@ -11,8 +11,8 @@ set -e
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
 DB_NAME="${DB_NAME:-bsim}"
-DB_USER="${DB_USER:-bsim}"
-DB_PASSWORD="${DB_PASSWORD:-changeme}"
+DB_USER="${DB_USER:-ben}"
+DB_PASSWORD="${DB_PASSWORD:-goodyx12}"
 
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -356,7 +356,7 @@ main() {
             echo "  DB_PORT     - Database port (default: 5432)"
             echo "  DB_NAME     - Database name (default: bsim)"
             echo "  DB_USER     - Database user (default: ben)"
-            echo "  DB_PASSWORD - Database password (default: changeme)"
+            echo "  DB_PASSWORD - Database password (default: goodyx12)"
             ;;
         *)
             error "Unknown command: $1"
