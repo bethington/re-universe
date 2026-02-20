@@ -378,6 +378,149 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # GitHub Mining Service - Community Knowledge Discovery
+  # Provides intelligent repository discovery and quality assessment
+  github-mining:
+    build:
+      context: ./services/github-mining
+      dockerfile: Dockerfile
+    image: github-mining:latest
+    container_name: github-mining
+    ports:
+      - "${GITHUB_MINING_PORT:-8094}:8094"
+    env_file:
+      - .env
+    environment:
+      - GITHUB_MINING_HOST=${GITHUB_MINING_HOST:-github-mining}
+      - GITHUB_MINING_PORT=8094
+      - BSIM_DB_HOST=bsim-postgres
+      - BSIM_DB_PORT=5432
+      - BSIM_DB_NAME=${BSIM_DB_NAME:-bsim}
+      - BSIM_DB_USER=${BSIM_DB_USER:-ben}
+      - BSIM_DB_PASSWORD=${BSIM_DB_PASSWORD}
+      - REDIS_HOST=redis-cache
+      - REDIS_PORT=6379
+      - REDIS_DB=2
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GITHUB_REQUESTS_PER_HOUR=${GITHUB_REQUESTS_PER_HOUR:-1000}
+      - MIN_REPOSITORY_STARS=${MIN_REPOSITORY_STARS:-5}
+      - MIN_RELEVANCE_SCORE=${MIN_RELEVANCE_SCORE:-0.3}
+      - MIN_QUALITY_SCORE=${MIN_QUALITY_SCORE:-40.0}
+      - MAX_REPOSITORY_SIZE_MB=${MAX_REPOSITORY_SIZE_MB:-200}
+      - CONCURRENT_MINING_TASKS=${CONCURRENT_MINING_TASKS:-5}
+      - DISCOVERY_INTERVAL_HOURS=${DISCOVERY_INTERVAL_HOURS:-6}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG=${DEBUG:-False}
+    depends_on:
+      bsim-postgres:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+    networks:
+      - backend
+      - proxy
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE:-false}"
+      - "traefik.http.routers.github-mining.rule=Host(`mining.xebyte.com`)"
+      - "traefik.http.routers.github-mining.entrypoints=websecure"
+      - "traefik.http.routers.github-mining.tls.certresolver=le"
+      - "traefik.http.services.github-mining.loadbalancer.server.port=8094"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8094/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  # Knowledge Integration Service
+  knowledge-integration:
+    build:
+      context: ./services/knowledge-integration
+      dockerfile: Dockerfile
+    image: knowledge-integration:latest
+    container_name: knowledge-integration
+    ports:
+      - "${KNOWLEDGE_INTEGRATION_PORT:-8095}:8095"
+    env_file:
+      - .env
+    environment:
+      - KNOWLEDGE_INTEGRATION_HOST=${KNOWLEDGE_INTEGRATION_HOST:-knowledge-integration}
+      - KNOWLEDGE_INTEGRATION_PORT=8095
+      - BSIM_DB_HOST=bsim-postgres
+      - BSIM_DB_PORT=5432
+      - BSIM_DB_USER=${BSIM_DB_USER:-ben}
+      - BSIM_DB_PASSWORD=${BSIM_DB_PASSWORD}
+      - BSIM_DB_NAME=${BSIM_DB_NAME:-bsim}
+      - REDIS_HOST=redis-cache
+      - REDIS_PORT=6379
+    depends_on:
+      bsim-postgres:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+      github-mining:
+        condition: service_healthy
+    networks:
+      - backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.knowledge-integration.rule=Host(`knowledge.xebyte.com`)"
+      - "traefik.http.routers.knowledge-integration.entrypoints=websecure"
+      - "traefik.http.routers.knowledge-integration.tls.certresolver=le"
+      - "traefik.http.services.knowledge-integration.loadbalancer.server.port=8095"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import requests; requests.get('http://localhost:8095/health', timeout=5).raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  # Monitoring Dashboard Service
+  monitoring-dashboard:
+    build:
+      context: ./services/monitoring-dashboard
+      dockerfile: Dockerfile
+    image: monitoring-dashboard:latest
+    container_name: monitoring-dashboard
+    ports:
+      - "${MONITORING_DASHBOARD_PORT:-8096}:8096"
+    env_file:
+      - .env
+    environment:
+      - MONITORING_DASHBOARD_HOST=${MONITORING_DASHBOARD_HOST:-monitoring-dashboard}
+      - MONITORING_DASHBOARD_PORT=8096
+      - BSIM_DB_HOST=bsim-postgres
+      - BSIM_DB_PORT=5432
+      - BSIM_DB_USER=${BSIM_DB_USER:-ben}
+      - BSIM_DB_PASSWORD=${BSIM_DB_PASSWORD}
+      - BSIM_DB_NAME=${BSIM_DB_NAME:-bsim}
+      - REDIS_HOST=redis-cache
+      - REDIS_PORT=6379
+    depends_on:
+      bsim-postgres:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+    networks:
+      - backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.monitoring-dashboard.rule=Host(`monitoring.xebyte.com`)"
+      - "traefik.http.routers.monitoring-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.monitoring-dashboard.tls.certresolver=le"
+      - "traefik.http.services.monitoring-dashboard.loadbalancer.server.port=8096"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
 volumes:
   bsim_postgres_data:
   redis_data:
