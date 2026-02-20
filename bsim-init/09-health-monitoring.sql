@@ -43,10 +43,10 @@ SELECT
 CREATE VIEW table_health_metrics AS
 SELECT
     schemaname,
-    tablename,
-    pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as total_size,
-    pg_size_pretty(pg_relation_size(schemaname||'.'||tablename)) as table_size,
-    pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename) - pg_relation_size(schemaname||'.'||tablename)) as index_size,
+    relname,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||relname)) as total_size,
+    pg_size_pretty(pg_relation_size(schemaname||'.'||relname)) as table_size,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||relname) - pg_relation_size(schemaname||'.'||relname)) as index_size,
     n_tup_ins as inserts,
     n_tup_upd as updates,
     n_tup_del as deletes,
@@ -61,13 +61,13 @@ SELECT
         ELSE 0
     END as dead_row_percentage
 FROM pg_stat_user_tables
-ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+ORDER BY pg_total_relation_size(schemaname||'.'||relname) DESC;
 
 -- Index usage and efficiency
 CREATE VIEW index_health_metrics AS
 SELECT
     schemaname,
-    tablename,
+    relname,
     indexname,
     idx_scan as times_used,
     idx_tup_read as tuples_read,
@@ -246,7 +246,7 @@ BEGIN
     RETURN QUERY
     SELECT
         'VACUUM RECOMMENDED'::text as action,
-        tablename::text as target,
+        relname::text as target,
         'PENDING'::text as status,
         'Dead rows: ' || ROUND(CASE WHEN n_live_tup > 0 THEN (n_dead_tup::float / n_live_tup::float) * 100 ELSE 0 END, 2)::text || '%' as details
     FROM pg_stat_user_tables
@@ -302,7 +302,7 @@ BEGIN
         CASE
             WHEN EXISTS (
                 SELECT 1 FROM pg_indexes
-                WHERE tablename = 'function_embeddings'
+                WHERE relname = 'function_embeddings'
                 AND indexname LIKE '%vector%'
             ) THEN 'CREATED'
             ELSE 'MISSING'
@@ -310,13 +310,13 @@ BEGIN
         (
             SELECT count(*)::text
             FROM pg_indexes
-            WHERE tablename IN ('function_embeddings', 'community_insights')
+            WHERE relname IN ('function_embeddings', 'community_insights')
             AND indexname LIKE '%vector%'
         ) || ' vector indexes' as count_or_size,
         CASE
             WHEN NOT EXISTS (
                 SELECT 1 FROM pg_indexes
-                WHERE tablename = 'function_embeddings'
+                WHERE relname = 'function_embeddings'
                 AND indexname LIKE '%vector%'
             ) THEN 'Vector indexes will be created automatically'
             ELSE 'Vector indexes optimized for similarity search'
