@@ -72,8 +72,36 @@
             letter-spacing: 0.5px;
         }
 
-        .header-search {
+        .header-nav {
+            display: flex;
+            gap: 1rem;
             margin-left: auto;
+            margin-right: 1rem;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.4rem 0.8rem;
+            background-color: var(--bg-light);
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 0.75rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .nav-link:hover {
+            background-color: var(--bg-hover);
+            border-color: var(--accent-gold);
+            color: var(--accent-gold);
+            transform: translateY(-1px);
+        }
+
+        .header-search {
             position: relative;
         }
 
@@ -2817,6 +2845,11 @@
 <body>
     <div class="header">
         <h1>BSim Analysis Portal</h1>
+        <nav class="header-nav">
+            <a href="/chat" target="_blank" class="nav-link" title="AI Chat Assistant">💬 Chat</a>
+            <a href="/monitoring" target="_blank" class="nav-link" title="System Monitoring">📊 Monitor</a>
+            <a href="https://api.xebyte.com/api/health" target="_blank" class="nav-link" title="API Status">🔗 API</a>
+        </nav>
         <div class="header-search">
             <input type="text" id="hashSearch" placeholder="Search by hash..."
                 onkeydown="if(event.key==='Enter') searchByHash()">
