@@ -329,6 +329,55 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # Chat Interface Service - Real-time AI Chat with User Feedback
+  # Provides WebSocket-based chat interface with AI orchestration integration
+  chat-interface:
+    build:
+      context: ./services/chat-interface
+      dockerfile: Dockerfile
+    image: chat-interface:latest
+    container_name: chat-interface
+    ports:
+      - "${CHAT_INTERFACE_PORT:-8093}:8093"
+    env_file:
+      - .env
+    environment:
+      - CHAT_INTERFACE_HOST=${CHAT_INTERFACE_HOST:-chat-interface}
+      - CHAT_INTERFACE_PORT=8093
+      - BSIM_DB_HOST=bsim-postgres
+      - BSIM_DB_PORT=5432
+      - BSIM_DB_NAME=${BSIM_DB_NAME:-bsim}
+      - BSIM_DB_USER=${BSIM_DB_USER:-ben}
+      - BSIM_DB_PASSWORD=${BSIM_DB_PASSWORD}
+      - AI_ORCHESTRATION_URL=http://ai-orchestration:8092
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-change-in-production}
+      - MAX_CONVERSATION_HISTORY=100
+      - RATE_LIMIT_REQUESTS=100
+      - WEBSOCKET_MAX_CONNECTIONS=1000
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG=${DEBUG:-False}
+    depends_on:
+      bsim-postgres:
+        condition: service_healthy
+      ai-orchestration:
+        condition: service_healthy
+    networks:
+      - backend
+      - proxy
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE:-false}"
+      - "traefik.http.routers.chat-interface.rule=Host(`chat.xebyte.com`)"
+      - "traefik.http.routers.chat-interface.entrypoints=websecure"
+      - "traefik.http.routers.chat-interface.tls.certresolver=le"
+      - "traefik.http.services.chat-interface.loadbalancer.server.port=8093"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8093/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
 volumes:
   bsim_postgres_data:
   redis_data:
