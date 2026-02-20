@@ -148,8 +148,32 @@ EOF
         cd "$FULL_BACKUP_PATH"
         zip -r "../$BACKUP_NAME.zip" . >/dev/null 2>&1
         cd - >/dev/null
+    elif command -v python3 >/dev/null 2>&1; then
+        # Use Python to create zip file
+        python3 - <<EOF
+import zipfile
+import os
+import sys
+
+def create_zip(source_dir, output_path):
+    with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk(source_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                # Get relative path for archive
+                arcname = os.path.relpath(file_path, source_dir)
+                zipf.write(file_path, arcname)
+    return True
+
+try:
+    create_zip("$FULL_BACKUP_PATH", "$ARCHIVE_PATH")
+    print("ZIP file created successfully using Python")
+except Exception as e:
+    print(f"Error creating ZIP file: {e}")
+    sys.exit(1)
+EOF
     else
-        echo "Warning: zip command not found, creating tar.gz instead"
+        echo "Warning: neither zip command nor python3 found, creating tar.gz instead"
         ARCHIVE_PATH="$BACKUP_PATH/$BACKUP_NAME.tar.gz"
         tar -czf "$ARCHIVE_PATH" -C "$FULL_BACKUP_PATH" .
     fi
