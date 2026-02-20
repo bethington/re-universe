@@ -201,6 +201,50 @@ services:
       retries: 3
       start_period: 30s
 
+  # Vector Search Service - Semantic Search with pgvector
+  # Provides embedding generation and similarity search for functions
+  vector-search:
+    build:
+      context: ./services/vector-search
+      dockerfile: Dockerfile
+    image: vector-search:latest
+    container_name: vector-search
+    ports:
+      - "${VECTOR_SEARCH_PORT:-8091}:8090"
+    env_file:
+      - .env
+    environment:
+      - VECTOR_SEARCH_HOST=${VECTOR_SEARCH_HOST:-vector-search}
+      - VECTOR_SEARCH_PORT=8090
+      - BSIM_DB_HOST=bsim-postgres
+      - BSIM_DB_PORT=5432
+      - BSIM_DB_NAME=${BSIM_DB_NAME:-bsim}
+      - BSIM_DB_USER=${BSIM_DB_USER:-ben}
+      - BSIM_DB_PASSWORD=${BSIM_DB_PASSWORD}
+      - REDIS_HOST=redis-cache
+      - REDIS_PORT=6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+      - VECTOR_DIMENSION=${VECTOR_DIMENSION:-1536}
+      - VECTOR_SIMILARITY_THRESHOLD=${VECTOR_SIMILARITY_THRESHOLD:-0.7}
+      - VECTOR_MAX_RESULTS=${VECTOR_MAX_RESULTS:-20}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG=${DEBUG:-False}
+    depends_on:
+      bsim-postgres:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
   # GhidraMCP - AI-Powered Analysis Interface (MCP Server)
   # Provides 144 REST endpoints for AI-assisted reverse engineering
   # Submodule: ./ghidra-mcp (github.com/bethington/ghidra-mcp)
