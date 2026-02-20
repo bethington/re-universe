@@ -4,11 +4,12 @@
 
 FROM postgres:15 AS builder
 
-# Install build dependencies
+# Install build dependencies including pgvector requirements
 RUN apt-get update && apt-get install -y \
     build-essential \
     git \
     postgresql-server-dev-15 \
+    postgresql-contrib-15 \
     && rm -rf /var/lib/apt/lists/*
 
 # Clone Ghidra repository (only the lshvector source needed)
@@ -22,10 +23,18 @@ RUN git clone --depth 1 --filter=blob:none --sparse \
 WORKDIR /build/ghidra/Ghidra/Features/BSim/src/lshvector
 RUN cp c/*.c c/*.h . && PG_CONFIG=/usr/bin/pg_config make -f Makefile.lshvector
 
+# Clone and build pgvector extension
+WORKDIR /build
+RUN git clone --depth 1 --branch v0.6.0 https://github.com/pgvector/pgvector.git && \
+    cd pgvector && \
+    make && \
+    make install
+
 # Final image
 FROM postgres:15
 
-# Copy built extension from builder stage
+# Copy built extensions from builder stage
+# LSHVector extension (Ghidra BSim)
 COPY --from=builder /build/ghidra/Ghidra/Features/BSim/src/lshvector/lshvector.so \
     /usr/lib/postgresql/15/lib/
 COPY --from=builder /build/ghidra/Ghidra/Features/BSim/src/lshvector/lshvector.control \
@@ -33,9 +42,17 @@ COPY --from=builder /build/ghidra/Ghidra/Features/BSim/src/lshvector/lshvector.c
 COPY --from=builder /build/ghidra/Ghidra/Features/BSim/src/lshvector/lshvector--1.0.sql \
     /usr/share/postgresql/15/extension/
 
+# pgvector extension (for semantic search)
+COPY --from=builder /usr/lib/postgresql/15/lib/vector.so \
+    /usr/lib/postgresql/15/lib/
+COPY --from=builder /usr/share/postgresql/15/extension/vector* \
+    /usr/share/postgresql/15/extension/
+
 # Verify extension files are in place
 RUN ls -la /usr/lib/postgresql/15/lib/lshvector.so && \
-    ls -la /usr/share/postgresql/15/extension/lshvector*
+    ls -la /usr/lib/postgresql/15/lib/vector.so && \
+    ls -la /usr/share/postgresql/15/extension/lshvector* && \
+    ls -la /usr/share/postgresql/15/extension/vector*
 
 # Copy BSim initialization scripts
 COPY bsim-init/ /docker-entrypoint-initdb.d/

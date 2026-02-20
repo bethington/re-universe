@@ -49,6 +49,11 @@ services:
       -c log_min_duration_statement=1000
       -c log_checkpoints=on
       -c log_lock_waits=on
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=128MB
+      -c max_parallel_workers_per_gather=4
+      -c max_parallel_workers=8
     networks:
       - backend
     healthcheck:
