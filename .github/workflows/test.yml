@@ -166,7 +166,7 @@ jobs:
         path: 'trivy-results.sarif'
 
   integration-test:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, docker, re-universe]
     timeout-minutes: 45
     
     steps:
