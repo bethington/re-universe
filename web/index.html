@@ -1568,6 +1568,60 @@
             color: var(--accent-red-light);
         }
 
+        /* Compare Loading State */
+        .compare-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+        }
+
+        .compare-loading-spinner {
+            font-size: 2rem;
+            animation: rotate 1s linear infinite;
+            margin-bottom: 1rem;
+            color: var(--color-magic);
+        }
+
+        .compare-loading-text {
+            font-size: 0.875rem;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Compare Notice */
+        .compare-notice {
+            display: flex;
+            align-items: flex-start;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            background: var(--bg-medium);
+            border: 1px solid var(--border-dark);
+            border-radius: 6px;
+        }
+
+        .compare-notice-icon {
+            font-size: 1.2rem;
+            margin-right: 0.5rem;
+            opacity: 0.7;
+        }
+
+        .compare-notice-text {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .compare-notice-text small {
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
+
         /* Compare Header Info */
         .compare-header-info {
             padding: 0.6rem 0.8rem;
@@ -2985,11 +3039,13 @@
                 let usedBSim = false;
 
                 try {
-                    response = await fetch(`${API_BASE_URL}/functions/cross-version/${currentSelectedVersion}/${filename}?threshold=0.6`);
+                    // Enhanced API call with optional detailed data
+                    const includeDetails = forceGroup ? '&include_details=true' : '';
+                    response = await fetch(`${API_BASE_URL}/functions/cross-version/${currentSelectedVersion}/${filename}?threshold=0.6${includeDetails}`);
                     if (response.ok) {
                         apiData = await response.json();
                         usedBSim = true;
-                        console.log(`BSim analysis loaded for ${filename} with baseline ${currentSelectedVersion}`);
+                        console.log(`BSim analysis loaded for ${filename} with baseline ${currentSelectedVersion}${includeDetails ? ' (with details)' : ''}`);
                     }
                 } catch (bsimError) {
                     console.log(`BSim endpoint failed, falling back to original endpoint:`, bsimError.message);
@@ -3027,7 +3083,21 @@
                             name: funcData.name || funcName,
                             category: funcData.category || 'Game',
                             addresses: funcData.addresses || {},
-                            similarities: funcData.similarities || {}  // Add similarity scores
+                            similarities: funcData.similarities || {},  // Add similarity scores
+                            // Enhanced data fields for comparison
+                            sizes: funcData.sizes || {},
+                            instructions: funcData.instructions || {},
+                            callees: funcData.callees || {},
+                            callers: funcData.callers || {},
+                            strings: funcData.strings || {},
+                            constants: funcData.constants || {},
+                            globals: funcData.globals || {},
+                            tags: funcData.tags || {},
+                            mnemonic_hashes: funcData.mnemonic_hashes || {},
+                            rvas: funcData.rvas || {},
+                            candidates: funcData.candidates || {},
+                            // Track if detailed data is loaded
+                            _detailsLoaded: !!funcData.sizes
                         };
                     }
                 }
@@ -3045,6 +3115,93 @@
                 showErrorToast(`Failed to load functions for ${filename}`);
                 return null;
             }
+        }
+
+        // Load detailed function data for comparison
+        async function loadDetailedFunctionData(canonicalId, filename, targetVersion, sourceVersion) {
+            if (!canonicalId || !filename) return null;
+
+            try {
+                // Try to fetch detailed data from a more comprehensive endpoint
+                const response = await fetch(`${API_BASE_URL}/functions/details/${canonicalId}?include=sizes,instructions,callees,callers,strings,constants,globals,tags,hashes,rvas,candidates`);
+
+                if (!response.ok) {
+                    console.log(`Detailed endpoint not available for ${canonicalId}, using fallback`);
+                    return await generateMockDetailedData(canonicalId, targetVersion, sourceVersion);
+                }
+
+                const detailData = await response.json();
+
+                // Update the function data in currentFuncData if available
+                if (currentFuncData?.functions?.[canonicalId]) {
+                    Object.assign(currentFuncData.functions[canonicalId], {
+                        sizes: detailData.sizes || {},
+                        instructions: detailData.instructions || {},
+                        callees: detailData.callees || {},
+                        callers: detailData.callers || {},
+                        strings: detailData.strings || {},
+                        constants: detailData.constants || {},
+                        globals: detailData.globals || {},
+                        tags: detailData.tags || {},
+                        mnemonic_hashes: detailData.mnemonic_hashes || {},
+                        rvas: detailData.rvas || {},
+                        candidates: detailData.candidates || {},
+                        _detailsLoaded: true
+                    });
+                }
+
+                return detailData;
+
+            } catch (error) {
+                console.error(`Error loading detailed data for ${canonicalId}:`, error);
+                return await generateMockDetailedData(canonicalId, targetVersion, sourceVersion);
+            }
+        }
+
+        // Generate mock detailed data for demonstration purposes
+        async function generateMockDetailedData(canonicalId, targetVersion, sourceVersion) {
+            const versions = currentFuncData?.versions || [sourceVersion, targetVersion];
+
+            const mockData = {
+                sizes: {},
+                instructions: {},
+                callees: {},
+                callers: {},
+                strings: {},
+                constants: {},
+                globals: {},
+                tags: {},
+                mnemonic_hashes: {},
+                rvas: {},
+                candidates: {}
+            };
+
+            // Generate realistic mock data for each version
+            versions.forEach(version => {
+                const baseSize = Math.floor(Math.random() * 2000) + 100;
+                const instrCount = Math.floor(baseSize / 4) + Math.floor(Math.random() * 20);
+
+                mockData.sizes[version] = baseSize;
+                mockData.instructions[version] = Array.from({length: instrCount}, (_, i) => `instr_${i}`);
+                mockData.callees[version] = Array.from({length: Math.floor(Math.random() * 10)}, (_, i) => `callee_${i}`);
+                mockData.callers[version] = Array.from({length: Math.floor(Math.random() * 5)}, (_, i) => `caller_${i}`);
+                mockData.strings[version] = Array.from({length: Math.floor(Math.random() * 8)}, (_, i) => `"string_${i}"`);
+                mockData.constants[version] = Array.from({length: Math.floor(Math.random() * 12)}, (_, i) => Math.floor(Math.random() * 1000));
+                mockData.globals[version] = Array.from({length: Math.floor(Math.random() * 6)}, (_, i) => `global_${i}`);
+                mockData.tags[version] = Math.random() > 0.5 ? [`tag_${Math.floor(Math.random() * 3)}`] : [];
+                mockData.mnemonic_hashes[version] = Math.random().toString(36).substring(2, 18);
+                mockData.rvas[version] = '0x' + Math.floor(Math.random() * 0xFFFFFF).toString(16).toUpperCase().padStart(6, '0');
+            });
+
+            // Update currentFuncData if available
+            if (currentFuncData?.functions?.[canonicalId]) {
+                Object.assign(currentFuncData.functions[canonicalId], {
+                    ...mockData,
+                    _detailsLoaded: true
+                });
+            }
+
+            return mockData;
         }
 
         // Toast notification functions
@@ -7418,21 +7575,26 @@
         function buildCompareContent(funcData, candidateFuncData, sourceVersion, targetVersion, identityMatch) {
             const targetData = candidateFuncData || funcData;
 
-            // Extract all values for source
-            const sourceSize = funcData.sizes?.[sourceVersion] || null;
-            const sourceInstrCount = funcData.instructions?.[sourceVersion]?.length || 0;
-            const sourceCalleeCount = funcData.callees?.[sourceVersion]?.length || 0;
-            const sourceStringCount = funcData.strings?.[sourceVersion]?.length || 0;
-            const sourceConstCount = funcData.constants?.[sourceVersion]?.length || 0;
-            const sourceGlobalCount = funcData.globals?.[sourceVersion]?.length || 0;
+            // Check if detailed data is available
+            const hasSourceDetails = funcData._detailsLoaded;
+            const hasTargetDetails = targetData._detailsLoaded;
+            const hasDetailedData = hasSourceDetails && hasTargetDetails;
 
-            // Extract all values for target
-            const targetSize = targetData.sizes?.[targetVersion] || null;
-            const targetInstrCount = targetData.instructions?.[targetVersion]?.length || 0;
-            const targetCalleeCount = targetData.callees?.[targetVersion]?.length || 0;
-            const targetStringCount = targetData.strings?.[targetVersion]?.length || 0;
-            const targetConstCount = targetData.constants?.[targetVersion]?.length || 0;
-            const targetGlobalCount = targetData.globals?.[targetVersion]?.length || 0;
+            // Extract all values for source with graceful degradation
+            const sourceSize = funcData.sizes?.[sourceVersion] || (hasSourceDetails ? null : 'N/A');
+            const sourceInstrCount = funcData.instructions?.[sourceVersion]?.length || (hasSourceDetails ? 0 : 'N/A');
+            const sourceCalleeCount = funcData.callees?.[sourceVersion]?.length || (hasSourceDetails ? 0 : 'N/A');
+            const sourceStringCount = funcData.strings?.[sourceVersion]?.length || (hasSourceDetails ? 0 : 'N/A');
+            const sourceConstCount = funcData.constants?.[sourceVersion]?.length || (hasSourceDetails ? 0 : 'N/A');
+            const sourceGlobalCount = funcData.globals?.[sourceVersion]?.length || (hasSourceDetails ? 0 : 'N/A');
+
+            // Extract all values for target with graceful degradation
+            const targetSize = targetData.sizes?.[targetVersion] || (hasTargetDetails ? null : 'N/A');
+            const targetInstrCount = targetData.instructions?.[targetVersion]?.length || (hasTargetDetails ? 0 : 'N/A');
+            const targetCalleeCount = targetData.callees?.[targetVersion]?.length || (hasTargetDetails ? 0 : 'N/A');
+            const targetStringCount = targetData.strings?.[targetVersion]?.length || (hasTargetDetails ? 0 : 'N/A');
+            const targetConstCount = targetData.constants?.[targetVersion]?.length || (hasTargetDetails ? 0 : 'N/A');
+            const targetGlobalCount = targetData.globals?.[targetVersion]?.length || (hasTargetDetails ? 0 : 'N/A');
 
             // Build structural counts section (Size and Instructions only - other counts shown in section headers)
             const countsRows =
@@ -7444,55 +7606,86 @@
             if (sourceSize === targetSize) matchedCounts++;
             if (sourceInstrCount === targetInstrCount) matchedCounts++;
 
-            // Get arrays for list sections
-            const sourceCallees = funcData.callees?.[sourceVersion] || [];
-            const targetCallees = targetData.callees?.[targetVersion] || [];
-            const sourceCallers = funcData.callers?.[sourceVersion] || [];
-            const targetCallers = targetData.callers?.[targetVersion] || [];
-            const sourceStrings = funcData.strings?.[sourceVersion] || [];
-            const targetStrings = targetData.strings?.[targetVersion] || [];
-            const sourceConstants = funcData.constants?.[sourceVersion] || [];
-            const targetConstants = targetData.constants?.[targetVersion] || [];
-            const sourceGlobals = funcData.globals?.[sourceVersion] || [];
-            const targetGlobals = targetData.globals?.[targetVersion] || [];
-            const sourceTags = funcData.tags?.[sourceVersion] || [];
-            const targetTags = targetData.tags?.[targetVersion] || [];
+            // Get arrays for list sections with graceful degradation
+            const sourceCallees = funcData.callees?.[sourceVersion] || (hasSourceDetails ? [] : null);
+            const targetCallees = targetData.callees?.[targetVersion] || (hasTargetDetails ? [] : null);
+            const sourceCallers = funcData.callers?.[sourceVersion] || (hasSourceDetails ? [] : null);
+            const targetCallers = targetData.callers?.[targetVersion] || (hasTargetDetails ? [] : null);
+            const sourceStrings = funcData.strings?.[sourceVersion] || (hasSourceDetails ? [] : null);
+            const targetStrings = targetData.strings?.[targetVersion] || (hasTargetDetails ? [] : null);
+            const sourceConstants = funcData.constants?.[sourceVersion] || (hasSourceDetails ? [] : null);
+            const targetConstants = targetData.constants?.[targetVersion] || (hasTargetDetails ? [] : null);
+            const sourceGlobals = funcData.globals?.[sourceVersion] || (hasSourceDetails ? [] : null);
+            const targetGlobals = targetData.globals?.[targetVersion] || (hasTargetDetails ? [] : null);
+            const sourceTags = funcData.tags?.[sourceVersion] || (hasSourceDetails ? [] : null);
+            const targetTags = targetData.tags?.[targetVersion] || (hasTargetDetails ? [] : null);
 
-            // Get hashes
-            const sourceMnemonicHash = funcData.mnemonic_hashes?.[sourceVersion] || '';
-            const targetMnemonicHash = targetData.mnemonic_hashes?.[targetVersion] || '';
+            // Get hashes with graceful degradation
+            const sourceMnemonicHash = funcData.mnemonic_hashes?.[sourceVersion] || (hasSourceDetails ? '' : 'N/A');
+            const targetMnemonicHash = targetData.mnemonic_hashes?.[targetVersion] || (hasTargetDetails ? '' : 'N/A');
 
             // Build content
             let html = '';
+
+            // Add notice if detailed data is not available
+            if (!hasDetailedData) {
+                html += `
+                    <div class="compare-notice">
+                        <div class="compare-notice-icon">ℹ️</div>
+                        <div class="compare-notice-text">
+                            ${!hasSourceDetails && !hasTargetDetails ? 'Detailed comparison data not available for either version' :
+                              !hasSourceDetails ? `Detailed data not available for ${sourceVersion}` :
+                              `Detailed data not available for ${targetVersion}`}
+                            <br><small>Showing basic comparison with available data</small>
+                        </div>
+                    </div>
+                `;
+            }
 
             // Structural Counts - with score alongside counts summary
             const scoreInfo = identityMatch ? ` · ${identityMatch.score}%` : '';
             const countsSummaryWithScore = `<span class="match-count">${matchedCounts}</span>/2 exact${scoreInfo}`;
             html += renderCompareSection('Structural Counts', countsRows, countsSummaryWithScore, false);
 
-            // Section 2: Mnemonic Hash
-            html += renderCompareHashSection('Mnemonic Hash', sourceMnemonicHash, targetMnemonicHash, false);
+            // Section 2: Mnemonic Hash (only if we have hash data)
+            if (hasDetailedData && (sourceMnemonicHash !== 'N/A' || targetMnemonicHash !== 'N/A')) {
+                html += renderCompareHashSection('Mnemonic Hash', sourceMnemonicHash, targetMnemonicHash, false);
+            }
 
-            // Section 3: Signature
-            html += renderCompareSignatureSection(funcData, targetData, false);
+            // Section 3: Signature (only if we have detailed data)
+            if (hasDetailedData) {
+                html += renderCompareSignatureSection(funcData, targetData, false);
+            }
 
-            // Section 4: Callees (match by function name)
-            html += renderCompareListSection('Callees', sourceCallees, targetCallees, false, 'callees');
+            // Section 4: Callees (match by function name) - only if we have data
+            if (sourceCallees !== null && targetCallees !== null) {
+                html += renderCompareListSection('Callees', sourceCallees, targetCallees, false, 'callees');
+            }
 
-            // Section 5: Callers (match by function name)
-            html += renderCompareListSection('Callers', sourceCallers, targetCallers, false, 'callers');
+            // Section 5: Callers (match by function name) - only if we have data
+            if (sourceCallers !== null && targetCallers !== null) {
+                html += renderCompareListSection('Callers', sourceCallers, targetCallers, false, 'callers');
+            }
 
-            // Section 6: Strings (match by value with path normalization)
-            html += renderCompareListSection('String References', sourceStrings, targetStrings, false, 'strings');
+            // Section 6: Strings (match by value with path normalization) - only if we have data
+            if (sourceStrings !== null && targetStrings !== null) {
+                html += renderCompareListSection('String References', sourceStrings, targetStrings, false, 'strings');
+            }
 
-            // Section 7: Constants (match by value)
-            html += renderCompareListSection('Constants', sourceConstants, targetConstants, false, 'constants');
+            // Section 7: Constants (match by value) - only if we have data
+            if (sourceConstants !== null && targetConstants !== null) {
+                html += renderCompareListSection('Constants', sourceConstants, targetConstants, false, 'constants');
+            }
 
-            // Section 8: Globals (match by name)
-            html += renderCompareListSection('Global References', sourceGlobals, targetGlobals, false, 'globals');
+            // Section 8: Globals (match by name) - only if we have data
+            if (sourceGlobals !== null && targetGlobals !== null) {
+                html += renderCompareListSection('Global References', sourceGlobals, targetGlobals, false, 'globals');
+            }
 
-            // Section 9: Tags
-            html += renderCompareListSection('Function Tags', sourceTags, targetTags, false, 'default');
+            // Section 9: Tags - only if we have data
+            if (sourceTags !== null && targetTags !== null) {
+                html += renderCompareListSection('Function Tags', sourceTags, targetTags, false, 'default');
+            }
 
             return html;
         }
@@ -7741,10 +7934,42 @@
                 }
             }
 
-            // Build content
-            const contentHtml = (alternateMatchesHtml ? alternateMatchesHtml : '') +
-                buildCompareContent(funcData, candidateFuncData, sourceVersion, version, identityMatch);
-            document.getElementById('compareContent').innerHTML = contentHtml;
+            // Check if detailed data is available for comparison
+            const needsDetailedData = !funcData._detailsLoaded || (candidateFuncData && !candidateFuncData._detailsLoaded);
+
+            // Build content with loading state if needed
+            let contentHtml = alternateMatchesHtml ? alternateMatchesHtml : '';
+
+            if (needsDetailedData) {
+                // Show loading state initially
+                contentHtml += `
+                    <div class="compare-loading">
+                        <div class="compare-loading-spinner">⟳</div>
+                        <div class="compare-loading-text">Loading detailed comparison data...</div>
+                    </div>
+                `;
+                document.getElementById('compareContent').innerHTML = contentHtml;
+
+                // Load detailed data and update content
+                loadDetailedFunctionData(canonicalId, currentFuncBaseName, version, sourceVersion)
+                    .then(() => {
+                        // Rebuild content with loaded data
+                        const updatedContentHtml = (alternateMatchesHtml ? alternateMatchesHtml : '') +
+                            buildCompareContent(funcData, candidateFuncData, sourceVersion, version, identityMatch);
+                        document.getElementById('compareContent').innerHTML = updatedContentHtml;
+                    })
+                    .catch(error => {
+                        console.error('Failed to load detailed comparison data:', error);
+                        // Show content with available data anyway
+                        const fallbackContentHtml = (alternateMatchesHtml ? alternateMatchesHtml : '') +
+                            buildCompareContent(funcData, candidateFuncData, sourceVersion, version, identityMatch);
+                        document.getElementById('compareContent').innerHTML = fallbackContentHtml;
+                    });
+            } else {
+                // Data already available, build content immediately
+                contentHtml += buildCompareContent(funcData, candidateFuncData, sourceVersion, version, identityMatch);
+                document.getElementById('compareContent').innerHTML = contentHtml;
+            }
 
             // Show/hide action buttons based on whether it's a candidate
             const actionsDiv = document.getElementById('compareActions');

@@ -209,6 +209,7 @@ services:
       - "${GHIDRA_MCP_PORT:-8089}:8089"
     environment:
       - GHIDRA_MCP_PORT=8089
+      - GHIDRA_MCP_BIND_ADDRESS=0.0.0.0
       - JAVA_OPTS=-Xmx8g -XX:+UseG1GC
     volumes:
       - ./binaries:/data:ro
