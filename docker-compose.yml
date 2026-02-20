@@ -196,9 +196,44 @@ services:
       retries: 3
       start_period: 30s
 
+  # GhidraMCP - AI-Powered Analysis Interface (MCP Server)
+  # Provides 144 REST endpoints for AI-assisted reverse engineering
+  # Submodule: ./ghidra-mcp (github.com/bethington/ghidra-mcp)
+  ghidra-mcp:
+    build:
+      context: ./ghidra-mcp
+      dockerfile: docker/Dockerfile
+    image: ghidra-mcp-headless:latest
+    container_name: ghidra-mcp
+    ports:
+      - "${GHIDRA_MCP_PORT:-8089}:8089"
+    environment:
+      - GHIDRA_MCP_PORT=8089
+      - JAVA_OPTS=-Xmx8g -XX:+UseG1GC
+    volumes:
+      - ./binaries:/data:ro
+      - ghidra_mcp_projects:/projects
+    networks:
+      - backend
+      - proxy
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE:-false}"
+      - "traefik.http.routers.ghidra-mcp.rule=Host(`mcp.xebyte.com`)"
+      - "traefik.http.routers.ghidra-mcp.entrypoints=websecure"
+      - "traefik.http.routers.ghidra-mcp.tls.certresolver=le"
+      - "traefik.http.services.ghidra-mcp.loadbalancer.server.port=8089"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
+
 volumes:
   bsim_postgres_data:
   redis_data:
+  ghidra_mcp_projects:
 
 networks:
   backend:
