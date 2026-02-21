@@ -1,58 +1,48 @@
 #!/bin/bash
-
-# Database Restore Script
-# This script drops and recreates the BSim database from backup
-# Use this when you need to restore the database to a known good state
-# or recover from database corruption issues
+# RE-Universe Database Restore Script
+# Use when: Container recreated, data lost, or recovery needed
+# Run from: ~/re-universe directory
 
 set -e
+cd "$(dirname "$0")/.."
 
-BACKUP_FILE="/home/ben/re-universe/backups/bsim_backup_2025-02-03.sql"
-DB_NAME="bsim"
-DB_USER="ben"
-DB_PASSWORD="***REDACTED***"
-DB_HOST="localhost"
-DB_PORT="5432"
+BACKUP_FILE="backups/backups/complete-system-backup-20260203_142107/bsim-database-complete.sql"
 
-echo "🔄 Starting database restore process..."
+echo "🔄 RE-Universe Database Restore"
+echo "================================"
 
-# Check if backup file exists
+# Check backup exists
 if [ ! -f "$BACKUP_FILE" ]; then
-    echo "❌ Backup file not found: $BACKUP_FILE"
+    echo "❌ Backup not found: $BACKUP_FILE"
     exit 1
 fi
 
 echo "📋 Stopping dependent services..."
-docker-compose stop ai-orchestration github-mining web
+docker compose stop ai-orchestration chat-interface github-mining knowledge-integration monitoring-dashboard vector-search ghidra-api ghidra-web ghidra-mcp
 
-echo "🗑️ Dropping existing database..."
-PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d postgres -c "DROP DATABASE IF EXISTS $DB_NAME;"
-
-echo "🆕 Creating new database..."
-PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d postgres -c "CREATE DATABASE $DB_NAME;"
+echo "🗑️ Recreating database..."
+docker exec bsim-postgres psql -U ben -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'bsim' AND pid <> pg_backend_pid();" 2>/dev/null || true
+docker exec bsim-postgres dropdb -U ben --if-exists bsim
+docker exec bsim-postgres createdb -U ben bsim
 
 echo "📦 Adding pgvector extension..."
-PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c "CREATE EXTENSION IF NOT EXISTS vector;"
+docker exec bsim-postgres psql -U ben -d bsim -c "CREATE EXTENSION IF NOT EXISTS vector;"
 
-echo "🔄 Restoring database from backup..."
-PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME < "$BACKUP_FILE"
+echo "🔄 Restoring from backup (this takes ~2-3 minutes)..."
+tail -n +2 "$BACKUP_FILE" | docker exec -i bsim-postgres psql -U ben -d bsim 2>&1 | tail -5
 
-echo "🚀 Restarting all services..."
-docker-compose up -d
-
-echo "⏳ Waiting for services to start..."
+echo "🚀 Starting all services..."
+docker compose up -d
 sleep 30
 
-echo "✅ Verifying database restore..."
-function_count=$(PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -c "SELECT COUNT(*) FROM functiontable;" | xargs)
+echo "✅ Verifying restore..."
+COUNT=$(docker exec bsim-postgres psql -U ben -d bsim -t -c "SELECT COUNT(*) FROM desctable;")
+echo "Functions restored: $COUNT"
 
-if [ "$function_count" -gt 0 ]; then
-    echo "✅ Database restore successful! Functions restored: $function_count"
-    echo "🔍 Running health check..."
-    ./health-check.sh
+if [ "$COUNT" -gt 0 ]; then
+    echo "🎉 Database restore successful!"
+    ./health-check.sh | tail -15
 else
-    echo "❌ Database restore failed - no functions found"
+    echo "❌ Restore failed - no data"
     exit 1
 fi
-
-echo "🎉 Database restore completed successfully!"
