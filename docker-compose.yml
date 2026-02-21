@@ -366,7 +366,7 @@ services:
       - proxy
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE:-false}"
-      - "traefik.http.routers.chat-interface.rule=(Host(`d2docs.xebyte.com`) || Host(`d2docs.xebyte.us`)) && PathPrefix(`/chat`)"
+      - "traefik.http.routers.chat-interface.rule=Host(`chat.d2docs.xebyte.com`) || Host(`chat.d2docs.xebyte.us`)"
       - "traefik.http.routers.chat-interface.entrypoints=websecure"
       - "traefik.http.routers.chat-interface.tls.certresolver=le"
       - "traefik.http.services.chat-interface.loadbalancer.server.port=8093"
@@ -510,7 +510,7 @@ services:
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE:-false}"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.monitoring-dashboard.rule=(Host(`d2docs.xebyte.com`) || Host(`d2docs.xebyte.us`)) && PathPrefix(`/monitoring`)"
+      - "traefik.http.routers.monitoring-dashboard.rule=Host(`monitor.d2docs.xebyte.com`) || Host(`monitor.d2docs.xebyte.us`)"
       - "traefik.http.routers.monitoring-dashboard.entrypoints=websecure"
       - "traefik.http.routers.monitoring-dashboard.tls.certresolver=le"
       - "traefik.http.services.monitoring-dashboard.loadbalancer.server.port=8096"
