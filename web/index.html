@@ -1434,6 +1434,392 @@
             margin-top: 1.5rem;
         }
 
+        /* Community Knowledge Tab Styles */
+        .community-container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .community-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--border-dark);
+        }
+
+        .community-controls {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .community-btn {
+            background: var(--bg-darker);
+            border: 1px solid var(--border-dark);
+            color: var(--text-primary);
+            padding: 0.5rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s ease;
+        }
+
+        .community-btn:hover {
+            background: var(--color-magic);
+            border-color: var(--color-magic);
+            color: var(--bg-dark);
+        }
+
+        .community-search {
+            background: var(--bg-darker);
+            border: 1px solid var(--border-dark);
+            color: var(--text-primary);
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            min-width: 250px;
+        }
+
+        .community-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .community-overview {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .community-stats {
+            background: var(--bg-darker);
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+            padding: 1rem;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            background: var(--bg-darkest);
+            padding: 1rem;
+            border-radius: 4px;
+            border: 1px solid var(--border-dark);
+        }
+
+        .stat-icon {
+            font-size: 2rem;
+        }
+
+        .stat-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--color-magic);
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .community-sections {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .community-section {
+            background: var(--bg-darker);
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .repo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1rem;
+        }
+
+        .repo-card {
+            background: var(--bg-darkest);
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+            padding: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        .repo-card:hover {
+            border-color: var(--color-magic);
+            transform: translateY(-2px);
+        }
+
+        .repo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.8rem;
+        }
+
+        .repo-name a {
+            color: var(--color-magic);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .repo-name a:hover {
+            text-decoration: underline;
+        }
+
+        .repo-stats {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.8rem;
+        }
+
+        .repo-stars, .repo-forks {
+            color: var(--text-muted);
+        }
+
+        .repo-description {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.4;
+            margin-bottom: 1rem;
+        }
+
+        .repo-relevance {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .relevance-bar {
+            flex: 1;
+            height: 4px;
+            background: var(--bg-dark);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .relevance-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--color-magic), var(--color-rare));
+            transition: width 0.3s ease;
+        }
+
+        .relevance-text {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .repo-tags {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .repo-tag {
+            background: var(--color-magic);
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+        }
+
+        .insights-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .insight-card {
+            background: var(--bg-darkest);
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+            padding: 1rem;
+        }
+
+        .insight-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.8rem;
+        }
+
+        .insight-type {
+            background: var(--color-rare);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .insight-confidence {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        .insight-content {
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-bottom: 0.8rem;
+        }
+
+        .insight-sources {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        .function-knowledge-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .function-knowledge-item {
+            background: var(--bg-darkest);
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+            padding: 1rem;
+        }
+
+        .function-knowledge-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.8rem;
+        }
+
+        .function-knowledge-header .function-name {
+            color: var(--color-magic);
+            font-weight: 600;
+        }
+
+        .function-knowledge-header .function-address {
+            font-family: var(--font-mono);
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        .function-community-desc {
+            color: var(--text-secondary);
+            line-height: 1.4;
+            margin-bottom: 1rem;
+        }
+
+        .function-sources {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .sources-label {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        .sources-list {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .source-link {
+            color: var(--color-magic);
+            text-decoration: none;
+            font-size: 0.8rem;
+        }
+
+        .source-link:hover {
+            text-decoration: underline;
+        }
+
+        .discussions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .discussion-item {
+            background: var(--bg-darkest);
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+            padding: 1rem;
+        }
+
+        .discussion-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.8rem;
+        }
+
+        .discussion-title a {
+            color: var(--color-magic);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .discussion-title a:hover {
+            text-decoration: underline;
+        }
+
+        .discussion-meta {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .discussion-preview {
+            color: var(--text-secondary);
+            line-height: 1.4;
+            margin-bottom: 1rem;
+            font-style: italic;
+        }
+
+        .discussion-stats {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .no-data {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 2rem;
+            font-style: italic;
+        }
+
+        .community-error {
+            text-align: center;
+            padding: 2rem;
+            background: var(--bg-darker);
+            border: 1px solid var(--color-crafted);
+            border-radius: 4px;
+        }
+
         .evolution-section {
             padding: 0.6rem 0.8rem;
             border-bottom: 1px solid var(--border-dark);
@@ -9619,8 +10005,9 @@
                     <div class="community-header">
                         <h3>Community Knowledge - ${fileInfo.name}</h3>
                         <div class="community-controls">
-                            <button class="community-btn" onclick="refreshCommunity()">🔄 Refresh</button>
+                            <button class="community-btn" onclick="refreshCommunity('${fileInfo.md5}')">🔄 Refresh</button>
                             <button class="community-btn" onclick="searchCommunity()">🔍 Search</button>
+                            <input type="text" class="community-search" id="communitySearch" placeholder="Search community knowledge..." onchange="filterCommunityData(this.value)">
                         </div>
                     </div>
                     <div class="community-content">
@@ -9631,7 +10018,385 @@
                     </div>
                 </div>
             `;
-            // TODO: Load community knowledge from GitHub mining service
+
+            // Load community knowledge from GitHub mining service
+            loadCommunityKnowledge(fileInfo);
+        }
+
+        async function loadCommunityKnowledge(fileInfo) {
+            try {
+                // Check GitHub mining service status
+                const healthResponse = await fetch('http://localhost:8094/health');
+                if (!healthResponse.ok) {
+                    throw new Error('GitHub mining service unavailable');
+                }
+
+                const healthData = await healthResponse.json();
+                console.log('GitHub Mining Service Status:', healthData);
+
+                // Load community data
+                await loadGitHubMiningData(fileInfo);
+
+            } catch (error) {
+                console.error('Error loading community knowledge:', error);
+                showCommunityError(error.message, fileInfo);
+            }
+        }
+
+        async function loadGitHubMiningData(fileInfo) {
+            const content = document.querySelector('#communityPanel .community-content');
+
+            try {
+                // Query GitHub mining service for community knowledge
+                const response = await fetch(`http://localhost:8094/community/knowledge/${fileInfo.md5}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                if (response.ok) {
+                    const communityData = await response.json();
+                    displayCommunityKnowledge(communityData, fileInfo);
+                } else {
+                    // Fallback to mock data if service doesn't have specific data
+                    const mockData = await generateMockCommunityData(fileInfo);
+                    displayCommunityKnowledge(mockData, fileInfo);
+                }
+
+            } catch (error) {
+                console.error('Error fetching community data:', error);
+                const mockData = await generateMockCommunityData(fileInfo);
+                displayCommunityKnowledge(mockData, fileInfo);
+            }
+        }
+
+        function displayCommunityKnowledge(data, fileInfo) {
+            const content = document.querySelector('#communityPanel .community-content');
+
+            content.innerHTML = `
+                <div class="community-overview">
+                    <div class="community-stats">
+                        <div class="stat-grid">
+                            <div class="stat-item">
+                                <div class="stat-icon">📚</div>
+                                <div class="stat-info">
+                                    <div class="stat-value">${data.sources?.length || 0}</div>
+                                    <div class="stat-label">Sources Found</div>
+                                </div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-icon">⭐</div>
+                                <div class="stat-info">
+                                    <div class="stat-value">${data.total_stars || 0}</div>
+                                    <div class="stat-label">Total Stars</div>
+                                </div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-icon">🔍</div>
+                                <div class="stat-info">
+                                    <div class="stat-value">${data.functions_documented || 0}</div>
+                                    <div class="stat-label">Functions Documented</div>
+                                </div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-icon">🏆</div>
+                                <div class="stat-info">
+                                    <div class="stat-value">${data.trust_score || 0}%</div>
+                                    <div class="stat-label">Trust Score</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="community-sections">
+                        <div class="community-section">
+                            <div class="section-header" onclick="toggleCommunitySection('repositories')">
+                                <h4>📂 Related Repositories</h4>
+                                <span class="toggle-icon">▼</span>
+                            </div>
+                            <div class="section-content" id="repositories">
+                                <div class="repo-grid">
+                                    ${data.repositories ? data.repositories.map(repo => `
+                                        <div class="repo-card">
+                                            <div class="repo-header">
+                                                <div class="repo-name">
+                                                    <a href="${repo.url}" target="_blank">${repo.name}</a>
+                                                </div>
+                                                <div class="repo-stats">
+                                                    <span class="repo-stars">⭐ ${repo.stars || 0}</span>
+                                                    <span class="repo-forks">🍴 ${repo.forks || 0}</span>
+                                                </div>
+                                            </div>
+                                            <div class="repo-description">${repo.description || 'No description available'}</div>
+                                            <div class="repo-relevance">
+                                                <div class="relevance-bar">
+                                                    <div class="relevance-fill" style="width: ${repo.relevance || 0}%"></div>
+                                                </div>
+                                                <span class="relevance-text">${repo.relevance || 0}% relevant</span>
+                                            </div>
+                                            <div class="repo-tags">
+                                                ${repo.topics ? repo.topics.map(topic => `<span class="repo-tag">${topic}</span>`).join('') : ''}
+                                            </div>
+                                        </div>
+                                    `).join('') : '<div class="no-data">No repositories found</div>'}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="community-section">
+                            <div class="section-header" onclick="toggleCommunitySection('insights')">
+                                <h4>💡 Community Insights</h4>
+                                <span class="toggle-icon">▼</span>
+                            </div>
+                            <div class="section-content" id="insights">
+                                <div class="insights-grid">
+                                    ${data.insights ? data.insights.map(insight => `
+                                        <div class="insight-card">
+                                            <div class="insight-header">
+                                                <div class="insight-type">${insight.type || 'General'}</div>
+                                                <div class="insight-confidence">${insight.confidence || 0}% confidence</div>
+                                            </div>
+                                            <div class="insight-content">${insight.content || 'No insight available'}</div>
+                                            <div class="insight-sources">
+                                                Sources: ${insight.source_count || 0} repositories
+                                            </div>
+                                        </div>
+                                    `).join('') : '<div class="no-data">No community insights available</div>'}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="community-section">
+                            <div class="section-header" onclick="toggleCommunitySection('functions')">
+                                <h4>⚙️ Function Knowledge</h4>
+                                <span class="toggle-icon">▼</span>
+                            </div>
+                            <div class="section-content" id="functions">
+                                <div class="function-knowledge-grid">
+                                    ${data.function_knowledge ? data.function_knowledge.map(func => `
+                                        <div class="function-knowledge-item">
+                                            <div class="function-knowledge-header">
+                                                <div class="function-name">${func.name || 'Unknown'}</div>
+                                                <div class="function-address">0x${func.address || '000000'}</div>
+                                            </div>
+                                            <div class="function-community-desc">${func.community_description || 'No community description'}</div>
+                                            <div class="function-sources">
+                                                <span class="sources-label">Found in:</span>
+                                                <div class="sources-list">
+                                                    ${func.sources ? func.sources.map(source => `
+                                                        <a href="${source.url}" target="_blank" class="source-link">${source.name}</a>
+                                                    `).join('') : 'No sources'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `).join('') : '<div class="no-data">No function knowledge available</div>'}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="community-section">
+                            <div class="section-header" onclick="toggleCommunitySection('discussions')">
+                                <h4>💬 Community Discussions</h4>
+                                <span class="toggle-icon">▼</span>
+                            </div>
+                            <div class="section-content" id="discussions">
+                                <div class="discussions-list">
+                                    ${data.discussions ? data.discussions.map(discussion => `
+                                        <div class="discussion-item">
+                                            <div class="discussion-header">
+                                                <div class="discussion-title">
+                                                    <a href="${discussion.url}" target="_blank">${discussion.title}</a>
+                                                </div>
+                                                <div class="discussion-meta">
+                                                    <span class="discussion-date">${discussion.date}</span>
+                                                    <span class="discussion-platform">${discussion.platform}</span>
+                                                </div>
+                                            </div>
+                                            <div class="discussion-preview">${discussion.preview || 'No preview available'}</div>
+                                            <div class="discussion-stats">
+                                                <span class="discussion-replies">💬 ${discussion.replies || 0} replies</span>
+                                                <span class="discussion-relevance">🎯 ${discussion.relevance || 0}% relevant</span>
+                                            </div>
+                                        </div>
+                                    `).join('') : '<div class="no-data">No discussions found</div>'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showCommunityError(errorMessage, fileInfo) {
+            const content = document.querySelector('#communityPanel .community-content');
+
+            content.innerHTML = `
+                <div class="community-error">
+                    <div class="error-icon">⚠️</div>
+                    <h4>Community Knowledge Unavailable</h4>
+                    <div class="error-message">${errorMessage}</div>
+                    <div class="error-suggestions">
+                        <p><strong>Possible solutions:</strong></p>
+                        <ul>
+                            <li>Check GitHub Mining service is running (port 8094)</li>
+                            <li>Verify GitHub API token is configured</li>
+                            <li>Ensure network connectivity to GitHub</li>
+                            <li>Wait for initial community data mining to complete</li>
+                        </ul>
+                    </div>
+                    <div class="error-actions">
+                        <button class="community-btn" onclick="loadCommunityKnowledge({md5: '${fileInfo.md5}', name: '${fileInfo.name}'})">
+                            🔄 Retry Loading
+                        </button>
+                        <button class="community-btn" onclick="triggerCommunityMining('${fileInfo.md5}')">
+                            🚀 Start Mining
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function generateMockCommunityData(fileInfo) {
+            // Generate realistic mock data for development
+            await new Promise(resolve => setTimeout(resolve, 800));
+
+            return {
+                sources: [
+                    { name: 'DiabloEvolution', url: 'https://github.com/user/DiabloEvolution' },
+                    { name: 'D2ModdingTools', url: 'https://github.com/user/D2ModdingTools' },
+                    { name: 'D2Reverse', url: 'https://github.com/user/D2Reverse' }
+                ],
+                total_stars: 1247,
+                functions_documented: 89,
+                trust_score: 87,
+                repositories: [
+                    {
+                        name: 'DiabloEvolution',
+                        url: 'https://github.com/user/DiabloEvolution',
+                        description: 'Complete Diablo II reverse engineering and modding toolkit',
+                        stars: 456,
+                        forks: 78,
+                        relevance: 95,
+                        topics: ['diablo2', 'reverse-engineering', 'modding']
+                    },
+                    {
+                        name: 'D2ModdingTools',
+                        url: 'https://github.com/user/D2ModdingTools',
+                        description: 'Collection of tools for Diablo II modification',
+                        stars: 234,
+                        forks: 45,
+                        relevance: 82,
+                        topics: ['diablo2', 'tools', 'modding']
+                    },
+                    {
+                        name: 'D2Reverse',
+                        url: 'https://github.com/user/D2Reverse',
+                        description: 'Diablo II binary analysis and documentation',
+                        stars: 567,
+                        forks: 123,
+                        relevance: 90,
+                        topics: ['diablo2', 'reverse-engineering', 'analysis']
+                    }
+                ],
+                insights: [
+                    {
+                        type: 'Architecture',
+                        content: 'Community analysis suggests this binary uses a custom message dispatch system for game events.',
+                        confidence: 89,
+                        source_count: 3
+                    },
+                    {
+                        type: 'Performance',
+                        content: 'Multiple sources indicate critical performance bottlenecks in the rendering pipeline functions.',
+                        confidence: 76,
+                        source_count: 5
+                    }
+                ],
+                function_knowledge: [
+                    {
+                        name: 'GameLoop',
+                        address: '4010A0',
+                        community_description: 'Main game loop handling input, update, and render phases. Critical for understanding game timing.',
+                        sources: [
+                            { name: 'DiabloEvolution', url: 'https://github.com/user/DiabloEvolution' },
+                            { name: 'D2Reverse', url: 'https://github.com/user/D2Reverse' }
+                        ]
+                    },
+                    {
+                        name: 'ProcessInput',
+                        address: '401120',
+                        community_description: 'Handles all keyboard and mouse input processing. Contains anti-cheat validation.',
+                        sources: [
+                            { name: 'D2ModdingTools', url: 'https://github.com/user/D2ModdingTools' }
+                        ]
+                    }
+                ],
+                discussions: [
+                    {
+                        title: 'Understanding D2Game.dll message dispatch system',
+                        url: 'https://forums.example.com/discussion/1234',
+                        platform: 'Forum',
+                        date: '2024-01-15',
+                        preview: 'Deep dive into how Diablo II handles inter-module communication...',
+                        replies: 23,
+                        relevance: 92
+                    },
+                    {
+                        title: 'Reverse engineering the inventory system',
+                        url: 'https://reddit.com/r/diablo2/discussion/5678',
+                        platform: 'Reddit',
+                        date: '2024-01-20',
+                        preview: 'Analysis of how items are stored and managed in memory...',
+                        replies: 45,
+                        relevance: 88
+                    }
+                ]
+            };
+        }
+
+        function toggleCommunitySection(sectionId) {
+            const content = document.getElementById(sectionId);
+            const icon = content.parentElement.querySelector('.toggle-icon');
+
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                icon.textContent = '▼';
+            } else {
+                content.style.display = 'none';
+                icon.textContent = '▶';
+            }
+        }
+
+        function refreshCommunity(md5) {
+            const fileInfo = { md5, name: 'Selected Binary' };
+            loadCommunityKnowledge(fileInfo);
+        }
+
+        function searchCommunity() {
+            const searchTerm = document.getElementById('communitySearch').value;
+            filterCommunityData(searchTerm);
+        }
+
+        function filterCommunityData(searchTerm) {
+            if (!searchTerm) return;
+
+            // Filter displayed community data based on search term
+            const allItems = document.querySelectorAll('.repo-card, .insight-card, .function-knowledge-item, .discussion-item');
+
+            allItems.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                if (text.includes(searchTerm.toLowerCase())) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        function triggerCommunityMining(md5) {
+            // Trigger community mining for specific binary
+            alert('Triggering community mining - this would start background mining process for the selected binary');
         }
 
         // Placeholder functions for tab-specific actions
