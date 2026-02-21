@@ -212,3 +212,88 @@ If issues discovered:
 
 *Plan created: February 21, 2026*
 *Status: Ready for execution*
+
+---
+
+## Appendix: PD2 Mod Preservation
+
+### Target Structure with Mods Folder
+
+```
+diablo2/
+├── vanilla/
+│   ├── 1.00/
+│   │   ├── D2Game.dll           # Shared (single copy)
+│   │   ├── D2Server.dll         # Unique server binary
+│   │   ├── Classic-Game.exe     # Prefixed
+│   │   └── LoD-Game.exe         # Prefixed
+│   ├── 1.07/
+│   └── ... through 1.14d
+│
+└── mods/
+    └── pd2/
+        ├── BH.dll               # Maphack
+        ├── D2Client.dll         # Modified client
+        ├── D2Game.dll           # Modified engine
+        ├── Game.exe             # PD2 executable
+        ├── PD2_EXT.dll          # PD2 extension
+        ├── ProjectDiablo.dll    # Core PD2 mod
+        ├── SGD2FreeDisplayFix.dll
+        ├── SGD2FreeRes.dll
+        ├── ddraw.dll            # Graphics wrapper
+        ├── glide3x.dll          # Glide wrapper
+        └── ... (31 total binaries)
+```
+
+### PD2 Migration
+
+| Source | Target | Method |
+|--------|--------|--------|
+| `pd2/PD2/*` | `diablo2/mods/pd2/*` | Direct copy, preserve all analysis |
+
+### Why Separate Mods Folder?
+
+1. **Different purpose** - Mods are modifications, not official Blizzard releases
+2. **No deduplication** - PD2 binaries are unique, don't share with vanilla
+3. **Future expansion** - Can add Median XL, Path of Diablo, etc. later
+4. **Clear organization** - Separates official vs. community content
+
+### PD2 Binary Inventory (31 files)
+
+```
+BH.dll              - Maphack overlay
+binkw32.dll         - Video codec
+Bnclient.dll        - Battle.net client (modified)
+D2CMP.dll           - Compression
+D2Client.dll        - Client logic (modified)
+D2Common.dll        - Shared functions (modified)
+D2DDraw.dll         - DirectDraw
+D2Direct3D.dll      - Direct3D
+D2Game.dll          - Core engine (modified)
+D2Gdi.dll           - GDI graphics
+D2gfx.dll           - Graphics utilities
+D2Glide.dll         - 3dfx Glide
+D2Lang.dll          - Localization
+D2Launch.dll        - Launcher
+D2MCPClient.dll     - MCP client
+D2Multi.dll         - Multiplayer
+D2Net.dll           - Networking
+D2sound.dll         - Audio
+D2Win.dll           - Window management
+ddraw.dll           - DirectDraw wrapper
+Fog.dll             - Blizzard utility
+Game.exe            - Main executable
+glide3x.dll         - Glide 3 wrapper
+ijl11.dll           - Intel JPEG
+libcrypto-1_1.dll   - Crypto library
+PD2_EXT.dll         - PD2 extension
+ProjectDiablo.dll   - Core mod DLL
+SGD2FreeDisplayFix.dll - Resolution fix
+SGD2FreeRes.dll     - Free resolution
+SmackW32.dll        - Smacker video
+Storm.dll           - Blizzard utility
+```
+
+---
+
+*Updated: February 21, 2026*
