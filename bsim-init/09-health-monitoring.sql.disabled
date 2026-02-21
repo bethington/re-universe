@@ -57,7 +57,7 @@ SELECT
     last_analyze,
     last_autoanalyze,
     CASE
-        WHEN n_live_tup > 0 THEN ROUND((n_dead_tup::float / n_live_tup::float) * 100, 2)
+        WHEN n_live_tup > 0 THEN ROUND(((n_dead_tup::numeric / n_live_tup::numeric) * 100)::numeric, 2)
         ELSE 0
     END as dead_row_percentage
 FROM pg_stat_user_tables
@@ -68,7 +68,7 @@ CREATE VIEW index_health_metrics AS
 SELECT
     schemaname,
     relname,
-    indexname,
+    indexrelname,
     idx_scan as times_used,
     idx_tup_read as tuples_read,
     idx_tup_fetch as tuples_fetched,
@@ -303,7 +303,7 @@ BEGIN
             WHEN EXISTS (
                 SELECT 1 FROM pg_indexes
                 WHERE relname = 'function_embeddings'
-                AND indexname LIKE '%vector%'
+                AND indexrelname LIKE '%vector%'
             ) THEN 'CREATED'
             ELSE 'MISSING'
         END as status,
@@ -311,13 +311,13 @@ BEGIN
             SELECT count(*)::text
             FROM pg_indexes
             WHERE relname IN ('function_embeddings', 'community_insights')
-            AND indexname LIKE '%vector%'
+            AND indexrelname LIKE '%vector%'
         ) || ' vector indexes' as count_or_size,
         CASE
             WHEN NOT EXISTS (
                 SELECT 1 FROM pg_indexes
                 WHERE relname = 'function_embeddings'
-                AND indexname LIKE '%vector%'
+                AND indexrelname LIKE '%vector%'
             ) THEN 'Vector indexes will be created automatically'
             ELSE 'Vector indexes optimized for similarity search'
         END as recommendation;
