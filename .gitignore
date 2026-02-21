@@ -66,3 +66,5 @@ ssl/*.key
 *.pem
 
 reports/functions_v2/
+.env.save
+*.save
