@@ -622,12 +622,159 @@
             color: var(--color-magic);
         }
 
-        /* Panel 3: Cross Version Matrix */
+        /* Panel 3: Enhanced Detail View with Tabs */
         .panel-details {
             flex: 1;
             min-width: 300px;
             max-width: 100%;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Tab Navigation */
+        .tab-navigation {
+            display: flex;
+            border-bottom: 1px solid var(--border-dark);
+            background: var(--bg-dark);
+            flex-shrink: 0;
+        }
+
+        .tab-button {
+            padding: 0.6rem 1rem;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .tab-button:hover {
+            color: var(--text-primary);
+            background: var(--bg-hover);
+        }
+
+        .tab-button.active {
+            color: var(--accent-gold);
+            border-bottom-color: var(--accent-gold);
+            background: var(--bg-medium);
+        }
+
+        .tab-button .tab-icon {
+            margin-right: 0.4rem;
+            font-size: 0.9rem;
+        }
+
+        /* Tab Content */
+        .tab-content {
+            flex: 1;
+            overflow: hidden;
+            display: none;
+        }
+
+        .tab-content.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tab-panel {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Tab-specific styling */
+        .assembly-container, .documentation-container, .community-container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .assembly-header, .doc-header, .community-header {
+            padding: 0.8rem 1rem;
+            background: var(--bg-medium);
+            border-bottom: 1px solid var(--border-dark);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .assembly-header h3, .doc-header h3, .community-header h3 {
+            margin: 0;
+            color: var(--accent-gold);
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .assembly-controls, .doc-controls, .community-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .assembly-btn, .doc-btn, .community-btn {
+            padding: 0.4rem 0.8rem;
+            background: var(--bg-light);
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .assembly-btn:hover, .doc-btn:hover, .community-btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-gold);
+            color: var(--accent-gold);
+        }
+
+        .assembly-content, .doc-content, .community-content {
+            flex: 1;
+            overflow: auto;
+            padding: 1rem;
+        }
+
+        .loading-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .loading-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.7;
+        }
+
+        .loading-text {
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .generate-btn {
+            padding: 0.6rem 1.2rem;
+            background: var(--accent-gold);
+            color: var(--bg-darkest);
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .generate-btn:hover {
+            background: var(--color-rare);
+            transform: translateY(-1px);
         }
 
         .details-empty {
@@ -2846,8 +2993,8 @@
     <div class="header">
         <h1>BSim Analysis Portal</h1>
         <nav class="header-nav">
-            <a href="/chat" target="_blank" class="nav-link" title="AI Chat Assistant">💬 Chat</a>
-            <a href="/monitoring" target="_blank" class="nav-link" title="System Monitoring">📊 Monitor</a>
+            <a href="https://chat.d2docs.xebyte.com" target="_blank" class="nav-link" title="AI Chat Assistant">💬 Chat</a>
+            <a href="https://monitor.d2docs.xebyte.com" target="_blank" class="nav-link" title="System Monitoring">📊 Monitor</a>
             <a href="https://api.xebyte.com/api/health" target="_blank" class="nav-link" title="API Status">🔗 API</a>
         </nav>
         <div class="header-search">
@@ -2884,20 +3031,76 @@
                 </div>
             </div>
 
-            <!-- Panel 3: Cross Version Matrix -->
+            <!-- Panel 3: Enhanced Detail View with Tabs -->
             <div class="panel panel-details">
                 <div class="panel-header">
                     <div class="panel-header-content">
-                        <h2 id="crossVersionTitle">Cross Version Matrix</h2>
-                        <div id="crossVersionInfo" class="exports-header-info" style="display: none;"></div>
+                        <h2 id="detailsTitle">Function Analysis</h2>
+                        <div id="detailsInfo" class="exports-header-info" style="display: none;"></div>
                     </div>
                 </div>
-                <div class="panel-content" id="detailsContent">
-                    <div class="details-empty">
-                        <div class="details-empty-icon">🔍</div>
-                        <div class="details-empty-text">
-                            Select a file to view its evolution across versions<br><br>
-                            Or search for a hash above to identify a file
+
+                <!-- Tab Navigation -->
+                <div class="tab-navigation">
+                    <button class="tab-button active" data-tab="comparison" onclick="switchTab('comparison')">
+                        <span class="tab-icon">⚖️</span>Comparison
+                    </button>
+                    <button class="tab-button" data-tab="assembly" onclick="switchTab('assembly')">
+                        <span class="tab-icon">🔧</span>Assembly
+                    </button>
+                    <button class="tab-button" data-tab="documentation" onclick="switchTab('documentation')">
+                        <span class="tab-icon">📝</span>AI Documentation
+                    </button>
+                    <button class="tab-button" data-tab="community" onclick="switchTab('community')">
+                        <span class="tab-icon">🌐</span>Community
+                    </button>
+                </div>
+
+                <!-- Tab Content Areas -->
+                <div id="comparisonTab" class="tab-content active">
+                    <div class="tab-panel" id="comparisonPanel">
+                        <div class="details-empty">
+                            <div class="details-empty-icon">⚖️</div>
+                            <div class="details-empty-text">
+                                Select a file to view cross-version function comparison<br><br>
+                                Compare functions across different D2 versions
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="assemblyTab" class="tab-content">
+                    <div class="tab-panel" id="assemblyPanel">
+                        <div class="details-empty">
+                            <div class="details-empty-icon">🔧</div>
+                            <div class="details-empty-text">
+                                Select a function to view static analysis<br><br>
+                                Assembly code, control flow, and live correlation
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="documentationTab" class="tab-content">
+                    <div class="tab-panel" id="documentationPanel">
+                        <div class="details-empty">
+                            <div class="details-empty-icon">📝</div>
+                            <div class="details-empty-text">
+                                Select a function to view AI documentation<br><br>
+                                Comprehensive AI-generated analysis and documentation
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="communityTab" class="tab-content">
+                    <div class="tab-panel" id="communityPanel">
+                        <div class="details-empty">
+                            <div class="details-empty-icon">🌐</div>
+                            <div class="details-empty-text">
+                                Select a function to view community insights<br><br>
+                                Community knowledge, forum discussions, and discoveries
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -4697,15 +4900,32 @@
         }
 
         function renderFileDetails(filename, fileInfo, history) {
-            const container = document.getElementById('detailsContent');
+            // Update the details panel title
+            const titleElement = document.getElementById('detailsTitle');
+            const infoElement = document.getElementById('detailsInfo');
+            if (titleElement && infoElement) {
+                titleElement.textContent = `Analysis - ${filename}`;
+                infoElement.style.display = 'block';
+                infoElement.textContent = 'Multiple analysis views available';
+            }
+
+            // Load content for the currently active tab
+            if (selectedFile) {
+                loadTabContent(currentTab, selectedFile);
+            }
+        }
+
+        function renderDetailsInPanel(panel, fileInfo) {
+            const filename = fileInfo.name;
             const fileType = getFileType(filename);
             const baseName = filename.split(' (')[0];
+            const history = fileInfo.history;
 
-            console.log('renderFileDetails: fileType=', fileType, 'filename=', filename);
+            console.log('renderDetailsInPanel: fileType=', fileType, 'filename=', filename);
 
             // For PE files (DLL/EXE), always try to load from API even if fileInfo is null
             if (fileType === 'pe') {
-                renderPEExportsView(container, baseName, filename, fileInfo, history);
+                renderPEExportsView(panel, baseName, filename, fileInfo, history);
                 return;
             }
 
@@ -8282,6 +8502,134 @@
             // Empty cell
             return '<td class="addr-cell missing">—</td>';
         }
+
+        // Tab Management Functions
+        let currentTab = 'comparison';
+
+        function switchTab(tabName) {
+            // Deactivate all tabs
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            // Activate selected tab
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            document.getElementById(`${tabName}Tab`).classList.add('active');
+
+            currentTab = tabName;
+
+            // Load tab-specific content if file is selected
+            if (selectedFile) {
+                loadTabContent(tabName, selectedFile);
+            }
+        }
+
+        function loadTabContent(tabName, fileInfo) {
+            switch (tabName) {
+                case 'comparison':
+                    loadComparisonTab(fileInfo);
+                    break;
+                case 'assembly':
+                    loadAssemblyTab(fileInfo);
+                    break;
+                case 'documentation':
+                    loadDocumentationTab(fileInfo);
+                    break;
+                case 'community':
+                    loadCommunityTab(fileInfo);
+                    break;
+            }
+        }
+
+        function loadComparisonTab(fileInfo) {
+            // This will contain the existing cross-version comparison logic
+            const panel = document.getElementById('comparisonPanel');
+            // Move existing renderDetails logic here
+            renderDetailsInPanel(panel, fileInfo);
+        }
+
+        function loadAssemblyTab(fileInfo) {
+            const panel = document.getElementById('assemblyPanel');
+            panel.innerHTML = `
+                <div class="assembly-container">
+                    <div class="assembly-header">
+                        <h3>Static Analysis - ${fileInfo.name}</h3>
+                        <div class="assembly-controls">
+                            <button class="assembly-btn" onclick="refreshAssembly()">🔄 Refresh</button>
+                            <button class="assembly-btn" onclick="exportAssembly()">💾 Export</button>
+                        </div>
+                    </div>
+                    <div class="assembly-content">
+                        <div class="loading-placeholder">
+                            <div class="loading-icon">🔧</div>
+                            <div class="loading-text">Loading assembly analysis...</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            // TODO: Integrate with Ghidra MCP for assembly data
+        }
+
+        function loadDocumentationTab(fileInfo) {
+            const panel = document.getElementById('documentationPanel');
+            panel.innerHTML = `
+                <div class="documentation-container">
+                    <div class="doc-header">
+                        <h3>AI Documentation - ${fileInfo.name}</h3>
+                        <div class="doc-controls">
+                            <button class="doc-btn" onclick="generateDocs()">✨ Generate</button>
+                            <button class="doc-btn" onclick="exportDocs()">💾 Export</button>
+                        </div>
+                    </div>
+                    <div class="doc-content">
+                        <div class="loading-placeholder">
+                            <div class="loading-icon">📝</div>
+                            <div class="loading-text">Loading AI documentation...</div>
+                            <button class="generate-btn" onclick="generateDocumentation('${fileInfo.name}')">
+                                Generate Documentation
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function loadCommunityTab(fileInfo) {
+            const panel = document.getElementById('communityPanel');
+            panel.innerHTML = `
+                <div class="community-container">
+                    <div class="community-header">
+                        <h3>Community Knowledge - ${fileInfo.name}</h3>
+                        <div class="community-controls">
+                            <button class="community-btn" onclick="refreshCommunity()">🔄 Refresh</button>
+                            <button class="community-btn" onclick="searchCommunity()">🔍 Search</button>
+                        </div>
+                    </div>
+                    <div class="community-content">
+                        <div class="loading-placeholder">
+                            <div class="loading-icon">🌐</div>
+                            <div class="loading-text">Loading community insights...</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            // TODO: Load community knowledge from GitHub mining service
+        }
+
+        // Placeholder functions for tab-specific actions
+        function refreshAssembly() { console.log('Refreshing assembly...'); }
+        function exportAssembly() { console.log('Exporting assembly...'); }
+        function generateDocs() { console.log('Generating documentation...'); }
+        function exportDocs() { console.log('Exporting documentation...'); }
+        function generateDocumentation(filename) {
+            // TODO: Integrate with AI orchestration service
+            console.log('Generating AI documentation for:', filename);
+        }
+        function refreshCommunity() { console.log('Refreshing community data...'); }
+        function searchCommunity() { console.log('Searching community knowledge...'); }
     </script>
 </body>
 
