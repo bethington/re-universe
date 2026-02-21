@@ -1096,6 +1096,344 @@
             font-size: 0.9rem;
         }
 
+        /* AI Documentation Tab Styles */
+        .documentation-container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .doc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--border-dark);
+        }
+
+        .doc-controls {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .doc-btn {
+            background: var(--bg-darker);
+            border: 1px solid var(--border-dark);
+            color: var(--text-primary);
+            padding: 0.5rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s ease;
+        }
+
+        .doc-btn:hover {
+            background: var(--color-magic);
+            border-color: var(--color-magic);
+            color: var(--bg-dark);
+        }
+
+        .doc-model-select {
+            background: var(--bg-darker);
+            border: 1px solid var(--border-dark);
+            color: var(--text-primary);
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            min-width: 160px;
+        }
+
+        .doc-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .ai-status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            background: var(--bg-darker);
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+        }
+
+        .status-icon.healthy {
+            color: #4ade80;
+        }
+
+        .status-icon.unhealthy {
+            color: #f87171;
+        }
+
+        .doc-placeholder {
+            text-align: center;
+            padding: 3rem 2rem;
+            background: var(--bg-darker);
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+        }
+
+        .doc-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        .doc-features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 0.8rem;
+            margin: 2rem 0;
+        }
+
+        .feature-item {
+            background: var(--bg-darkest);
+            padding: 0.8rem;
+            border-radius: 4px;
+            border: 1px solid var(--border-dark);
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .generate-btn {
+            background: linear-gradient(135deg, var(--color-magic), var(--color-rare));
+            border: none;
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-top: 1.5rem;
+        }
+
+        .generate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(138, 43, 226, 0.3);
+        }
+
+        .doc-loading {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .loading-spinner {
+            font-size: 3rem;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-steps {
+            margin: 2rem 0;
+            text-align: left;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .loading-steps .step {
+            padding: 0.5rem;
+            margin: 0.3rem 0;
+            border-radius: 4px;
+            color: var(--text-muted);
+            transition: all 0.3s ease;
+        }
+
+        .loading-steps .step.active {
+            background: var(--color-magic);
+            color: white;
+            transform: translateX(10px);
+        }
+
+        .loading-steps .step.completed {
+            background: var(--color-set);
+            color: var(--bg-dark);
+        }
+
+        .loading-progress {
+            width: 100%;
+            height: 4px;
+            background: var(--bg-darker);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 1.5rem;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--color-magic), var(--color-rare));
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .doc-results {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .doc-summary {
+            background: var(--bg-darker);
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+            padding: 1rem;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .doc-sections {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .doc-section {
+            background: var(--bg-darker);
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: var(--bg-dark);
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .section-header:hover {
+            background: var(--bg-darkest);
+        }
+
+        .section-header h5 {
+            margin: 0;
+            color: var(--color-magic);
+        }
+
+        .toggle-icon {
+            color: var(--text-muted);
+            transition: transform 0.2s ease;
+        }
+
+        .section-content {
+            padding: 1rem;
+            border-top: 1px solid var(--border-dark);
+        }
+
+        .doc-text {
+            margin: 0;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .function-docs {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .function-doc-item {
+            background: var(--bg-darkest);
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+            padding: 1rem;
+        }
+
+        .function-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .function-name {
+            font-weight: 600;
+            color: var(--color-magic);
+        }
+
+        .function-address {
+            font-family: var(--font-mono);
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        .function-description {
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .doc-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            background: var(--bg-darker);
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+            padding: 1rem;
+        }
+
+        .doc-error {
+            text-align: center;
+            padding: 2rem;
+            background: var(--bg-darker);
+            border: 1px solid var(--color-crafted);
+            border-radius: 4px;
+        }
+
+        .error-message {
+            background: var(--bg-darkest);
+            border: 1px solid var(--border-dark);
+            padding: 1rem;
+            border-radius: 4px;
+            margin: 1rem 0;
+            color: var(--color-crafted);
+            font-family: var(--font-mono);
+        }
+
+        .error-suggestions {
+            text-align: left;
+            margin: 1.5rem auto;
+            max-width: 500px;
+            background: var(--bg-darkest);
+            border: 1px solid var(--border-dark);
+            padding: 1rem;
+            border-radius: 4px;
+        }
+
+        .error-suggestions ul {
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
+        }
+
+        .error-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+
         .evolution-section {
             padding: 0.6rem 0.8rem;
             border-bottom: 1px solid var(--border-dark);
@@ -8969,21 +9307,309 @@
                     <div class="doc-header">
                         <h3>AI Documentation - ${fileInfo.name}</h3>
                         <div class="doc-controls">
-                            <button class="doc-btn" onclick="generateDocs()">✨ Generate</button>
+                            <button class="doc-btn" onclick="generateDocs('${fileInfo.md5}', '${fileInfo.name}')">✨ Generate</button>
                             <button class="doc-btn" onclick="exportDocs()">💾 Export</button>
+                            <select class="doc-model-select" id="modelSelect">
+                                <option value="claude-sonnet">Claude Sonnet (Recommended)</option>
+                                <option value="claude-haiku">Claude Haiku (Fast)</option>
+                                <option value="openai-gpt4">GPT-4 (Alternative)</option>
+                            </select>
                         </div>
                     </div>
                     <div class="doc-content">
-                        <div class="loading-placeholder">
-                            <div class="loading-icon">📝</div>
-                            <div class="loading-text">Loading AI documentation...</div>
-                            <button class="generate-btn" onclick="generateDocumentation('${fileInfo.name}')">
-                                Generate Documentation
+                        <div class="doc-placeholder">
+                            <div class="doc-icon">🤖</div>
+                            <h4>AI-Generated Documentation</h4>
+                            <p>Generate comprehensive documentation using advanced AI models</p>
+                            <div class="doc-features">
+                                <div class="feature-item">✨ Function analysis and documentation</div>
+                                <div class="feature-item">🔍 Code structure explanation</div>
+                                <div class="feature-item">📊 Cross-reference generation</div>
+                                <div class="feature-item">🎯 Context-aware insights</div>
+                            </div>
+                            <button class="generate-btn" onclick="generateDocumentation('${fileInfo.md5}', '${fileInfo.name}')">
+                                🚀 Start AI Documentation
                             </button>
                         </div>
                     </div>
                 </div>
             `;
+
+            // Check AI orchestration service status
+            checkAIServiceStatus();
+        }
+
+        async function checkAIServiceStatus() {
+            try {
+                const response = await fetch('http://localhost:8092/health');
+                const status = await response.json();
+
+                if (status.status === 'healthy') {
+                    console.log('AI Orchestration service is healthy:', status);
+                    updateAIServiceIndicator(true);
+                } else {
+                    updateAIServiceIndicator(false);
+                }
+            } catch (error) {
+                console.error('AI Orchestration service unavailable:', error);
+                updateAIServiceIndicator(false);
+            }
+        }
+
+        function updateAIServiceIndicator(isHealthy) {
+            const docContent = document.querySelector('#documentationPanel .doc-content');
+            if (!docContent) return;
+
+            const statusIndicator = document.createElement('div');
+            statusIndicator.className = 'ai-status-indicator';
+            statusIndicator.innerHTML = `
+                <div class="status-icon ${isHealthy ? 'healthy' : 'unhealthy'}">
+                    ${isHealthy ? '🟢' : '🔴'}
+                </div>
+                <span class="status-text">
+                    AI Service: ${isHealthy ? 'Connected' : 'Unavailable'}
+                </span>
+            `;
+
+            // Insert at the top of doc-content
+            docContent.insertBefore(statusIndicator, docContent.firstChild);
+        }
+
+        async function generateDocumentation(md5, name) {
+            const content = document.querySelector('#documentationPanel .doc-content');
+            const modelSelect = document.getElementById('modelSelect');
+            const selectedModel = modelSelect ? modelSelect.value : 'claude-sonnet';
+
+            // Show loading state
+            content.innerHTML = `
+                <div class="doc-loading">
+                    <div class="loading-spinner">🔄</div>
+                    <h4>Generating AI Documentation</h4>
+                    <div class="loading-steps">
+                        <div class="step active">📊 Analyzing binary structure...</div>
+                        <div class="step">🤖 Invoking ${selectedModel}...</div>
+                        <div class="step">📝 Generating comprehensive docs...</div>
+                        <div class="step">✨ Finalizing documentation...</div>
+                    </div>
+                    <div class="loading-progress">
+                        <div class="progress-bar"></div>
+                    </div>
+                </div>
+            `;
+
+            // Simulate progress animation
+            animateDocumentationProgress();
+
+            try {
+                // Prepare analysis request
+                const analysisRequest = {
+                    binary_md5: md5,
+                    binary_name: name,
+                    model: selectedModel,
+                    analysis_type: 'comprehensive',
+                    include_functions: true,
+                    include_structure: true,
+                    include_cross_refs: true
+                };
+
+                // Call AI orchestration service
+                const response = await fetch('http://localhost:8092/analyze/documentation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(analysisRequest)
+                });
+
+                if (response.ok) {
+                    const documentation = await response.json();
+                    displayGeneratedDocumentation(documentation);
+                } else {
+                    throw new Error(`AI service error: ${response.statusText}`);
+                }
+
+            } catch (error) {
+                console.error('Error generating documentation:', error);
+                showDocumentationError(error.message);
+            }
+        }
+
+        function animateDocumentationProgress() {
+            const steps = document.querySelectorAll('.loading-steps .step');
+            const progressBar = document.querySelector('.progress-bar');
+            let currentStep = 0;
+
+            const progressInterval = setInterval(() => {
+                if (currentStep < steps.length) {
+                    if (currentStep > 0) {
+                        steps[currentStep - 1].classList.remove('active');
+                        steps[currentStep - 1].classList.add('completed');
+                    }
+                    steps[currentStep].classList.add('active');
+
+                    if (progressBar) {
+                        progressBar.style.width = `${((currentStep + 1) / steps.length) * 100}%`;
+                    }
+
+                    currentStep++;
+                } else {
+                    clearInterval(progressInterval);
+                }
+            }, 1500);
+
+            return progressInterval;
+        }
+
+        function displayGeneratedDocumentation(docs) {
+            const content = document.querySelector('#documentationPanel .doc-content');
+
+            content.innerHTML = `
+                <div class="doc-results">
+                    <div class="doc-summary">
+                        <h4>📋 Documentation Summary</h4>
+                        <div class="summary-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Functions Documented:</span>
+                                <span class="stat-value">${docs.function_count || 0}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Coverage:</span>
+                                <span class="stat-value">${docs.coverage_percentage || 'N/A'}%</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Model Used:</span>
+                                <span class="stat-value">${docs.model_used || 'Unknown'}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="doc-sections">
+                        <div class="doc-section">
+                            <div class="section-header" onclick="toggleSection('overview')">
+                                <h5>🔍 Binary Overview</h5>
+                                <span class="toggle-icon">▼</span>
+                            </div>
+                            <div class="section-content" id="overview">
+                                <pre class="doc-text">${docs.overview || 'No overview available'}</pre>
+                            </div>
+                        </div>
+
+                        <div class="doc-section">
+                            <div class="section-header" onclick="toggleSection('architecture')">
+                                <h5>🏗️ Architecture Analysis</h5>
+                                <span class="toggle-icon">▼</span>
+                            </div>
+                            <div class="section-content" id="architecture">
+                                <pre class="doc-text">${docs.architecture || 'No architecture analysis available'}</pre>
+                            </div>
+                        </div>
+
+                        <div class="doc-section">
+                            <div class="section-header" onclick="toggleSection('functions')">
+                                <h5>⚙️ Key Functions</h5>
+                                <span class="toggle-icon">▼</span>
+                            </div>
+                            <div class="section-content" id="functions">
+                                <div class="function-docs">
+                                    ${docs.key_functions ? docs.key_functions.map(func => `
+                                        <div class="function-doc-item">
+                                            <div class="function-header">
+                                                <span class="function-name">${func.name}</span>
+                                                <span class="function-address">0x${func.address}</span>
+                                            </div>
+                                            <div class="function-description">${func.description}</div>
+                                        </div>
+                                    `).join('') : 'No function documentation available'}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="doc-section">
+                            <div class="section-header" onclick="toggleSection('insights')">
+                                <h5>💡 AI Insights</h5>
+                                <span class="toggle-icon">▼</span>
+                            </div>
+                            <div class="section-content" id="insights">
+                                <pre class="doc-text">${docs.insights || 'No insights available'}</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="doc-actions">
+                        <button class="doc-btn" onclick="regenerateDocumentation('${docs.binary_md5}', '${docs.binary_name}')">
+                            🔄 Regenerate
+                        </button>
+                        <button class="doc-btn" onclick="exportDocumentation()">
+                            💾 Export Documentation
+                        </button>
+                        <button class="doc-btn" onclick="shareDocumentation()">
+                            🔗 Share
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showDocumentationError(errorMessage) {
+            const content = document.querySelector('#documentationPanel .doc-content');
+
+            content.innerHTML = `
+                <div class="doc-error">
+                    <div class="error-icon">⚠️</div>
+                    <h4>Documentation Generation Failed</h4>
+                    <div class="error-message">${errorMessage}</div>
+                    <div class="error-suggestions">
+                        <p><strong>Possible solutions:</strong></p>
+                        <ul>
+                            <li>Check AI Orchestration service is running (port 8092)</li>
+                            <li>Verify API keys are configured in environment</li>
+                            <li>Ensure binary data is available in BSim database</li>
+                            <li>Try a different AI model</li>
+                        </ul>
+                    </div>
+                    <div class="error-actions">
+                        <button class="doc-btn" onclick="checkAIServiceStatus()">
+                            🔍 Check Service Status
+                        </button>
+                        <button class="doc-btn" onclick="loadDocumentationTab({md5: '${md5}', name: '${name}'})">
+                            🔄 Retry
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function toggleSection(sectionId) {
+            const content = document.getElementById(sectionId);
+            const icon = content.parentElement.querySelector('.toggle-icon');
+
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                icon.textContent = '▼';
+            } else {
+                content.style.display = 'none';
+                icon.textContent = '▶';
+            }
+        }
+
+        function generateDocs(md5, name) {
+            generateDocumentation(md5, name);
+        }
+
+        function exportDocs() {
+            alert('Export documentation to PDF, Markdown, or HTML formats');
+        }
+
+        function regenerateDocumentation(md5, name) {
+            generateDocumentation(md5, name);
+        }
+
+        function exportDocumentation() {
+            alert('Exporting documentation - this would save the generated docs in various formats');
+        }
+
+        function shareDocumentation() {
+            alert('Sharing documentation - this would generate shareable links or export options');
         }
 
         function loadCommunityTab(fileInfo) {
