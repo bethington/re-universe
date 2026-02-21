@@ -50,6 +50,10 @@ __pycache__/
 *.exe
 *.dll
 
+# Exception for reorganized D2 binaries
+!binaries/**/*.exe
+!binaries/**/*.dll
+
 # External repositories and source trees
 ghidra/
 postgres-ssl/
