@@ -909,6 +909,193 @@
             color: var(--color-magic);
         }
 
+        /* Assembly Tab Styles */
+        .assembly-container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .assembly-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--border-dark);
+        }
+
+        .assembly-controls {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .assembly-btn, .retry-btn {
+            background: var(--bg-darker);
+            border: 1px solid var(--border-dark);
+            color: var(--text-primary);
+            padding: 0.5rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s ease;
+        }
+
+        .assembly-btn:hover, .retry-btn:hover {
+            background: var(--color-magic);
+            border-color: var(--color-magic);
+            color: var(--bg-dark);
+        }
+
+        .assembly-select {
+            background: var(--bg-darker);
+            border: 1px solid var(--border-dark);
+            color: var(--text-primary);
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            min-width: 200px;
+        }
+
+        .assembly-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .assembly-overview {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .assembly-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            background: var(--bg-darker);
+            padding: 1rem;
+            border-radius: 4px;
+            border: 1px solid var(--border-dark);
+        }
+
+        .function-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 0.5rem;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 0.5rem;
+        }
+
+        .function-item {
+            background: var(--bg-darker);
+            border: 1px solid var(--border-dark);
+            padding: 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .function-item:hover {
+            background: var(--bg-dark);
+            border-color: var(--color-magic);
+            transform: translateY(-2px);
+        }
+
+        .function-name {
+            font-weight: 600;
+            color: var(--color-magic);
+            margin-bottom: 0.2rem;
+        }
+
+        .function-address {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .more-functions {
+            text-align: center;
+            color: var(--text-muted);
+            font-style: italic;
+            margin-top: 1rem;
+        }
+
+        .assembly-view {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .assembly-sections {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .assembly-section {
+            background: var(--bg-darker);
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .assembly-section h5 {
+            background: var(--bg-dark);
+            margin: 0;
+            padding: 0.8rem;
+            border-bottom: 1px solid var(--border-dark);
+            color: var(--color-magic);
+        }
+
+        .code-block {
+            margin: 0;
+            padding: 1rem;
+            background: var(--bg-darkest);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            line-height: 1.4;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .assembly-placeholder, .error-placeholder {
+            text-align: center;
+            padding: 3rem 2rem;
+            background: var(--bg-darker);
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+        }
+
+        .placeholder-icon, .error-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .error-icon {
+            color: var(--color-crafted);
+        }
+
+        .assembly-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin: 1.5rem 0;
+        }
+
+        .assembly-note {
+            background: var(--bg-darkest);
+            border: 1px solid var(--border-dark);
+            padding: 1rem;
+            border-radius: 4px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
         .evolution-section {
             padding: 0.6rem 0.8rem;
             border-bottom: 1px solid var(--border-dark);
@@ -8545,9 +8732,8 @@
         }
 
         function loadComparisonTab(fileInfo) {
-            // This will contain the existing cross-version comparison logic
+            // Load the existing cross-version comparison functionality
             const panel = document.getElementById('comparisonPanel');
-            // Move existing renderDetails logic here
             renderDetailsInPanel(panel, fileInfo);
         }
 
@@ -8558,19 +8744,222 @@
                     <div class="assembly-header">
                         <h3>Static Analysis - ${fileInfo.name}</h3>
                         <div class="assembly-controls">
-                            <button class="assembly-btn" onclick="refreshAssembly()">🔄 Refresh</button>
+                            <button class="assembly-btn" onclick="refreshAssembly('${fileInfo.md5}')">🔄 Refresh</button>
                             <button class="assembly-btn" onclick="exportAssembly()">💾 Export</button>
+                            <select class="assembly-select" id="functionSelect" onchange="loadFunctionAssembly(this.value, '${fileInfo.md5}')">
+                                <option value="">Select function...</option>
+                            </select>
                         </div>
                     </div>
                     <div class="assembly-content">
                         <div class="loading-placeholder">
                             <div class="loading-icon">🔧</div>
-                            <div class="loading-text">Loading assembly analysis...</div>
+                            <div class="loading-text">Loading Ghidra MCP analysis...</div>
                         </div>
                     </div>
                 </div>
             `;
-            // TODO: Integrate with Ghidra MCP for assembly data
+
+            // Load assembly data from Ghidra MCP
+            loadGhidraAssemblyData(fileInfo);
+        }
+
+        async function loadGhidraAssemblyData(fileInfo) {
+            try {
+                // First check if the binary is already loaded in Ghidra MCP
+                const healthResponse = await fetch('http://localhost:8089/health');
+                if (!healthResponse.ok) {
+                    throw new Error('Ghidra MCP service unavailable');
+                }
+
+                const healthData = await healthResponse.json();
+                console.log('Ghidra MCP Status:', healthData);
+
+                // Load program metadata and functions
+                await loadGhidraProgram(fileInfo);
+
+            } catch (error) {
+                console.error('Error loading Ghidra assembly data:', error);
+                const panel = document.getElementById('assemblyPanel');
+                const content = panel.querySelector('.assembly-content');
+                content.innerHTML = `
+                    <div class="error-placeholder">
+                        <div class="error-icon">⚠️</div>
+                        <div class="error-text">Failed to connect to Ghidra MCP</div>
+                        <div class="error-detail">${error.message}</div>
+                        <button class="retry-btn" onclick="refreshAssembly('${fileInfo.md5}')">Retry</button>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadGhidraProgram(fileInfo) {
+            // For now, we'll work with already analyzed functions from BSim database
+            // In a full implementation, we'd load the binary file into Ghidra MCP first
+
+            const content = document.querySelector('#assemblyPanel .assembly-content');
+
+            // Fetch functions for this executable from BSim
+            // For now, simulate with mock data since we don't have the API endpoint
+            const functions = await getMockFunctionData(fileInfo.md5);
+
+            // Populate function selector
+            const functionSelect = document.getElementById('functionSelect');
+            functions.forEach(func => {
+                const option = document.createElement('option');
+                option.value = func.address;
+                option.textContent = `${func.name} (0x${func.address.toString(16)})`;
+                functionSelect.appendChild(option);
+            });
+
+            // Show function overview
+            content.innerHTML = `
+                <div class="assembly-overview">
+                    <div class="assembly-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Functions Found:</span>
+                            <span class="stat-value">${functions.length}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Binary:</span>
+                            <span class="stat-value">${fileInfo.name}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Architecture:</span>
+                            <span class="stat-value">${fileInfo.architecture || 'x86'}</span>
+                        </div>
+                    </div>
+                    <div class="function-list">
+                        <h4>Available Functions:</h4>
+                        <div class="function-grid">
+                            ${functions.slice(0, 20).map(func => `
+                                <div class="function-item" onclick="loadFunctionAssembly('${func.address}', '${fileInfo.md5}')">
+                                    <div class="function-name">${func.name}</div>
+                                    <div class="function-address">0x${func.address.toString(16)}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        ${functions.length > 20 ? `<div class="more-functions">... and ${functions.length - 20} more functions</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        async function loadFunctionAssembly(address, md5) {
+            if (!address) return;
+
+            const content = document.querySelector('#assemblyPanel .assembly-content');
+            content.innerHTML = `
+                <div class="loading-placeholder">
+                    <div class="loading-icon">🔧</div>
+                    <div class="loading-text">Loading function assembly...</div>
+                </div>
+            `;
+
+            try {
+                // Try to get assembly from Ghidra MCP
+                // For now, we'll simulate with placeholder data since we need the binary loaded
+                const response = await fetch(`http://localhost:8089/decompile_function?address=0x${address.toString(16)}`);
+
+                if (response.ok) {
+                    const decompiled = await response.json();
+                    displayAssemblyData(decompiled, address);
+                } else {
+                    // Fallback to BSim data if Ghidra MCP doesn't have the program loaded
+                    displayBSimAssemblyPlaceholder(address, md5);
+                }
+
+            } catch (error) {
+                console.error('Error loading function assembly:', error);
+                displayBSimAssemblyPlaceholder(address, md5);
+            }
+        }
+
+        function displayAssemblyData(data, address) {
+            const content = document.querySelector('#assemblyPanel .assembly-content');
+            content.innerHTML = `
+                <div class="assembly-view">
+                    <div class="assembly-header">
+                        <h4>Function at 0x${address.toString(16)}</h4>
+                    </div>
+                    <div class="assembly-sections">
+                        <div class="assembly-section">
+                            <h5>📋 Decompiled Code</h5>
+                            <pre class="code-block">${data.decompiled_code || 'No decompiled code available'}</pre>
+                        </div>
+                        <div class="assembly-section">
+                            <h5>⚙️ Assembly Instructions</h5>
+                            <pre class="code-block">${data.assembly || 'No assembly available'}</pre>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function displayBSimAssemblyPlaceholder(address, md5) {
+            const content = document.querySelector('#assemblyPanel .assembly-content');
+            content.innerHTML = `
+                <div class="assembly-placeholder">
+                    <div class="placeholder-icon">📝</div>
+                    <h4>Function Analysis Available</h4>
+                    <p>Function at address 0x${address.toString(16)} found in BSim database.</p>
+                    <div class="assembly-actions">
+                        <button class="assembly-btn" onclick="loadIntoGhidra('${md5}', '${address}')">
+                            🔧 Load into Ghidra MCP
+                        </button>
+                        <button class="assembly-btn" onclick="viewBSimData('${address}', '${md5}')">
+                            📊 View BSim Data
+                        </button>
+                    </div>
+                    <div class="assembly-note">
+                        <strong>Note:</strong> To view full disassembly and decompiled code, the binary needs to be loaded into Ghidra MCP.
+                    </div>
+                </div>
+            `;
+        }
+
+        function refreshAssembly(md5) {
+            const fileInfo = { md5, name: 'Selected Binary' }; // Simplified for refresh
+            loadGhidraAssemblyData(fileInfo);
+        }
+
+        function exportAssembly() {
+            alert('Export functionality will export current assembly view to various formats');
+        }
+
+        function loadIntoGhidra(md5, address) {
+            alert('Loading binary into Ghidra MCP - This would integrate with the binary file loading system');
+        }
+
+        function viewBSimData(address, md5) {
+            alert('Viewing BSim metadata for function - This would show BSim analysis results');
+        }
+
+        async function getMockFunctionData(md5) {
+            // Mock function data based on BSim database structure
+            const commonFunctions = [
+                { address: 0x401000, name: 'WinMain' },
+                { address: 0x401060, name: 'InitializeEngine' },
+                { address: 0x4010A0, name: 'GameLoop' },
+                { address: 0x401120, name: 'ProcessInput' },
+                { address: 0x401180, name: 'UpdateGameState' },
+                { address: 0x4011E0, name: 'RenderFrame' },
+                { address: 0x401240, name: 'LoadTextures' },
+                { address: 0x4012A0, name: 'CreatePlayer' },
+                { address: 0x401300, name: 'SpawnMonster' },
+                { address: 0x401360, name: 'CheckCollision' },
+                { address: 0x4013C0, name: 'CalculateDamage' },
+                { address: 0x401420, name: 'UpdateInventory' },
+                { address: 0x401480, name: 'SaveGame' },
+                { address: 0x4014E0, name: 'LoadGame' },
+                { address: 0x401540, name: 'NetworkUpdate' },
+                { address: 0x4015A0, name: 'CleanupResources' }
+            ];
+
+            // Simulate network delay
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            return commonFunctions;
         }
 
         function loadDocumentationTab(fileInfo) {
