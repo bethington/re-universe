@@ -10,6 +10,7 @@ services:
       - ${GHIDRA_PORT_RANGE_END:-13102}:13102
     volumes:
       - ${REPO_DATA_PATH:-./repo-data}:/repos
+      - ./config/server.conf:/ghidra/server/server.conf:ro
     environment:
       - JVM_OPTS=-Xmx${JVM_MAX_MEMORY:-4g}
       - GHIDRA_IP=${GHIDRA_IP:-localhost}
@@ -172,7 +173,7 @@ services:
       - BSIM_DB_NAME=${BSIM_DB_NAME:-bsim}
       - BSIM_DB_USER=${BSIM_DB_USER:-ben}
       - BSIM_DB_PASSWORD=${BSIM_DB_PASSWORD}
-      - GHIDRA_SERVER_HOST=ghidra-server
+      - GHIDRA_SERVER_HOST=10.0.10.30
       - GHIDRA_SERVER_PORT=13100
       - GHIDRA_PROJECTS_PATH=/repos
       - REDIS_HOST=redis-cache
@@ -266,6 +267,11 @@ services:
       - GHIDRA_MCP_PORT=8089
       - GHIDRA_MCP_BIND_ADDRESS=0.0.0.0
       - JAVA_OPTS=-Xmx8g -XX:+UseG1GC
+      - GHIDRA_SERVER_HOST=10.0.10.30
+      - GHIDRA_SERVER_PORT=13100
+      - GHIDRA_SERVER_USER=ghidra-mcp
+      - GHIDRA_DEFAULT_REPOSITORY=pd2
+      - GHIDRA_SERVER_PASSWORD=ghidra-mcp-pass123
     volumes:
       - ./binaries:/data:ro
       - ghidra_mcp_projects:/projects
