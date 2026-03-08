@@ -423,8 +423,8 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
             baseName = baseName.substring(baseName.indexOf("_") + 1);
         }
         
-        // Handle exception naming: "Classic_1.05b_Diablo_II.exe" -> "Diablo II.exe" or "Game.exe"
-        if (baseName.matches("^(Classic|LoD)_\\d+\\.\\d+[a-z]?_.*")) {
+        // Handle exception naming: "Classic_1.05b_Diablo_II.exe", "LoD_1.05b_Game.exe", or "vanilla_1.05b_Game.exe"
+        if (baseName.matches("^(Classic|LoD|vanilla)_\\d+\\.\\d+[a-z]?_.*")) {
             String[] parts = baseName.split("_", 3);
             if (parts.length >= 3) {
                 baseName = parts[2].replace("_", " ");

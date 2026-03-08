@@ -397,7 +397,7 @@ public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
 
     /**
      * Extract game version string from the Ghidra project path.
-     * Handles paths like "/1.03/D2Game.dll" or "/Classic/1.05b/Game.exe".
+     * Handles paths like "/vanilla/1.03/D2Game.dll" or "/vanilla/1.05b/Game.exe".
      */
     private String extractVersionFromPath(String projectPath) {
         if (projectPath == null || projectPath.isEmpty()) {

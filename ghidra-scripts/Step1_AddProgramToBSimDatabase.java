@@ -5,9 +5,9 @@
 // single pass - previously Step2 has been merged into this script for efficiency.
 //
 // UNIFIED VERSION SYSTEM SUPPORT:
-// - Folder structure parsing (PREFERRED): /Classic/1.01/, /LoD/1.07/
-// - Filename parsing (fallback): 1.03_D2Game.dll, Classic_1.03_Game.exe
-// - Only processes official D2 versions (Classic 1.00-1.06b, LoD 1.07-1.14d)
+// - Folder structure parsing (PREFERRED): /vanilla/1.01/, /vanilla/1.07/
+// - Filename parsing (fallback): 1.03_D2Game.dll
+// - Only processes official D2 versions (1.00-1.14d)
 // - Automatically skips mods and unofficial versions
 // - Validates detected information and provides clear feedback
 //
@@ -111,8 +111,8 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
     private static final String[] VALID_GAME_VERSIONS = VERSION_CODES.keySet().toArray(new String[0]);
 
     // Valid version families (ONLY official Diablo 2 releases)
-    // Classic: 1.00-1.06b | LoD: 1.07-1.14d
-    private static final String[] VALID_VERSION_FAMILIES = {"Classic", "LoD"};
+    // All versions use "vanilla" family in the unified folder structure
+    private static final String[] VALID_VERSION_FAMILIES = {"vanilla"};
 
     // Processing mode
     private static final String MODE_SINGLE = "Single Program (current)";
@@ -135,7 +135,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
     // Helper class for unified version parsing
     private static class UnifiedVersionInfo {
         String gameVersion = null;
-        String familyType = "Unified";
+        String familyType = "vanilla";
         boolean isException = false;
         String detectionMethod = "unknown";
 
@@ -152,7 +152,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 detectionMethod = "filename";
             } else {
                 detectionMethod = "fallback";
-                familyType = "Unknown";
+                familyType = "vanilla";
                 gameVersion = "Unknown";
             }
         }
@@ -166,23 +166,23 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             if (executableName == null || executableName.isEmpty()) return;
 
             // Extract version from unified naming convention
-            // Standard binaries: 1.03_D2Game.dll -> version: 1.03, family: Unified
+            // Standard binaries: 1.03_D2Game.dll -> version: 1.03, family: vanilla
             Pattern standardPattern = Pattern.compile("^(1\\.[0-9]+[a-zA-Z]?)_([A-Za-z0-9_]+)\\.(dll|exe)$", Pattern.CASE_INSENSITIVE);
             Matcher standardMatcher = standardPattern.matcher(executableName);
 
             if (standardMatcher.matches()) {
                 gameVersion = standardMatcher.group(1).toLowerCase();  // Normalize to lowercase
-                familyType = "Unified";
+                familyType = "vanilla";
                 isException = false;
                 return;
             }
 
-            // Exception binaries: Classic_1.03_Game.exe -> version: 1.03, family: Classic
-            Pattern exceptionPattern = Pattern.compile("^(Classic|LoD)_(1\\.[0-9]+[a-zA-Z]?)_(Game|Diablo_II)\\.(exe|dll)$", Pattern.CASE_INSENSITIVE);
+            // Legacy exception binaries: Classic_1.03_Game.exe or LoD_1.03_Game.exe -> version: 1.03, family: vanilla
+            Pattern exceptionPattern = Pattern.compile("^(Classic|LoD|vanilla)_(1\\.[0-9]+[a-zA-Z]?)_(Game|Diablo_II)\\.(exe|dll)$", Pattern.CASE_INSENSITIVE);
             Matcher exceptionMatcher = exceptionPattern.matcher(executableName);
 
             if (exceptionMatcher.matches()) {
-                familyType = exceptionMatcher.group(1);
+                familyType = "vanilla";
                 gameVersion = exceptionMatcher.group(2).toLowerCase();  // Normalize to lowercase
                 isException = true;
                 return;
@@ -193,18 +193,13 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             Matcher versionMatcher = versionPattern.matcher(executableName);
             if (versionMatcher.find()) {
                 gameVersion = versionMatcher.group(1).toLowerCase();  // Normalize to lowercase
-                // Determine family based on version (older versions = Classic, newer = LoD)
-                if (isClassicVersion(gameVersion)) {
-                    familyType = "Classic";
-                } else {
-                    familyType = "LoD";
-                }
+                familyType = "vanilla";
             }
         }
 
         /**
          * Parse version and family information from folder structure
-         * Expected structure: /Classic/1.01/, /LoD/1.07/, or just /1.04b/
+         * Expected structure: /vanilla/1.01/, /vanilla/1.07/, or just /1.04b/
          */
         private boolean parseFromFolderStructure(String projectPath) {
             if (projectPath == null || projectPath.isEmpty()) {
@@ -217,13 +212,13 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             // Split path into components
             String[] pathComponents = normalizedPath.split("/");
 
-            // PASS 1: Look for Classic/LoD/Mod followed by version folder
+            // PASS 1: Look for vanilla/Mod followed by version folder
             for (int i = 0; i < pathComponents.length; i++) {
                 String component = pathComponents[i];
 
-                // Check for family indicators (Classic, LoD, and mods)
-                if (component.equals("Classic") || component.equals("LoD") || isModFolder(component)) {
-                    familyType = component;
+                // Check for family indicators (vanilla, and mods)
+                if (component.equals("vanilla") || isModFolder(component)) {
+                    familyType = component.equals("vanilla") ? "vanilla" : component;
 
                     // Look for version in next component
                     if (i + 1 < pathComponents.length) {
@@ -244,8 +239,8 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                                 // Track as mod with base version (e.g., "1.13c-PD2")
                                 gameVersion = baseVersion + "-" + component;
                             } else {
-                                // Classic/LoD with proper version
-                                isException = (component.equals("Classic") || component.equals("LoD"));
+                                // vanilla with proper version
+                                isException = false;
                             }
 
                             return true;
@@ -261,9 +256,26 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                         return true;
                     }
                 }
+
+                // Legacy support: also accept Classic/LoD folders, map to vanilla
+                if (component.equals("Classic") || component.equals("LoD")) {
+                    familyType = "vanilla";
+
+                    if (i + 1 < pathComponents.length) {
+                        String nextComponent = pathComponents[i + 1];
+                        Pattern versionPattern = Pattern.compile("^(1\\.[0-9]+[a-z]?)$", Pattern.CASE_INSENSITIVE);
+                        Matcher versionMatcher = versionPattern.matcher(nextComponent);
+
+                        if (versionMatcher.matches()) {
+                            gameVersion = nextComponent.toLowerCase();
+                            isException = false;
+                            return true;
+                        }
+                    }
+                }
             }
 
-            // PASS 2: Look for version folder directly (without Classic/LoD prefix)
+            // PASS 2: Look for version folder directly (without vanilla prefix)
             // This handles project structures like /1.04b/D2Game.dll
             for (int i = 0; i < pathComponents.length; i++) {
                 String component = pathComponents[i];
@@ -274,13 +286,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 
                 if (versionMatcher.matches()) {
                     gameVersion = component.toLowerCase();  // Normalize to lowercase
-                    
-                    // Infer family from version number
-                    if (isClassicVersion(gameVersion)) {
-                        familyType = "Classic";
-                    } else {
-                        familyType = "LoD";
-                    }
+                    familyType = "vanilla";
                     isException = false;
                     return true;
                 }
@@ -337,7 +343,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
         /**
          * Check if this program should be skipped (not an official D2 version)
-         * Only Classic 1.00-1.06b and LoD 1.07-1.14d are processed
+         * Only versions 1.00-1.14d are processed
          * All mods (PD2, PoD, MedianXL, etc.) are ignored
          */
         public boolean shouldSkip() {
@@ -419,32 +425,10 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
         /**
          * Get the validated version family (returns null if invalid)
-         * RULE: Versions 1.07+ are ALWAYS LoD (Lord of Destruction era)
-         *       Only versions 1.00-1.06b can be Classic
+         * All official versions use "vanilla" family
          */
         public String getValidatedVersionFamily() {
-            // First check if version is 1.07+ - these are ALWAYS LoD regardless of folder
-            if (gameVersion != null && !isClassicVersion(gameVersion)) {
-                return "LoD";  // 1.07+ versions are always LoD
-            }
-            
-            // For Classic-era versions (1.00-1.06b), use folder structure
-            if (familyType == null || familyType.equals("Unknown") || familyType.equals("Unified")) {
-                return "Classic";  // Default to Classic for pre-1.07 versions
-            }
-            
-            // Check if it's a valid family
-            for (String validFamily : VALID_VERSION_FAMILIES) {
-                if (familyType.equals(validFamily)) {
-                    return familyType;
-                }
-            }
-            
-            // Mods are treated as LoD
-            if (isModFolder(familyType)) {
-                return "LoD";
-            }
-            return "Classic";  // Fallback for pre-1.07
+            return "vanilla";
         }
 
         public String getDisplayInfo() {
@@ -471,9 +455,9 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
         // Load database credentials from db.env
         loadDbConfig();
-        println("Supports folder structure: /Classic/1.01/, /LoD/1.07/, /PD2/");
+        println("Supports folder structure: /vanilla/1.01/, /vanilla/1.07/, /PD2/");
         println("Mod support: PD2 → 1.13c-PD2, PoD → 1.13c-PoD, MedianXL → 1.13c-MedianXL");
-        println("Fallback filename parsing: 1.03_D2Game.dll, Classic_1.03_Game.exe");
+        println("Fallback filename parsing: 1.03_D2Game.dll");
 
         // Ask user which mode to use
         String[] modes = { MODE_SINGLE, MODE_ALL, MODE_VERSION };
@@ -535,8 +519,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
                 "This program cannot be processed:\n\n" +
                 versionInfo.getSkipReason() + "\n\n" +
                 "Only official Diablo 2 versions are supported:\n" +
-                "• Classic: 1.00 through 1.06b\n" +
-                "• LoD: 1.07 through 1.14d");
+                "• Versions 1.00 through 1.14d");
             println("Skipped: " + versionInfo.getSkipReason());
             return;
         }
@@ -553,8 +536,8 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         if (!versionInfo.isValidUnifiedFormat()) {
             boolean proceed = askYesNo("Version Detection Failed",
                 "Could not detect version information from folder structure or filename.\n" +
-                "Expected folder structure: /Classic/1.01/, /LoD/1.07/, /PD2/\n" +
-                "Or filename formats: 1.03_D2Game.dll, Classic_1.03_Game.exe\n\n" +
+                "Expected folder structure: /vanilla/1.01/, /vanilla/1.07/, /PD2/\n" +
+                "Or filename formats: 1.03_D2Game.dll\n\n" +
                 "Detection attempted via: " + versionInfo.detectionMethod + "\n" +
                 "Program path: " + programPath + "\n\n" +
                 "Proceed with unknown version info?");
@@ -624,7 +607,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
         if (programFiles.isEmpty()) {
             popup("No official Diablo 2 programs found in the project.\n\n" +
-                  "Only Classic (1.00-1.06b) and LoD (1.07-1.14d) versions are supported.");
+                  "Only versions 1.00-1.14d are supported.");
             return;
         }
 
@@ -659,8 +642,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
         boolean proceed = askYesNo("Process Official D2 Programs",
             String.format("Add %d official D2 programs to BSim database?\n\n" +
-                "• Classic (1.00-1.06b): included\n" +
-                "• LoD (1.07-1.14d): included\n" +
+                "• Versions 1.00-1.14d: included\n" +
                 "• Mods/Other: %d excluded\n\n" +
                 "This may take a while.", programFiles.size(), skippedMods.size()));
 
@@ -751,11 +733,9 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         // Ask for version filter
         String versionFilter = askString("Version Filter",
             "Enter filter in one of these formats:\n\n" +
-            "• 'Classic/1.09' - Classic binaries for version 1.09 only\n" +
-            "• 'LoD/1.09' - LoD binaries for version 1.09 only\n" +
-            "• '1.09' - Both Classic and LoD for version 1.09\n" +
-            "• 'Classic' - All Classic versions\n" +
-            "• 'LoD' - All LoD versions", "LoD/1.09");
+            "• 'vanilla/1.09' - Binaries for version 1.09 only\n" +
+            "• '1.09' - Binaries for version 1.09\n" +
+            "• 'vanilla' - All vanilla versions", "vanilla/1.09");
 
         if (versionFilter == null || versionFilter.trim().isEmpty()) {
             println("Operation cancelled - no filter provided");
@@ -767,13 +747,12 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         String versionFilterPart = null;
         
         if (versionFilter.contains("/")) {
-            // Format: "Classic/1.09" or "LoD/1.13c"
+            // Format: "vanilla/1.09"
             String[] parts = versionFilter.split("/", 2);
             familyFilter = parts[0].trim();
             versionFilterPart = parts[1].trim();
             println("Filter: Family='" + familyFilter + "', Version='" + versionFilterPart + "'");
-        } else if (versionFilter.equalsIgnoreCase("Classic") || 
-                   versionFilter.equalsIgnoreCase("LoD") ||
+        } else if (versionFilter.equalsIgnoreCase("vanilla") ||
                    versionFilter.equalsIgnoreCase("D2R")) {
             // Family-only filter
             familyFilter = versionFilter;
@@ -842,7 +821,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
         if (matchingFiles.isEmpty()) {
             popup("No official D2 programs matching filter '" + versionFilter + "' found.\n\n" +
-                  "Only Classic (1.00-1.06b) and LoD (1.07-1.14d) versions are supported.");
+                  "Only versions 1.00-1.14d are supported.");
             return;
         }
 
@@ -1195,7 +1174,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
         if (versionCode == null) {
             printerr("WARNING: Could not validate game version from: " + versionInfo.gameVersion);
-            printerr("  Known versions: 1.00-1.06b (Classic), 1.07-1.14d (LoD)");
+            printerr("  Known versions: 1.00-1.14d");
         }
 
         // Generate hashes from actual program
@@ -1705,7 +1684,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
         }
         
         // 1.00 - 1.13d = Visual C++ 6.0
-        // This covers the entire classic and LoD era before the 2016 update
+        // This covers the entire vanilla era before the 2016 update
         return "visualstudio:vc6";
     }
 
@@ -1719,7 +1698,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
     /**
      * Get path as string for authentic BSim schema (for lookup table)
-     * Returns Ghidra project folder path like "/Classic/1.09d" or "/LoD/1.07"
+     * Returns Ghidra project folder path like "/vanilla/1.09d" or "/vanilla/1.07"
      */
     private String getPathString() {
         return getPathForVersion(currentVersionInfo);
@@ -1727,21 +1706,16 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
     /**
      * Construct Ghidra project folder path from version info
-     * Format: /{FamilyType}/{GameVersion}
-     * Examples: /Classic/1.00, /LoD/1.07, /LoD/1.09d
+     * Format: /vanilla/{GameVersion}
+     * Examples: /vanilla/1.00, /vanilla/1.07, /vanilla/1.09d
      */
     private String getPathForVersion(UnifiedVersionInfo versionInfo) {
         if (versionInfo == null) {
             return "/unknown";
         }
         
-        String family = versionInfo.familyType;
+        String family = "vanilla";
         String version = versionInfo.gameVersion;
-        
-        // Normalize family type
-        if (family == null || family.equals("Unified") || family.equals("Unknown")) {
-            family = "unknown";
-        }
         
         // Normalize version
         if (version == null || version.equals("Unknown")) {
@@ -2683,9 +2657,9 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             fileName = matcher.group(1);
         }
 
-        // Also handle Classic_1.XX_ and LoD_1.XX_ prefixes
+        // Also handle Classic_1.XX_, LoD_1.XX_, and vanilla_1.XX_ prefixes (legacy support)
         java.util.regex.Pattern familyPrefixPattern = 
-            java.util.regex.Pattern.compile("^(Classic|LoD)_1\\.[0-9]+[a-z]?_(.+)$");
+            java.util.regex.Pattern.compile("^(Classic|LoD|vanilla)_1\\.[0-9]+[a-z]?_(.+)$");
         java.util.regex.Matcher familyMatcher = familyPrefixPattern.matcher(fileName);
         if (familyMatcher.matches()) {
             fileName = familyMatcher.group(2);
@@ -2756,7 +2730,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
             try (ResultSet rs = checkStmt.executeQuery()) {
                 if (!rs.next()) {
                     // Version doesn't exist, insert it
-                    String family = isClassicVersionCode(versionCode) ? "Classic" : "LoD";
+                    String family = "vanilla";
                     String description = getVersionDescription(versionString, family);
                     
                     try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {

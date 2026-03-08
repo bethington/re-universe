@@ -106,12 +106,12 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
     }};
 
     private static final String[] VALID_GAME_VERSIONS = VERSION_CODES.keySet().toArray(new String[0]);
-    private static final String[] VALID_VERSION_FAMILIES = {"Classic", "LoD"};
+    private static final String[] VALID_VERSION_FAMILIES = {"vanilla"};
 
     // Unified version info helper - ported from Step1 for full folder structure parsing
     private static class UnifiedVersionInfo {
         String gameVersion = null;
-        String familyType = "Unified";
+        String familyType = "vanilla";
         boolean isException = false;
         String detectionMethod = "unknown";
 
@@ -128,7 +128,7 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
                 detectionMethod = "filename";
             } else {
                 detectionMethod = "fallback";
-                familyType = "Unknown";
+                familyType = "vanilla";
                 gameVersion = "Unknown";
             }
         }
@@ -141,23 +141,23 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
         private void parseUnifiedName(String executableName) {
             if (executableName == null || executableName.isEmpty()) return;
 
-            // Standard binaries: 1.03_D2Game.dll -> version: 1.03, family: Unified
+            // Standard binaries: 1.03_D2Game.dll -> version: 1.03, family: vanilla
             Pattern standardPattern = Pattern.compile("^(1\\.[0-9]+[a-zA-Z]?)_([A-Za-z0-9_]+)\\.(dll|exe)$", Pattern.CASE_INSENSITIVE);
             Matcher standardMatcher = standardPattern.matcher(executableName);
 
             if (standardMatcher.matches()) {
                 gameVersion = standardMatcher.group(1).toLowerCase();
-                familyType = "Unified";
+                familyType = "vanilla";
                 isException = false;
                 return;
             }
 
-            // Exception binaries: Classic_1.03_Game.exe -> version: 1.03, family: Classic
-            Pattern exceptionPattern = Pattern.compile("^(Classic|LoD)_(1\\.[0-9]+[a-zA-Z]?)_(Game|Diablo_II)\\.(exe|dll)$", Pattern.CASE_INSENSITIVE);
+            // Legacy exception binaries: Classic_1.03_Game.exe or LoD_1.03_Game.exe -> version: 1.03, family: vanilla
+            Pattern exceptionPattern = Pattern.compile("^(Classic|LoD|vanilla)_(1\\.[0-9]+[a-zA-Z]?)_(Game|Diablo_II)\\.(exe|dll)$", Pattern.CASE_INSENSITIVE);
             Matcher exceptionMatcher = exceptionPattern.matcher(executableName);
 
             if (exceptionMatcher.matches()) {
-                familyType = exceptionMatcher.group(1);
+                familyType = "vanilla";
                 gameVersion = exceptionMatcher.group(2).toLowerCase();
                 isException = true;
                 return;
@@ -168,17 +168,13 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
             Matcher versionMatcher = versionPattern.matcher(executableName);
             if (versionMatcher.find()) {
                 gameVersion = versionMatcher.group(1).toLowerCase();
-                if (isClassicVersion(gameVersion)) {
-                    familyType = "Classic";
-                } else {
-                    familyType = "LoD";
-                }
+                familyType = "vanilla";
             }
         }
 
         /**
          * Parse version and family information from folder structure.
-         * Expected structure: /1.04b/D2Game.dll or /Classic/1.01/Game.exe
+         * Expected structure: /vanilla/1.04b/D2Game.dll or /1.04b/D2Game.dll
          */
         private boolean parseFromFolderStructure(String projectPath) {
             if (projectPath == null || projectPath.isEmpty()) {
@@ -188,12 +184,12 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
             String normalizedPath = projectPath.replace("\\", "/").replaceAll("^/+|/+$", "");
             String[] pathComponents = normalizedPath.split("/");
 
-            // PASS 1: Look for Classic/LoD followed by version folder
+            // PASS 1: Look for vanilla (or legacy Classic/LoD) followed by version folder
             for (int i = 0; i < pathComponents.length; i++) {
                 String component = pathComponents[i];
 
-                if (component.equals("Classic") || component.equals("LoD")) {
-                    familyType = component;
+                if (component.equals("vanilla") || component.equals("Classic") || component.equals("LoD")) {
+                    familyType = "vanilla";
 
                     if (i + 1 < pathComponents.length) {
                         String nextComponent = pathComponents[i + 1];
@@ -202,7 +198,6 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
 
                         if (versionMatcher.matches()) {
                             gameVersion = nextComponent.toLowerCase();
-                            isException = (component.equals("Classic") || component.equals("LoD"));
                             return true;
                         }
                     }
@@ -217,26 +212,12 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
 
                 if (versionMatcher.matches()) {
                     gameVersion = component.toLowerCase();
-                    if (isClassicVersion(gameVersion)) {
-                        familyType = "Classic";
-                    } else {
-                        familyType = "LoD";
-                    }
+                    familyType = "vanilla";
                     isException = false;
                     return true;
                 }
             }
 
-            return false;
-        }
-
-        private boolean isClassicVersion(String version) {
-            String[] classicVersions = {"1.00", "1.01", "1.02", "1.03", "1.04", "1.04b", "1.04c", "1.05", "1.05b", "1.06", "1.06b"};
-            for (String classicVer : classicVersions) {
-                if (version.equals(classicVer)) {
-                    return true;
-                }
-            }
             return false;
         }
 
@@ -264,28 +245,14 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
         }
 
         public String getValidatedVersionFamily() {
-            if (gameVersion != null && !isClassicVersion(gameVersion)) {
-                return "LoD";
-            }
-            if (familyType == null || familyType.equals("Unknown") || familyType.equals("Unified")) {
-                return "Classic";
-            }
-            for (String validFamily : VALID_VERSION_FAMILIES) {
-                if (familyType.equals(validFamily)) {
-                    return familyType;
-                }
-            }
-            return "Classic";
+            return "vanilla";
         }
 
         public String getDisplayInfo() {
             if (gameVersion == null || gameVersion.equals("Unknown")) {
                 return String.format("Invalid/Unknown format (detection: %s)", detectionMethod);
             }
-            String baseInfo = isException ?
-                String.format("%s %s", familyType, gameVersion) :
-                String.format("Unified %s", gameVersion);
-            return String.format("%s (detected via %s)", baseInfo, detectionMethod);
+            return String.format("vanilla %s (detected via %s)", gameVersion, detectionMethod);
         }
 
         public boolean isValid() {
@@ -612,7 +579,7 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
 
         // Handle null/missing version info
         String gameVersion = versionInfo.gameVersion != null ? versionInfo.gameVersion : "Unknown";
-        String familyType = versionInfo.familyType != null ? versionInfo.familyType : "Unified";
+        String familyType = versionInfo.familyType != null ? versionInfo.familyType : "vanilla";
 
         if (fileName.equals("Game.exe") || fileName.equals("Diablo_II.exe")) {
             return String.format("%s_%s_Diablo_II.exe", familyType, gameVersion);
@@ -625,12 +592,7 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
 
         String sql = """
             SELECT DISTINCT e.id, e.name_exec,
-                   CASE
-                       WHEN e.name_exec ~ '^Classic_' THEN 'Classic'
-                       WHEN e.name_exec ~ '^LoD_' THEN 'LoD'
-                       WHEN e.name_exec ~ '^1\\.' THEN 'Unified'
-                       ELSE 'Other'
-                   END as game_type
+                   'vanilla' as game_type
             FROM exetable e
             JOIN desctable d ON e.id = d.id_exe
             JOIN enhanced_signatures es ON d.id = es.function_id
