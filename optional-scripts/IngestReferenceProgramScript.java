@@ -52,7 +52,7 @@ public class IngestReferenceProgramScript extends GhidraScript {
     // ========================================================================
     // CONNECTION CONFIGURATION - Edit these values before running
     // ========================================================================
-    private static final String DB_HOST = "10.0.0.30";
+    private static final String DB_HOST = "10.0.10.30";
     private static final int DB_PORT = 5432;
     private static final String DB_NAME = "bsim";
     private static final String DB_USERNAME = "ben";

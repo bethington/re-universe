@@ -11,15 +11,14 @@
 // - Progress monitoring: Provides detailed status reporting throughout execution
 //
 // WORKFLOW COMPONENTS:
-// - Step1: Binary ingestion with version detection (if needed)
-// - Step2: Signature generation for similarity analysis (if needed)
+// - Step1: Binary ingestion with version detection and signature generation
 // - Step3: Optional enrichment data population (configurable)
 // - Step4: Similarity matrix generation and analysis
 // - Reporting: Comprehensive results and quality metrics
 //
 // UNIFIED VERSION OPTIMIZATION:
 // - Leverages unified version system for efficient cross-version analysis
-// - Utilizes materialized views and schema functions for performance
+// - Utilizes schema functions for performance
 // - Provides version-aware processing and reporting
 // - Supports both standard and exception binary formats
 //
@@ -31,10 +30,9 @@
 //
 // WORKFLOW POSITION: Can be run independently or as final orchestration step
 //
-// @author Claude Code Assistant
-// @category BSim
+// @author Ben Ethington
+// @category Diablo 2
 // @keybinding ctrl shift W
-// @menupath Tools.BSim.Step5 - Complete Similarity Workflow
 
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.*;
@@ -47,9 +45,49 @@ import java.util.*;
 
 public class Step5_CompleteSimilarityWorkflow extends GhidraScript {
 
-    private static final String DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
-    private static final String DB_USER = "ben";
-    private static final String DB_PASS = "***REDACTED***";
+    // Resolved credentials (loaded from db.env)
+    private String dbUrl;
+    private String dbUser;
+    private String dbPass;
+
+    private void loadDbConfig() throws Exception {
+        String host = "10.0.10.30";
+        String port = "5432";
+        String dbName = "bsim";
+        dbUser = "ben";
+        dbPass = "";
+
+        String scriptDir = getSourceFile().getParentFile().getAbsolutePath();
+        java.io.File envFile = new java.io.File(scriptDir, "db.env");
+
+        if (envFile.exists()) {
+            println("Loading database config from db.env");
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(envFile))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (line.isEmpty() || line.startsWith("#")) continue;
+                    int eq = line.indexOf('=');
+                    if (eq <= 0) continue;
+                    String key = line.substring(0, eq).trim();
+                    String value = line.substring(eq + 1).trim();
+                    switch (key) {
+                        case "BSIM_DB_HOST": host = value; break;
+                        case "BSIM_DB_PORT": port = value; break;
+                        case "BSIM_DB_NAME": dbName = value; break;
+                        case "BSIM_DB_USER": dbUser = value; break;
+                        case "BSIM_DB_PASSWORD": dbPass = value; break;
+                    }
+                }
+            }
+        } else {
+            throw new Exception("ERROR: db.env not found at " + envFile.getAbsolutePath() +
+                ". Create this file with BSIM_DB_HOST, BSIM_DB_PORT, BSIM_DB_NAME, BSIM_DB_USER, BSIM_DB_PASSWORD.");
+        }
+
+        dbUrl = "jdbc:postgresql://" + host + ":" + port + "/" + dbName;
+        println("Database: " + dbUrl + " (user: " + dbUser + ")");
+    }
     private static final double MIN_SIMILARITY = 0.75;
     private static final double MIN_CONFIDENCE = 30.0;
     private static final int MAX_COMPARISONS = 2000; // Limit for performance
@@ -65,6 +103,9 @@ public class Step5_CompleteSimilarityWorkflow extends GhidraScript {
     @Override
     public void run() throws Exception {
         println("=== BSim Similarity-Based Cross-Version Matching ===");
+
+        // Load database credentials from db.env
+        loadDbConfig();
 
         // First ask for scope
         String[] scopes = { SCOPE_SINGLE, SCOPE_ALL, SCOPE_VERSION };
@@ -280,7 +321,7 @@ public class Step5_CompleteSimilarityWorkflow extends GhidraScript {
     private void generateSignatures(Program program) throws Exception {
         println("Generating enhanced function signatures...");
 
-        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPass)) {
             int executableId = getExecutableId(conn, program.getName());
             if (executableId == -1) {
                 throw new RuntimeException("Executable not found. Please run AddProgramToBSimDatabase.java first.");
@@ -364,7 +405,7 @@ public class Step5_CompleteSimilarityWorkflow extends GhidraScript {
                         insertStmt.setInt(2, executableId);
                         insertStmt.setString(3, signatureData);
                         insertStmt.setString(4, signature.mnemonicPattern); // Use as hash
-                        insertStmt.setBytes(5, signature.vectorData);
+                        insertStmt.setString(5, bytesToHex(signature.vectorData));
                         insertStmt.setDouble(6, signature.quality);
 
                         insertStmt.executeUpdate();
@@ -465,6 +506,14 @@ public class Step5_CompleteSimilarityWorkflow extends GhidraScript {
         return vector;
     }
 
+    private static String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder(bytes.length * 2);
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b & 0xff));
+        }
+        return sb.toString();
+    }
+
     private String extractMnemonicPattern(Function function) {
         Map<String, Integer> mnemonics = new HashMap<>();
         AddressSetView body = function.getBody();
@@ -530,7 +579,7 @@ public class Step5_CompleteSimilarityWorkflow extends GhidraScript {
     private void findSimilarFunctions(Program program) throws Exception {
         println("Finding similar functions across versions...");
 
-        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPass)) {
             int executableId = getExecutableId(conn, program.getName());
             findAndStoreSimilarities(conn, executableId);
 
@@ -551,7 +600,9 @@ public class Step5_CompleteSimilarityWorkflow extends GhidraScript {
                 es1.lsh_vector as source_vector,
                 es2.lsh_vector as target_vector,
                 es1.signature_data as source_data,
-                es2.signature_data as target_data
+                es2.signature_data as target_data,
+                (SELECT COUNT(*) FROM desctable dx WHERE dx.id_exe = d1.id_exe) as source_instr,
+                (SELECT COUNT(*) FROM desctable dx WHERE dx.id_exe = d2.id_exe) as target_instr
             FROM enhanced_signatures es1
             JOIN desctable d1 ON es1.function_id = d1.id
             JOIN enhanced_signatures es2 ON es2.function_id != es1.function_id
@@ -571,7 +622,7 @@ public class Step5_CompleteSimilarityWorkflow extends GhidraScript {
             ON CONFLICT (source_function_id, target_function_id) DO UPDATE SET
                 similarity_score = EXCLUDED.similarity_score,
                 confidence_score = EXCLUDED.confidence_score,
-                updated_at = NOW()
+                computed_at = NOW()
             """;
 
         int similarityCount = 0;
@@ -663,7 +714,7 @@ public class Step5_CompleteSimilarityWorkflow extends GhidraScript {
     private void updateCrossVersionRelationships(Program program) throws SQLException {
         println("Refreshing cross-version relationships...");
 
-        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPass)) {
             // Try calling the refresh function for single-match cross-version system
             try (Statement stmt = conn.createStatement()) {
                 stmt.execute("SELECT refresh_cross_version_matrix()");
@@ -698,7 +749,7 @@ public class Step5_CompleteSimilarityWorkflow extends GhidraScript {
     private void queryExistingSimilarities(Program program) throws Exception {
         println("Querying existing similarities from database...");
 
-        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPass)) {
             String querySql = """
                 SELECT
                     s.name_func as source_function,

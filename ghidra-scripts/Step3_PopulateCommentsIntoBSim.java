@@ -8,7 +8,7 @@
 // - Pre-comments: Comments placed before function entry points
 // - Post-comments: Comments placed after function definitions
 // - Plate comments: Function header documentation blocks
-// - Inline comments: Comments within function bodies (selected)
+// - EOL comments: End-of-line comments at function entry points
 //
 // ANALYSIS ENHANCEMENT:
 // - Improves function matching by providing semantic context
@@ -24,10 +24,9 @@
 // WORKFLOW POSITION: Optional after Step1-2, enhances Step4-5 results
 // DEPENDENCIES: Requires functions to be added via Step1
 //
-// @author Claude Code Assistant
-// @category BSim
+// @author Ben Ethington
+// @category Diablo 2
 // @keybinding ctrl shift C
-// @menupath Tools.BSim.Step3a - Populate Comments (Optional)
 
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.*;
@@ -40,9 +39,49 @@ import java.util.*;
 
 public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
 
-    private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
-    private static final String DEFAULT_DB_USER = "ben";
-    private static final String DEFAULT_DB_PASS = "***REDACTED***";
+    // Resolved credentials (loaded from db.env)
+    private String dbUrl;
+    private String dbUser;
+    private String dbPass;
+
+    private void loadDbConfig() throws Exception {
+        String host = "10.0.10.30";
+        String port = "5432";
+        String dbName = "bsim";
+        dbUser = "ben";
+        dbPass = "";
+
+        String scriptDir = getSourceFile().getParentFile().getAbsolutePath();
+        java.io.File envFile = new java.io.File(scriptDir, "db.env");
+
+        if (envFile.exists()) {
+            println("Loading database config from db.env");
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(envFile))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (line.isEmpty() || line.startsWith("#")) continue;
+                    int eq = line.indexOf('=');
+                    if (eq <= 0) continue;
+                    String key = line.substring(0, eq).trim();
+                    String value = line.substring(eq + 1).trim();
+                    switch (key) {
+                        case "BSIM_DB_HOST": host = value; break;
+                        case "BSIM_DB_PORT": port = value; break;
+                        case "BSIM_DB_NAME": dbName = value; break;
+                        case "BSIM_DB_USER": dbUser = value; break;
+                        case "BSIM_DB_PASSWORD": dbPass = value; break;
+                    }
+                }
+            }
+        } else {
+            throw new Exception("ERROR: db.env not found at " + envFile.getAbsolutePath() +
+                ". Create this file with BSIM_DB_HOST, BSIM_DB_PORT, BSIM_DB_NAME, BSIM_DB_USER, BSIM_DB_PASSWORD.");
+        }
+
+        dbUrl = "jdbc:postgresql://" + host + ":" + port + "/" + dbName;
+        println("Database: " + dbUrl + " (user: " + dbUser + ")");
+    }
 
     // Mode selection constants
     private static final String MODE_SINGLE = "Single Program (current)";
@@ -52,6 +91,9 @@ public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
     @Override
     public void run() throws Exception {
         println("=== BSim Comment Population Script ===");
+
+        // Load database credentials from db.env
+        loadDbConfig();
 
         // Ask user for processing mode
         String[] modes = { MODE_SINGLE, MODE_ALL, MODE_VERSION };
@@ -75,7 +117,16 @@ public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
         }
 
         String programName = currentProgram.getName();
+        // Get project path for version-aware executable lookup
+        String projectPath = null;
+        DomainFile domainFile = currentProgram.getDomainFile();
+        if (domainFile != null) {
+            projectPath = domainFile.getPathname();
+        }
         println("Program: " + programName);
+        if (projectPath != null) {
+            println("Project path: " + projectPath);
+        }
 
         // Count functions with comments
         int functionsWithComments = countFunctionsWithComments(currentProgram);
@@ -98,7 +149,7 @@ public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
         }
 
         try {
-            populateComments(currentProgram, programName);
+            populateComments(currentProgram, programName, projectPath);
             println("Successfully populated comments into BSim database!");
 
         } catch (Exception e) {
@@ -238,7 +289,7 @@ public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
         try {
             int commentCount = countFunctionsWithComments(program);
             if (commentCount > 0) {
-                populateComments(program, file.getName());
+                populateComments(program, file.getName(), file.getPathname());
                 println("  Added " + commentCount + " function comments");
             } else {
                 println("  No comments to add");
@@ -278,14 +329,20 @@ public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
                (eolComment != null && !eolComment.trim().isEmpty());
     }
 
-    private void populateComments(Program program, String programName) throws Exception {
+    private void populateComments(Program program, String programName, String projectPath) throws Exception {
         println("Connecting to BSim database...");
 
-        try (Connection conn = DriverManager.getConnection(DEFAULT_DB_URL, DEFAULT_DB_USER, DEFAULT_DB_PASS)) {
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPass)) {
             println("Connected to BSim database successfully");
 
-            // Get executable ID
-            int executableId = getExecutableId(conn, programName);
+            // Extract version from project path for disambiguation
+            String versionString = extractVersionFromPath(projectPath);
+            if (versionString != null) {
+                println("Detected version from path: " + versionString);
+            }
+
+            // Get executable ID with version-aware lookup
+            int executableId = getExecutableId(conn, programName, versionString);
             if (executableId == -1) {
                 throw new RuntimeException("Executable not found in BSim database. Please populate functions first.");
             }
@@ -301,17 +358,60 @@ public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
         }
     }
 
-    private int getExecutableId(Connection conn, String programName) throws SQLException {
+    private int getExecutableId(Connection conn, String programName, String versionString) throws SQLException {
+        // If we have a version, use it to disambiguate executables with the same name across versions
+        if (versionString != null) {
+            String selectWithVersionSql =
+                "SELECT e.id FROM exetable e " +
+                "JOIN game_versions gv ON e.game_version = gv.id " +
+                "WHERE e.name_exec = ? AND gv.version_string = ?";
+            try (PreparedStatement stmt = conn.prepareStatement(selectWithVersionSql)) {
+                stmt.setString(1, programName);
+                stmt.setString(2, versionString);
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) {
+                    return rs.getInt("id");
+                }
+            }
+        }
+
+        // Fallback: query by name only (may be ambiguous if same binary exists in multiple versions)
         String selectSql = "SELECT id FROM exetable WHERE name_exec = ?";
         try (PreparedStatement stmt = conn.prepareStatement(selectSql)) {
             stmt.setString(1, programName);
             ResultSet rs = stmt.executeQuery();
 
             if (rs.next()) {
-                return rs.getInt("id");
+                int id = rs.getInt("id");
+                // Check if there are multiple matches
+                if (rs.next()) {
+                    printerr("WARNING: Multiple executables found with name '" + programName +
+                             "'. Using first match (id=" + id + "). " +
+                             "Provide version info via project path for accurate matching.");
+                }
+                return id;
             }
             return -1;
         }
+    }
+
+    /**
+     * Extract game version string from the Ghidra project path.
+     * Handles paths like "/1.03/D2Game.dll" or "/Classic/1.05b/Game.exe".
+     */
+    private String extractVersionFromPath(String projectPath) {
+        if (projectPath == null || projectPath.isEmpty()) {
+            return null;
+        }
+
+        String[] pathParts = projectPath.replace("\\", "/").split("/");
+        for (String part : pathParts) {
+            if (part.isEmpty()) continue;
+            if (part.matches("1\\.[0-9]{1,2}[a-z]?")) {
+                return part;
+            }
+        }
+        return null;
     }
 
     private void processComments(Connection conn, Program program, int executableId, String programName) throws Exception {

@@ -16,11 +16,9 @@
 // - Safe to run - it's idempotent and will just skip already-processed functions
 // - Consider deleting this script once you've verified Step1 works correctly
 //
-// @author Claude Code Assistant
-// @category BSim
+// @author Ben Ethington
+// @category Diablo 2
 // @keybinding ctrl shift L
-// @menupath Tools.BSim.Step2 - Generate Enhanced Signatures (DEPRECATED)
-// @deprecated Use Step1_AddProgramToBSimDatabase instead
 
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.*;
@@ -31,21 +29,64 @@ import java.util.*;
 
 public class Step2_GenerateBSimSignatures extends GhidraScript {
 
-    private static final String DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
-    private static final String DB_USER = "ben";
-    private static final String DB_PASS = "***REDACTED***";
+    // Resolved credentials (loaded from db.env)
+    private String dbUrl;
+    private String dbUser;
+    private String dbPass;
     
     // Statistics
     private int totalProcessed = 0;
     private int totalSkipped = 0;
     private int totalErrors = 0;
 
+    private void loadDbConfig() throws Exception {
+        String host = "10.0.10.30";
+        String port = "5432";
+        String dbName = "bsim";
+        dbUser = "ben";
+        dbPass = "";
+
+        String scriptDir = getSourceFile().getParentFile().getAbsolutePath();
+        java.io.File envFile = new java.io.File(scriptDir, "db.env");
+
+        if (envFile.exists()) {
+            println("Loading database config from db.env");
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(envFile))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (line.isEmpty() || line.startsWith("#")) continue;
+                    int eq = line.indexOf('=');
+                    if (eq <= 0) continue;
+                    String key = line.substring(0, eq).trim();
+                    String value = line.substring(eq + 1).trim();
+                    switch (key) {
+                        case "BSIM_DB_HOST": host = value; break;
+                        case "BSIM_DB_PORT": port = value; break;
+                        case "BSIM_DB_NAME": dbName = value; break;
+                        case "BSIM_DB_USER": dbUser = value; break;
+                        case "BSIM_DB_PASSWORD": dbPass = value; break;
+                    }
+                }
+            }
+        } else {
+            throw new Exception("ERROR: db.env not found at " + envFile.getAbsolutePath() +
+                ". Create this file with BSIM_DB_HOST, BSIM_DB_PORT, BSIM_DB_NAME, BSIM_DB_USER, BSIM_DB_PASSWORD.");
+        }
+
+        dbUrl = "jdbc:postgresql://" + host + ":" + port + "/" + dbName;
+        println("Database: " + dbUrl + " (user: " + dbUser + ")");
+    }
+
     @Override
     public void run() throws Exception {
         println("=== Enhanced BSim Signature Generation (Idempotent) ===");
         println("");
 
-        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
+        // Load database credentials from db.env
+        loadDbConfig();
+
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPass)) {
             println("Connected to BSim database");
 
             // Check if enhanced_signatures table exists

@@ -5,7 +5,7 @@
 // previous steps. This is the core analysis step that produces actionable results.
 //
 // SIMILARITY ANALYSIS PROCESS:
-// - Compares LSH signatures from Step2 across all binary versions
+// - Compares function signatures across all binary versions
 // - Incorporates enrichment data from Step3 scripts for enhanced accuracy
 // - Uses unified version system for structured cross-version analysis
 // - Calculates similarity scores using multiple algorithmic approaches
@@ -24,15 +24,14 @@
 //
 // UNIFIED VERSION INTEGRATION:
 // - Processes functions across all versions in unified format
-// - Uses materialized views for optimized cross-version queries
+// - Folder structure parsing for accurate version detection (ported from Step1)
 // - Maintains version metadata for accurate family grouping
 //
-// WORKFLOW POSITION: Requires Steps1-2, enhanced by Step3, enables practical results
+// WORKFLOW POSITION: Requires Step1, enhanced by Step3, enables practical results
 //
-// @author Claude Code Assistant
-// @category BSim
+// @author Ben Ethington
+// @category Diablo 2
 // @keybinding ctrl shift M
-// @menupath Tools.BSim.Step4 - Generate Similarity Matrix
 
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.*;
@@ -46,114 +45,251 @@ import java.util.regex.*;
 
 public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
 
-    private static final String DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
-    private static final String DB_USER = "ben";
-    private static final String DB_PASS = "***REDACTED***";
+    // Resolved credentials (loaded from db.env)
+    private String dbUrl;
+    private String dbUser;
+    private String dbPass;
 
-    // Unified version info helper
+    private void loadDbConfig() throws Exception {
+        String host = "10.0.10.30";
+        String port = "5432";
+        String dbName = "bsim";
+        dbUser = "ben";
+        dbPass = "";
+
+        String scriptDir = getSourceFile().getParentFile().getAbsolutePath();
+        java.io.File envFile = new java.io.File(scriptDir, "db.env");
+
+        if (envFile.exists()) {
+            println("Loading database config from db.env");
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(envFile))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (line.isEmpty() || line.startsWith("#")) continue;
+                    int eq = line.indexOf('=');
+                    if (eq <= 0) continue;
+                    String key = line.substring(0, eq).trim();
+                    String value = line.substring(eq + 1).trim();
+                    switch (key) {
+                        case "BSIM_DB_HOST": host = value; break;
+                        case "BSIM_DB_PORT": port = value; break;
+                        case "BSIM_DB_NAME": dbName = value; break;
+                        case "BSIM_DB_USER": dbUser = value; break;
+                        case "BSIM_DB_PASSWORD": dbPass = value; break;
+                    }
+                }
+            }
+        } else {
+            throw new Exception("ERROR: db.env not found at " + envFile.getAbsolutePath() +
+                ". Create this file with BSIM_DB_HOST, BSIM_DB_PORT, BSIM_DB_NAME, BSIM_DB_USER, BSIM_DB_PASSWORD.");
+        }
+
+        dbUrl = "jdbc:postgresql://" + host + ":" + port + "/" + dbName;
+        println("Database: " + dbUrl + " (user: " + dbUser + ")");
+    }
+
+    // Version code mapping: version string -> numeric code
+    // These values match game_versions.id in the database (FK: exetable.game_version -> game_versions.id)
+    private static final java.util.Map<String, Integer> VERSION_CODES = new java.util.HashMap<String, Integer>() {{
+        put("1.00",  1000); put("1.01",  1010); put("1.02",  1020); put("1.03",  1030);
+        put("1.04",  1040); put("1.04b", 1041); put("1.04c", 1042);
+        put("1.05",  1050); put("1.05b", 1051);
+        put("1.06",  1060); put("1.06b", 1061);
+        put("1.07",  1070); put("1.08",  1080);
+        put("1.09",  1090); put("1.09b", 1091); put("1.09d", 1093);
+        put("1.10",  1100); put("1.10s", 1101);
+        put("1.11",  1110); put("1.11b", 1111);
+        put("1.12",  1120); put("1.12a", 1121);
+        put("1.13",  1130); put("1.13c", 1132); put("1.13d", 1133);
+        put("1.14",  1140); put("1.14a", 1141); put("1.14b", 1142); put("1.14c", 1143); put("1.14d", 1144);
+    }};
+
+    private static final String[] VALID_GAME_VERSIONS = VERSION_CODES.keySet().toArray(new String[0]);
+    private static final String[] VALID_VERSION_FAMILIES = {"Classic", "LoD"};
+
+    // Unified version info helper - ported from Step1 for full folder structure parsing
     private static class UnifiedVersionInfo {
         String gameVersion = null;
         String familyType = "Unified";
         boolean isException = false;
+        String detectionMethod = "unknown";
 
-        UnifiedVersionInfo(String executableName) {
+        UnifiedVersionInfo(String executableName, String projectPath) {
+            // Try folder structure parsing first (preferred method)
+            if (parseFromFolderStructure(projectPath)) {
+                detectionMethod = "folder_structure";
+                return;
+            }
+
+            // Fallback to filename parsing
             parseUnifiedName(executableName);
+            if (gameVersion != null) {
+                detectionMethod = "filename";
+            } else {
+                detectionMethod = "fallback";
+                familyType = "Unknown";
+                gameVersion = "Unknown";
+            }
+        }
+
+        // Legacy constructor for backward compatibility
+        UnifiedVersionInfo(String executableName) {
+            this(executableName, null);
         }
 
         private void parseUnifiedName(String executableName) {
             if (executableName == null || executableName.isEmpty()) return;
 
-            // Try to extract version info from file path first
-            if (executableName.contains("/") || executableName.contains("\\")) {
-                parseFromPath(executableName);
-                if (gameVersion != null) return; // Successfully parsed from path
-            }
-
-            // Standard binaries: 1.03_D2Game.dll
-            Pattern standardPattern = Pattern.compile("^(1\\.[0-9]{1,2}[a-z]?)_([A-Za-z0-9_]+)\\.(dll|exe)$");
+            // Standard binaries: 1.03_D2Game.dll -> version: 1.03, family: Unified
+            Pattern standardPattern = Pattern.compile("^(1\\.[0-9]+[a-zA-Z]?)_([A-Za-z0-9_]+)\\.(dll|exe)$", Pattern.CASE_INSENSITIVE);
             Matcher standardMatcher = standardPattern.matcher(executableName);
 
             if (standardMatcher.matches()) {
-                gameVersion = standardMatcher.group(1);
+                gameVersion = standardMatcher.group(1).toLowerCase();
                 familyType = "Unified";
                 isException = false;
                 return;
             }
 
-            // Exception binaries: Classic_1.03_Game.exe
-            Pattern exceptionPattern = Pattern.compile("^(Classic|LoD)_(1\\.[0-9]{1,2}[a-z]?)_(Game|Diablo_II)\\.(exe|dll)$");
+            // Exception binaries: Classic_1.03_Game.exe -> version: 1.03, family: Classic
+            Pattern exceptionPattern = Pattern.compile("^(Classic|LoD)_(1\\.[0-9]+[a-zA-Z]?)_(Game|Diablo_II)\\.(exe|dll)$", Pattern.CASE_INSENSITIVE);
             Matcher exceptionMatcher = exceptionPattern.matcher(executableName);
 
             if (exceptionMatcher.matches()) {
                 familyType = exceptionMatcher.group(1);
-                gameVersion = exceptionMatcher.group(2);
+                gameVersion = exceptionMatcher.group(2).toLowerCase();
                 isException = true;
+                return;
+            }
+
+            // Fallback: try to extract version from filename
+            Pattern versionPattern = Pattern.compile("(1\\.[0-9]+[a-zA-Z]?)", Pattern.CASE_INSENSITIVE);
+            Matcher versionMatcher = versionPattern.matcher(executableName);
+            if (versionMatcher.find()) {
+                gameVersion = versionMatcher.group(1).toLowerCase();
+                if (isClassicVersion(gameVersion)) {
+                    familyType = "Classic";
+                } else {
+                    familyType = "LoD";
+                }
             }
         }
 
-        private void parseFromPath(String fullPath) {
-            // Parse paths like "/Classic/1.05b/D2Sound.dll" or "/PD2/Game.exe"
-            String[] pathParts = fullPath.split("[/\\\\]");
+        /**
+         * Parse version and family information from folder structure.
+         * Expected structure: /1.04b/D2Game.dll or /Classic/1.01/Game.exe
+         */
+        private boolean parseFromFolderStructure(String projectPath) {
+            if (projectPath == null || projectPath.isEmpty()) {
+                return false;
+            }
 
-            for (int i = 0; i < pathParts.length; i++) {
-                String part = pathParts[i];
-                if (part.isEmpty()) continue; // Skip empty parts from leading slashes
+            String normalizedPath = projectPath.replace("\\", "/").replaceAll("^/+|/+$", "");
+            String[] pathComponents = normalizedPath.split("/");
 
-                // Check for family type (Classic, LoD, PD2, etc.)
-                if (part.equalsIgnoreCase("Classic") || part.equalsIgnoreCase("LoD")) {
-                    familyType = part;
-                    isException = true;
+            // PASS 1: Look for Classic/LoD followed by version folder
+            for (int i = 0; i < pathComponents.length; i++) {
+                String component = pathComponents[i];
 
-                    // Look for version in next part
-                    if (i + 1 < pathParts.length) {
-                        String nextPart = pathParts[i + 1];
-                        // Updated regex to handle 1.00, 1.05b, 1.13c, etc.
-                        if (nextPart.matches("1\\.[0-9]{1,2}[a-z]?")) {
-                            gameVersion = nextPart;
+                if (component.equals("Classic") || component.equals("LoD")) {
+                    familyType = component;
+
+                    if (i + 1 < pathComponents.length) {
+                        String nextComponent = pathComponents[i + 1];
+                        Pattern versionPattern = Pattern.compile("^(1\\.[0-9]+[a-z]?)$", Pattern.CASE_INSENSITIVE);
+                        Matcher versionMatcher = versionPattern.matcher(nextComponent);
+
+                        if (versionMatcher.matches()) {
+                            gameVersion = nextComponent.toLowerCase();
+                            isException = (component.equals("Classic") || component.equals("LoD"));
+                            return true;
                         }
                     }
-                    return;
                 }
+            }
 
-                // Check for PD2 or mod paths
-                if (part.equalsIgnoreCase("PD2")) {
-                    familyType = "PD2";
-                    gameVersion = "PD2";
-                    isException = false;
-                    return;
-                }
+            // PASS 2: Look for version folder directly (e.g., /1.04b/D2Game.dll)
+            for (int i = 0; i < pathComponents.length; i++) {
+                String component = pathComponents[i];
+                Pattern versionPattern = Pattern.compile("^(1\\.[0-9]+[a-z]?)$", Pattern.CASE_INSENSITIVE);
+                Matcher versionMatcher = versionPattern.matcher(component);
 
-                // Direct version pattern (like "1.05b" or "1.00")
-                if (part.matches("1\\.[0-9]{1,2}[a-z]?")) {
-                    gameVersion = part;
-                    if (familyType == null) {
-                        familyType = "Unified";
+                if (versionMatcher.matches()) {
+                    gameVersion = component.toLowerCase();
+                    if (isClassicVersion(gameVersion)) {
+                        familyType = "Classic";
+                    } else {
+                        familyType = "LoD";
                     }
-                    return;
+                    isException = false;
+                    return true;
                 }
             }
 
-            // Fallback: try to infer from filename
-            String fileName = fullPath;
-            if (fileName.contains("/")) fileName = fileName.substring(fileName.lastIndexOf("/") + 1);
-            if (fileName.contains("\\")) fileName = fileName.substring(fileName.lastIndexOf("\\") + 1);
+            return false;
+        }
 
-            if (fileName.equals("Game.exe") || fileName.equals("Diablo II.exe")) {
-                familyType = "Classic";
-                gameVersion = "Unknown";
-                isException = true;
+        private boolean isClassicVersion(String version) {
+            String[] classicVersions = {"1.00", "1.01", "1.02", "1.03", "1.04", "1.04b", "1.04c", "1.05", "1.05b", "1.06", "1.06b"};
+            for (String classicVer : classicVersions) {
+                if (version.equals(classicVer)) {
+                    return true;
+                }
             }
+            return false;
+        }
+
+        public boolean shouldSkip() {
+            if (gameVersion == null || gameVersion.equals("Unknown")) {
+                return true;
+            }
+            String baseVersion = gameVersion.contains("-") ? gameVersion.split("-")[0] : gameVersion;
+            return !VERSION_CODES.containsKey(baseVersion);
+        }
+
+        public Integer getVersionCode() {
+            if (gameVersion == null || gameVersion.equals("Unknown")) return null;
+            String baseVersion = gameVersion.contains("-") ? gameVersion.split("-")[0] : gameVersion;
+            return VERSION_CODES.get(baseVersion);
+        }
+
+        public String getValidatedGameVersion() {
+            if (gameVersion == null || gameVersion.equals("Unknown")) return null;
+            String baseVersion = gameVersion.contains("-") ? gameVersion.split("-")[0] : gameVersion;
+            if (VERSION_CODES.containsKey(baseVersion)) {
+                return baseVersion;
+            }
+            return null;
+        }
+
+        public String getValidatedVersionFamily() {
+            if (gameVersion != null && !isClassicVersion(gameVersion)) {
+                return "LoD";
+            }
+            if (familyType == null || familyType.equals("Unknown") || familyType.equals("Unified")) {
+                return "Classic";
+            }
+            for (String validFamily : VALID_VERSION_FAMILIES) {
+                if (familyType.equals(validFamily)) {
+                    return familyType;
+                }
+            }
+            return "Classic";
         }
 
         public String getDisplayInfo() {
-            if (gameVersion == null) return "Unknown format";
-            return isException ?
-                String.format("%s %s (Exception)", familyType, gameVersion) :
-                String.format("Unified %s (Standard)", gameVersion);
+            if (gameVersion == null || gameVersion.equals("Unknown")) {
+                return String.format("Invalid/Unknown format (detection: %s)", detectionMethod);
+            }
+            String baseInfo = isException ?
+                String.format("%s %s", familyType, gameVersion) :
+                String.format("Unified %s", gameVersion);
+            return String.format("%s (detected via %s)", baseInfo, detectionMethod);
         }
 
         public boolean isValid() {
-            return gameVersion != null;
+            return gameVersion != null && !gameVersion.equals("Unknown") && VERSION_CODES.containsKey(gameVersion);
         }
     }
 
@@ -169,6 +305,9 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
     @Override
     public void run() throws Exception {
         println("=== Function Similarity Matrix Generation ===");
+
+        // Load database credentials from db.env
+        loadDbConfig();
 
         // Ask user for processing mode
         String[] modes = { MODE_SINGLE, MODE_ALL, MODE_VERSION };
@@ -192,6 +331,11 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
         }
 
         String programName = currentProgram.getName();
+        String programPath = "";
+        DomainFile domainFile = currentProgram.getDomainFile();
+        if (domainFile != null) {
+            programPath = domainFile.getPathname();
+        }
         println("Program: " + programName);
 
         FunctionManager funcManager = currentProgram.getFunctionManager();
@@ -211,7 +355,7 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
         }
 
         try {
-            generateSimilarityMatrix(currentProgram, programName);
+            generateSimilarityMatrix(currentProgram, programName, programPath);
             println("Successfully generated similarity matrix!");
 
         } catch (Exception e) {
@@ -349,7 +493,7 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
 
         Program program = (Program) file.getDomainObject(this, false, false, monitor);
         try {
-            generateSimilarityMatrix(program, file.getName());
+            generateSimilarityMatrix(program, file.getName(), file.getPathname());
             println("  Similarity matrix generated successfully");
         } finally {
             program.release(this);
@@ -357,12 +501,17 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
     }
 
     private void generateSimilarityMatrix(Program program, String programName) throws Exception {
+        // Delegate to path-aware version with null path (single-program mode)
+        generateSimilarityMatrix(program, programName, null);
+    }
+
+    private void generateSimilarityMatrix(Program program, String programName, String programPath) throws Exception {
         println("Connecting to BSim database...");
 
-        UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(programName);
+        UnifiedVersionInfo versionInfo = new UnifiedVersionInfo(programName, programPath);
         println("Processing: " + programName + " (" + versionInfo.getDisplayInfo() + ")");
 
-        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPass)) {
             println("Connected to BSim database successfully");
 
             // Optimize connection for bulk operations
@@ -640,14 +789,14 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
             similarityCount, processedCount));
 
         // Now populate the single-match cross-version system
-        populateSingleMatchCrossVersionSystem(conn, currentExeId, currentVersionInfo);
+        populateSingleMatchCrossVersionSystem(conn, currentExeId, currentVersionInfo, program.getName());
     }
 
     /**
      * Populate the single-match cross-version system using similarity matrix data
      */
     private void populateSingleMatchCrossVersionSystem(Connection conn, int currentExeId,
-            UnifiedVersionInfo currentVersionInfo) throws SQLException {
+            UnifiedVersionInfo currentVersionInfo, String programName) throws SQLException {
 
         if (currentVersionInfo == null || currentVersionInfo.gameVersion == null) {
             println("Skipping cross-version system - no version information");
@@ -668,7 +817,7 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
         int equivalenceCount = 0;
         try (PreparedStatement stmt = conn.prepareStatement(createEquivalenceSql)) {
             stmt.setString(1, currentVersionInfo.gameVersion);
-            stmt.setString(2, extractBinaryName(currentVersionInfo));
+            stmt.setString(2, extractBinaryName(programName));
             stmt.setInt(3, currentExeId);
             equivalenceCount = stmt.executeUpdate();
         }
@@ -708,7 +857,7 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
         int matchCount = 0;
         try (PreparedStatement stmt = conn.prepareStatement(findBestMatchesSql)) {
             stmt.setString(1, currentVersionInfo.gameVersion);
-            stmt.setString(2, extractBinaryName(currentVersionInfo));
+            stmt.setString(2, extractBinaryName(programName));
             matchCount = stmt.executeUpdate();
         }
 
@@ -716,11 +865,14 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
     }
 
     /**
-     * Extract binary name from version info
+     * Extract binary name from the program being analyzed.
+     * Uses the actual program name rather than a hardcoded value.
      */
-    private String extractBinaryName(UnifiedVersionInfo versionInfo) {
-        // For now, use a default binary name - this could be enhanced to detect actual binary
-        return "D2Game.dll"; // Most common binary for analysis
+    private String extractBinaryName(String programName) {
+        if (programName != null && !programName.isEmpty()) {
+            return programName;
+        }
+        return "Unknown";
     }
 
     private long getFunctionId(Connection conn, String functionName, int executableId) throws SQLException {

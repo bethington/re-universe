@@ -1,8 +1,7 @@
 // Cross-Version Matrix API
 // Provides data access methods for matrix visualization and interactive analysis
-// @author Claude Code Assistant
-// @category BSim
-// @menupath Tools.BSim.API.Cross-Version Matrix Data
+// @author Ben Ethington
+// @category Diablo 2
 
 import ghidra.app.script.GhidraScript;
 import java.sql.*;
@@ -11,7 +10,7 @@ import java.util.stream.Collectors;
 
 public class CrossVersionMatrixAPI extends GhidraScript {
 
-    private static final String DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
+    private static final String DB_URL = "jdbc:postgresql://10.0.10.30:5432/bsim";
     private static final String DB_USER = "ben";
     private static final String DB_PASS = "***REDACTED***";
 

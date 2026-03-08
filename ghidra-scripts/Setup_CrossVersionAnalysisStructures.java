@@ -1,6 +1,6 @@
 // Setup Cross-Version Analysis Data Structures
 // Creates enhanced database structures for matrix visualization and advanced similarity analysis
-// @author Claude Code Assistant
+// @author Ben Ethington
 // @category BSim
 // @menupath Tools.BSim.Database.Setup Cross-Version Analysis Structures
 
@@ -9,7 +9,7 @@ import java.sql.*;
 
 public class Setup_CrossVersionAnalysisStructures extends GhidraScript {
 
-    private static final String DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
+    private static final String DB_URL = "jdbc:postgresql://10.0.10.30:5432/bsim";
     private static final String DB_USER = "ben";
     private static final String DB_PASS = "***REDACTED***";
 

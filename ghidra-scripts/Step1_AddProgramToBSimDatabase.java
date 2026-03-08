@@ -23,17 +23,15 @@
 // - Applies comprehensive function tagging (library, game logic, utility)
 // - Analyzes function complexity, calling patterns, and architectural features
 // - Populates all base tables required for BSim similarity operations
-// - Uses remote PostgreSQL database (10.0.0.30:5432) for enterprise deployment
+// - Uses remote PostgreSQL database (10.0.10.30:5432) for enterprise deployment
 //
 // WORKFLOW POSITION: Complete ingestion - directly enables Step3+ operations
 // NOTE: Step2_GenerateBSimSignatures is now DEPRECATED - signatures are generated
 //       inline during this script for each function as it is processed.
 //
-// @author Claude Code Assistant
-// @category BSim
+// @author Ben Ethington
+// @category Diablo 2
 // @keybinding ctrl shift B
-// @menupath Tools.BSim.Step1 - Add Program to Database
-// @toolbar
 
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.*;
@@ -48,10 +46,49 @@ import java.util.regex.*;
 
 public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
-    // Default BSim database configuration (updated for authentic schema)
-    private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
-    private static final String DEFAULT_DB_USER = "ben";
-    private static final String DEFAULT_DB_PASS = "***REDACTED***";
+    // Resolved credentials (loaded from db.env)
+    private String dbUrl;
+    private String dbUser;
+    private String dbPass;
+
+    private void loadDbConfig() throws Exception {
+        String host = "10.0.10.30";
+        String port = "5432";
+        String dbName = "bsim";
+        dbUser = "ben";
+        dbPass = "";
+
+        String scriptDir = getSourceFile().getParentFile().getAbsolutePath();
+        java.io.File envFile = new java.io.File(scriptDir, "db.env");
+
+        if (envFile.exists()) {
+            println("Loading database config from db.env");
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(envFile))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (line.isEmpty() || line.startsWith("#")) continue;
+                    int eq = line.indexOf('=');
+                    if (eq <= 0) continue;
+                    String key = line.substring(0, eq).trim();
+                    String value = line.substring(eq + 1).trim();
+                    switch (key) {
+                        case "BSIM_DB_HOST": host = value; break;
+                        case "BSIM_DB_PORT": port = value; break;
+                        case "BSIM_DB_NAME": dbName = value; break;
+                        case "BSIM_DB_USER": dbUser = value; break;
+                        case "BSIM_DB_PASSWORD": dbPass = value; break;
+                    }
+                }
+            }
+        } else {
+            throw new Exception("ERROR: db.env not found at " + envFile.getAbsolutePath() +
+                ". Create this file with BSIM_DB_HOST, BSIM_DB_PORT, BSIM_DB_NAME, BSIM_DB_USER, BSIM_DB_PASSWORD.");
+        }
+
+        dbUrl = "jdbc:postgresql://" + host + ":" + port + "/" + dbName;
+        println("Database: " + dbUrl + " (user: " + dbUser + ")");
+    }
 
     // Version code mapping: version string -> numeric code
     // Format: major*1000 + minor*10 + patch_letter_offset
@@ -431,6 +468,9 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
     public void run() throws Exception {
 
         println("=== BSim Database Population Script ===");
+
+        // Load database credentials from db.env
+        loadDbConfig();
         println("Supports folder structure: /Classic/1.01/, /LoD/1.07/, /PD2/");
         println("Mod support: PD2 → 1.13c-PD2, PoD → 1.13c-PoD, MedianXL → 1.13c-MedianXL");
         println("Fallback filename parsing: 1.03_D2Game.dll, Classic_1.03_Game.exe");
@@ -1003,7 +1043,7 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
 
         println("Connecting to BSim database...");
 
-        try (Connection conn = DriverManager.getConnection(DEFAULT_DB_URL, DEFAULT_DB_USER, DEFAULT_DB_PASS)) {
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPass)) {
 
             println("Connected to BSim database successfully");
 

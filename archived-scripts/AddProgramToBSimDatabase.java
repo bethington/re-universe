@@ -1,6 +1,6 @@
 // Add programs to PostgreSQL BSim database for cross-version analysis
 // Supports: Single program, All programs in project, or Version-filtered programs
-// @author Claude Code Assistant
+// @author Ben Ethington
 // @category BSim
 // @keybinding ctrl shift B
 // @menupath Tools.BSim.Add Program to Database
@@ -19,7 +19,7 @@ import java.sql.*;
 public class AddProgramToBSimDatabase extends GhidraScript {
 
     // Default BSim database configuration
-    private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
+    private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.10.30:5432/bsim";
     private static final String DEFAULT_DB_USER = "ben";
     private static final String DEFAULT_DB_PASS = "***REDACTED***";
 

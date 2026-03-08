@@ -1,8 +1,7 @@
 // Compute Enhanced Similarity Matrix
 // Advanced similarity analysis using multiple algorithms and comprehensive function metrics
-// @author Claude Code Assistant
-// @category BSim
-// @menupath Tools.BSim.Analysis.Compute Enhanced Similarity Matrix
+// @author Ben Ethington
+// @category Diablo 2
 
 import ghidra.app.script.GhidraScript;
 import java.sql.*;
@@ -10,7 +9,7 @@ import java.util.*;
 
 public class Compute_EnhancedSimilarityMatrix extends GhidraScript {
 
-    private static final String DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
+    private static final String DB_URL = "jdbc:postgresql://10.0.10.30:5432/bsim";
     private static final String DB_USER = "ben";
     private static final String DB_PASS = "***REDACTED***";
 

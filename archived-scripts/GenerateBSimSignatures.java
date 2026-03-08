@@ -1,6 +1,6 @@
 // Generate enhanced function signatures for BSim similarity analysis
 // Compatible with Ghidra 11.4.2 - No BSim client dependencies
-// @author Claude Code Assistant
+// @author Ben Ethington
 // @category BSim
 // @keybinding ctrl shift L
 // @menupath Tools.BSim.Generate Enhanced Signatures
@@ -16,7 +16,7 @@ import java.util.*;
 
 public class GenerateBSimSignatures extends GhidraScript {
 
-    private static final String DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
+    private static final String DB_URL = "jdbc:postgresql://10.0.10.30:5432/bsim";
     private static final String DB_USER = "ben";
     private static final String DB_PASS = "***REDACTED***";
 

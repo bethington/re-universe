@@ -7,12 +7,12 @@
 // - All executables (exetable)
 // - All functions (desctable)
 // - All enhanced signatures (enhanced_signatures)
-// - All function comments (function_comments)
+// - All function comments (core_comment)
 // - All cross-references and relationships
+// - Game version definitions (game_versions) - Step1 will recreate these
 //
 // THE FOLLOWING ARE PRESERVED:
 // - Database schema and tables
-// - Game version definitions (game_versions)
 // - Database configuration
 //
 // USE CASE: Starting fresh with a new set of binaries or after major changes
@@ -20,10 +20,9 @@
 //
 // WARNING: This operation is IRREVERSIBLE. All data will be permanently deleted.
 //
-// @author Claude Code Assistant
-// @category BSim
+// @author Ben Ethington
+// @category Diablo 2
 // @keybinding ctrl shift 0
-// @menupath Tools.BSim.Step0 - Reset Database (DANGER)
 
 import ghidra.app.script.GhidraScript;
 import java.sql.*;
@@ -31,9 +30,49 @@ import java.util.*;
 
 public class Step0_ResetBSimDatabase extends GhidraScript {
 
-    private static final String DEFAULT_DB_URL = "jdbc:postgresql://10.0.0.30:5432/bsim";
-    private static final String DEFAULT_DB_USER = "ben";
-    private static final String DEFAULT_DB_PASS = "***REDACTED***";
+    // Resolved credentials (loaded from db.env)
+    private String dbUrl;
+    private String dbUser;
+    private String dbPass;
+
+    private void loadDbConfig() throws Exception {
+        String host = "10.0.10.30";
+        String port = "5432";
+        String dbName = "bsim";
+        dbUser = "ben";
+        dbPass = "";
+
+        String scriptDir = getSourceFile().getParentFile().getAbsolutePath();
+        java.io.File envFile = new java.io.File(scriptDir, "db.env");
+
+        if (envFile.exists()) {
+            println("Loading database config from db.env");
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(envFile))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (line.isEmpty() || line.startsWith("#")) continue;
+                    int eq = line.indexOf('=');
+                    if (eq <= 0) continue;
+                    String key = line.substring(0, eq).trim();
+                    String value = line.substring(eq + 1).trim();
+                    switch (key) {
+                        case "BSIM_DB_HOST": host = value; break;
+                        case "BSIM_DB_PORT": port = value; break;
+                        case "BSIM_DB_NAME": dbName = value; break;
+                        case "BSIM_DB_USER": dbUser = value; break;
+                        case "BSIM_DB_PASSWORD": dbPass = value; break;
+                    }
+                }
+            }
+        } else {
+            throw new Exception("ERROR: db.env not found at " + envFile.getAbsolutePath() +
+                ". Create this file with BSIM_DB_HOST, BSIM_DB_PORT, BSIM_DB_NAME, BSIM_DB_USER, BSIM_DB_PASSWORD.");
+        }
+
+        dbUrl = "jdbc:postgresql://" + host + ":" + port + "/" + dbName;
+        println("Database: " + dbUrl + " (user: " + dbUser + ")");
+    }
 
     @Override
     public void run() throws Exception {
@@ -42,6 +81,11 @@ public class Step0_ResetBSimDatabase extends GhidraScript {
         println("║                                                               ║");
         println("║  ⚠️  WARNING: THIS WILL DELETE ALL DATA! ⚠️                    ║");
         println("╚═══════════════════════════════════════════════════════════════╝");
+        println("");
+
+        // Load database credentials from db.env
+        loadDbConfig();
+        println("Database: " + dbUrl + " (user: " + dbUser + ")");
         println("");
 
         // First confirmation
@@ -60,7 +104,7 @@ public class Step0_ResetBSimDatabase extends GhidraScript {
         }
 
         // Connect and show current data counts
-        try (Connection conn = DriverManager.getConnection(DEFAULT_DB_URL, DEFAULT_DB_USER, DEFAULT_DB_PASS)) {
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPass)) {
             println("Connected to BSim database");
             println("");
 

@@ -26,16 +26,14 @@ spring:
           max-idle: 10
           min-idle: 5
   cache:
-    type: redis
-    redis:
-      time-to-live: 30m
+    type: none
 
 # Ghidra Integration Settings
 ghidra:
   server:
     host: ${GHIDRA_SERVER_HOST:ghidra-server}
     port: ${GHIDRA_SERVER_PORT:13100}
-    ip: ${GHIDRA_IP:10.0.0.30}
+    ip: ${GHIDRA_IP:10.0.10.30}
     username: ${GHIDRA_USERS:benam}
     password: changeme
   projects:
