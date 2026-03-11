@@ -16,9 +16,12 @@ import java.util.*;
 
 public class GenerateBSimSignatures extends GhidraScript {
 
-    private static final String DB_URL = "jdbc:postgresql://10.0.10.30:5432/bsim";
-    private static final String DB_USER = "ben";
-    private static final String DB_PASS = "***REDACTED***";
+    private static final String DB_URL = "jdbc:postgresql://"
+        + System.getenv().getOrDefault("BSIM_DB_HOST", "localhost") + ":"
+        + System.getenv().getOrDefault("BSIM_DB_PORT", "5432") + "/"
+        + System.getenv().getOrDefault("BSIM_DB_NAME", "bsim");
+    private static final String DB_USER = System.getenv().getOrDefault("BSIM_DB_USER", "bsim_user");
+    private static final String DB_PASS = System.getenv().getOrDefault("BSIM_DB_PASSWORD", "");
 
     // Mode selection constants
     private static final String MODE_SINGLE = "Single Program (current)";

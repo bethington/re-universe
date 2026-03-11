@@ -6,7 +6,7 @@ The BSim PostgreSQL database is now configured with SSL support to resolve the "
 
 Use this connection URL in Ghidra BSim:
 ```
-postgresql://ben:***REDACTED***@localhost:5432/bsim?ssl=true&sslmode=require
+postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim?ssl=true&sslmode=require
 ```
 
 ## SSL Configuration Details
@@ -21,7 +21,7 @@ postgresql://ben:***REDACTED***@localhost:5432/bsim?ssl=true&sslmode=require
 
 #### Option 1: SSL Required (Recommended)
 ```
-postgresql://ben:***REDACTED***@localhost:5432/bsim?ssl=true&sslmode=require
+postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim?ssl=true&sslmode=require
 ```
 - ✅ Secure connection
 - ✅ Works with self-signed certificates
@@ -30,12 +30,12 @@ postgresql://ben:***REDACTED***@localhost:5432/bsim?ssl=true&sslmode=require
 #### Option 2: SSL with Certificate Verification
 If you need to verify the certificate (advanced users):
 ```
-postgresql://ben:***REDACTED***@localhost:5432/bsim?ssl=true&sslmode=verify-ca&sslrootcert=./ssl/ca.crt
+postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim?ssl=true&sslmode=verify-ca&sslrootcert=./ssl/ca.crt
 ```
 
 #### Option 3: SSL Disabled (For Testing Only)
 ```
-postgresql://ben:***REDACTED***@localhost:5432/bsim?ssl=false&sslmode=disable
+postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim?ssl=false&sslmode=disable
 ```
 - ⚠️ **Not recommended for production**
 - Use only for testing if SSL causes issues
@@ -64,7 +64,7 @@ postgresql://ben:***REDACTED***@localhost:5432/bsim?ssl=false&sslmode=disable
 
 1. **Try SSL Required Mode First**:
    ```
-   postgresql://ben:***REDACTED***@localhost:5432/bsim?ssl=true&sslmode=require
+   postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim?ssl=true&sslmode=require
    ```
 
 2. **Check Java SSL Configuration** (if needed):

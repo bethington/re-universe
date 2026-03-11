@@ -69,8 +69,8 @@
 ### **COLLABORATIVE RESEARCH INFRASTRUCTURE**
 ```
 🌐 OPERATIONAL ENVIRONMENT:
-Server: ghidra://10.0.10.30:13101/pd2
-Access: benam / ***REDACTED***
+Server: ghidra://<SERVER_IP>:13101/pd2
+Access: <USERNAME> / <PASSWORD>
 Security: TLS 1.2/1.3 SSL encryption
 Projects: 19+ analyzed evolutionary milestones
 Binaries: 554 organized files across 25 versions
@@ -85,7 +85,7 @@ Status: Multi-user collaborative analysis ready
 - **Multi-user Environment**: Collaborative reverse engineering enabled
 - **SSL Security**: TLS 1.2/1.3 encryption active
 - **Project Repository**: 19+ Ghidra projects accessible
-- **User Authentication**: benam/***REDACTED*** credentials operational
+- **User Authentication**: <USERNAME>/<PASSWORD> credentials operational
 - **Port Configuration**: 13100 (RMI), 13101 (SSL), 13102 (Block Stream)
 
 ### **BINARY COLLECTION ORGANIZED** ✅
@@ -156,9 +156,9 @@ Philosophy Shift: Efficiency focus → Feature completeness
 ### **REPOSITORY ACCESS INFORMATION**
 ```
 CONNECTION DETAILS:
-URL: ghidra://10.0.10.30:13101/pd2
-Username: benam
-Password: ***REDACTED***
+URL: ghidra://<SERVER_IP>:13101/pd2
+Username: <USERNAME>
+Password: <DB_PASSWORD>
 SSL: TLS 1.2/1.3 enabled
 Status: OPERATIONAL AND READY FOR RESEARCH
 

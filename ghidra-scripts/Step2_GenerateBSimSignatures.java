@@ -40,10 +40,10 @@ public class Step2_GenerateBSimSignatures extends GhidraScript {
     private int totalErrors = 0;
 
     private void loadDbConfig() throws Exception {
-        String host = "10.0.10.30";
+        String host = "localhost";
         String port = "5432";
         String dbName = "bsim";
-        dbUser = "ben";
+        dbUser = "bsim_user";
         dbPass = "";
 
         String scriptDir = getSourceFile().getParentFile().getAbsolutePath();

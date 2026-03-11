@@ -17,7 +17,7 @@ PROJECT_DIR="./ghidra-projects"
 BINARIES_DIR="./binaries"  # You'll need to specify where your binaries are
 
 # BSim configuration
-BSIM_URL="postgresql://ben:***REDACTED***@localhost:5432/bsim"
+BSIM_URL="postgresql://${BSIM_DB_USER:-bsim_user}:${BSIM_DB_PASSWORD}@${BSIM_DB_HOST:-localhost}:${BSIM_DB_PORT:-5432}/${BSIM_DB_NAME:-bsim}"
 
 echo -e "${CYAN}========================================${NC}"
 echo -e "${CYAN}BSim Database Population Workflow${NC}"

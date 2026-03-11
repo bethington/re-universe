@@ -3,7 +3,7 @@
 ## **CURRENT STATUS ASSESSMENT**
 
 **Date**: February 21, 2026
-**Repository**: ghidra://10.0.10.30:13101/pd2
+**Repository**: ghidra://<SERVER_IP>:13101/pd2
 **Current State**: Legacy Mangled Filesystem with 55+ projects
 
 ### **DOCKER CONFIGURATION CHANGES**

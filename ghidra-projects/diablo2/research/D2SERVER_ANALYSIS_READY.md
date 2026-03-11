@@ -55,7 +55,7 @@ cd ghidra/
 
 # Create new project:
 # Project Name: D2Server_v1.00_Analysis
-# Project Location: /home/ben/re-universe/ghidra-projects/diablo2/
+# Project Location: /opt/re-universe/ghidra-projects/diablo2/
 # Import: vanilla/1.00/D2Server.dll
 ```
 

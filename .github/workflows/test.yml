@@ -189,9 +189,9 @@ jobs:
       with:
         name: integration-test-results
         path: |
-          /home/ben/re-universe/*.log
-          /home/ben/re-universe/backups/
-          /home/ben/re-universe/sync-logs/
+          /opt/re-universe/*.log
+          /opt/re-universe/backups/
+          /opt/re-universe/sync-logs/
 
   documentation-test:
     runs-on: ubuntu-latest

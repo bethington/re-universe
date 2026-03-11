@@ -45,10 +45,10 @@ public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
     private String dbPass;
 
     private void loadDbConfig() throws Exception {
-        String host = "10.0.10.30";
+        String host = "localhost";
         String port = "5432";
         String dbName = "bsim";
-        dbUser = "ben";
+        dbUser = "bsim_user";
         dbPass = "";
 
         String scriptDir = getSourceFile().getParentFile().getAbsolutePath();
@@ -128,6 +128,13 @@ public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
             println("Project path: " + projectPath);
         }
 
+        // Check if this is a mod file
+        if (projectPath != null && shouldSkipPath(projectPath)) {
+            popup("This program is from a mod folder or has no recognized version.\n" +
+                  "Only official vanilla versions (1.00-1.14d) are processed.");
+            return;
+        }
+
         // Count functions with comments
         int functionsWithComments = countFunctionsWithComments(currentProgram);
         println("Functions with comments: " + functionsWithComments);
@@ -148,10 +155,10 @@ public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
             return;
         }
 
-        try {
-            populateComments(currentProgram, programName, projectPath);
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPass)) {
+            println("Connected to BSim database");
+            populateComments(currentProgram, programName, projectPath, conn);
             println("Successfully populated comments into BSim database!");
-
         } catch (Exception e) {
             printerr("Error populating comments: " + e.getMessage());
             e.printStackTrace();
@@ -169,36 +176,55 @@ public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
         ProjectData projectData = project.getProjectData();
         DomainFolder rootFolder = projectData.getRootFolder();
 
+        List<DomainFile> allFiles = new ArrayList<>();
+        collectProgramFiles(rootFolder, allFiles);
+
+        // Filter out mod files - only process official vanilla versions
         List<DomainFile> programFiles = new ArrayList<>();
-        collectProgramFiles(rootFolder, programFiles);
+        int skippedCount = 0;
+        for (DomainFile file : allFiles) {
+            if (shouldSkipPath(file.getPathname())) {
+                skippedCount++;
+            } else {
+                programFiles.add(file);
+            }
+        }
+
+        if (skippedCount > 0) {
+            println("Skipped " + skippedCount + " non-vanilla programs (mods, unknown versions)");
+        }
 
         if (programFiles.isEmpty()) {
-            popup("No program files found in the project.");
+            popup("No vanilla program files found in the project.");
             return;
         }
 
         boolean proceed = askYesNo("Process All Programs",
-            String.format("Found %d programs in project.\n\nPopulate comments for all programs?",
-                programFiles.size()));
+            String.format("Found %d vanilla programs (skipped %d mods/other).\n\nPopulate comments for all vanilla programs?",
+                programFiles.size(), skippedCount));
 
         if (!proceed) {
             println("Operation cancelled by user");
             return;
         }
 
-        println("Processing " + programFiles.size() + " programs...");
+        println("Processing " + programFiles.size() + " vanilla programs...");
         int successCount = 0;
         int errorCount = 0;
 
-        for (DomainFile file : programFiles) {
-            if (monitor.isCancelled()) break;
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPass)) {
+            println("Connected to BSim database");
 
-            try {
-                processProjectFile(file);
-                successCount++;
-            } catch (Exception e) {
-                printerr("Error processing " + file.getName() + ": " + e.getMessage());
-                errorCount++;
+            for (DomainFile file : programFiles) {
+                if (monitor.isCancelled()) break;
+
+                try {
+                    processProjectFile(file, conn);
+                    successCount++;
+                } catch (Exception e) {
+                    printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                    errorCount++;
+                }
             }
         }
 
@@ -227,9 +253,10 @@ public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
         List<DomainFile> allFiles = new ArrayList<>();
         collectProgramFiles(rootFolder, allFiles);
 
-        // Filter by version
+        // Filter by version AND skip mods
         List<DomainFile> matchingFiles = new ArrayList<>();
         for (DomainFile file : allFiles) {
+            if (shouldSkipPath(file.getPathname())) continue;
             String path = file.getPathname();
             if (path.contains(versionFilter) || file.getName().contains(versionFilter)) {
                 matchingFiles.add(file);
@@ -237,12 +264,12 @@ public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
         }
 
         if (matchingFiles.isEmpty()) {
-            popup("No programs matching version '" + versionFilter + "' found.");
+            popup("No vanilla programs matching version '" + versionFilter + "' found.");
             return;
         }
 
         boolean proceed = askYesNo("Process Filtered Programs",
-            String.format("Found %d programs matching '%s'.\n\nPopulate comments for these programs?",
+            String.format("Found %d vanilla programs matching '%s'.\n\nPopulate comments for these programs?",
                 matchingFiles.size(), versionFilter));
 
         if (!proceed) {
@@ -254,15 +281,19 @@ public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
         int successCount = 0;
         int errorCount = 0;
 
-        for (DomainFile file : matchingFiles) {
-            if (monitor.isCancelled()) break;
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPass)) {
+            println("Connected to BSim database");
 
-            try {
-                processProjectFile(file);
-                successCount++;
-            } catch (Exception e) {
-                printerr("Error processing " + file.getName() + ": " + e.getMessage());
-                errorCount++;
+            for (DomainFile file : matchingFiles) {
+                if (monitor.isCancelled()) break;
+
+                try {
+                    processProjectFile(file, conn);
+                    successCount++;
+                } catch (Exception e) {
+                    printerr("Error processing " + file.getName() + ": " + e.getMessage());
+                    errorCount++;
+                }
             }
         }
 
@@ -281,7 +312,44 @@ public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
         }
     }
 
-    private void processProjectFile(DomainFile file) throws Exception {
+    /**
+     * Check if a project path should be skipped (mod folder, unknown version).
+     * Only official vanilla versions 1.00-1.14d are processed.
+     */
+    private boolean shouldSkipPath(String projectPath) {
+        if (projectPath == null || projectPath.isEmpty()) return true;
+
+        String[] parts = projectPath.replace("\\", "/").split("/");
+
+        // Check for known mod folders or generic "Mods" folder
+        for (String part : parts) {
+            if (part.isEmpty()) continue;
+            if (isModFolder(part)) return true;
+            if (part.equalsIgnoreCase("Mods")) return true;
+        }
+
+        // Verify a valid vanilla version exists in the path (1.xx format)
+        for (String part : parts) {
+            if (part.matches("1\\.[0-9]{1,2}[a-z]?")) {
+                return false;
+            }
+        }
+
+        return true; // No valid version found
+    }
+
+    /**
+     * Check if a folder component represents a known Diablo 2 mod.
+     */
+    private boolean isModFolder(String component) {
+        String[] knownMods = {"PD2", "PoD", "MedianXL", "Eastern Sun", "Requiem", "PlugY"};
+        for (String mod : knownMods) {
+            if (component.equalsIgnoreCase(mod)) return true;
+        }
+        return false;
+    }
+
+    private void processProjectFile(DomainFile file, Connection conn) throws Exception {
         println("\nProcessing: " + file.getPathname());
         monitor.setMessage("Processing: " + file.getName());
 
@@ -289,7 +357,7 @@ public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
         try {
             int commentCount = countFunctionsWithComments(program);
             if (commentCount > 0) {
-                populateComments(program, file.getName(), file.getPathname());
+                populateComments(program, file.getName(), file.getPathname(), conn);
                 println("  Added " + commentCount + " function comments");
             } else {
                 println("  No comments to add");
@@ -329,33 +397,23 @@ public class Step3_PopulateCommentsIntoBSim extends GhidraScript {
                (eolComment != null && !eolComment.trim().isEmpty());
     }
 
-    private void populateComments(Program program, String programName, String projectPath) throws Exception {
-        println("Connecting to BSim database...");
-
-        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPass)) {
-            println("Connected to BSim database successfully");
-
-            // Extract version from project path for disambiguation
-            String versionString = extractVersionFromPath(projectPath);
-            if (versionString != null) {
-                println("Detected version from path: " + versionString);
-            }
-
-            // Get executable ID with version-aware lookup
-            int executableId = getExecutableId(conn, programName, versionString);
-            if (executableId == -1) {
-                throw new RuntimeException("Executable not found in BSim database. Please populate functions first.");
-            }
-
-            println("Executable ID: " + executableId);
-
-            // Process function comments
-            processComments(conn, program, executableId, programName);
-
-        } catch (SQLException e) {
-            printerr("Database error: " + e.getMessage());
-            throw e;
+    private void populateComments(Program program, String programName, String projectPath, Connection conn) throws Exception {
+        // Extract version from project path for disambiguation
+        String versionString = extractVersionFromPath(projectPath);
+        if (versionString != null) {
+            println("  Version: " + versionString);
         }
+
+        // Get executable ID with version-aware lookup
+        int executableId = getExecutableId(conn, programName, versionString);
+        if (executableId == -1) {
+            throw new RuntimeException("Executable not found in BSim database. Run Step1 first for: " + programName);
+        }
+
+        println("  Executable ID: " + executableId);
+
+        // Process function comments
+        processComments(conn, program, executableId, programName);
     }
 
     private int getExecutableId(Connection conn, String programName, String versionString) throws SQLException {

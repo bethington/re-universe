@@ -71,7 +71,7 @@ DNS.1 = ${SSL_CERT_COMMON_NAME}
 DNS.2 = localhost
 DNS.3 = bsim-postgres
 IP.1 = 127.0.0.1
-IP.2 = 10.0.10.30
+# IP.2 = <your-server-ip>
 EOF
 
 # Generate server certificate signed by CA

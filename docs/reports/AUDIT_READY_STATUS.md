@@ -35,7 +35,7 @@ Following your immediate recommendation, migration has been paused and comprehen
 
 ### **Command to Execute (Admin Required):**
 ```bash
-sudo bash /home/ben/re-universe/AUDIT_EXECUTION_COMMANDS.sh
+sudo bash /opt/re-universe/AUDIT_EXECUTION_COMMANDS.sh
 ```
 
 ### **Expected Audit Outputs:**

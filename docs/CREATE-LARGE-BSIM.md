@@ -42,7 +42,7 @@ Once you have Ghidra installed on your Windows machine:
 
 # This will execute:
 # cd C:/path/to/ghidra/support
-# ./bsim createdatabase postgresql://ben:***REDACTED***@localhost:5432/bsim large_32 --user ben
+# ./bsim createdatabase postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim large_32 --user ben
 ```
 
 ### Manual Database Creation
@@ -55,16 +55,16 @@ cd "C:/path/to/ghidra/support"
 
 # Create BSim database with large_32 template
 ./bsim createdatabase \
-  "postgresql://ben:***REDACTED***@localhost:5432/bsim?ssl=true&sslmode=require" \
+  "postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim?ssl=true&sslmode=require" \
   large_32 \
   --user ben
 
 # Add executable categories for organization
-./bsim addexecategory "postgresql://ben:***REDACTED***@localhost:5432/bsim" UNKNOWN
-./bsim addexecategory "postgresql://ben:***REDACTED***@localhost:5432/bsim" LIBRARY
-./bsim addexecategory "postgresql://ben:***REDACTED***@localhost:5432/bsim" EXECUTABLE
-./bsim addexecategory "postgresql://ben:***REDACTED***@localhost:5432/bsim" DRIVER
-./bsim addexecategory "postgresql://ben:***REDACTED***@localhost:5432/bsim" MALWARE
+./bsim addexecategory "postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim" UNKNOWN
+./bsim addexecategory "postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim" LIBRARY
+./bsim addexecategory "postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim" EXECUTABLE
+./bsim addexecategory "postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim" DRIVER
+./bsim addexecategory "postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim" MALWARE
 ```
 
 ## Step 3: Verify Database Creation
@@ -135,11 +135,11 @@ cd "C:/path/to/ghidra/support"
 ./bsim generatesigs \
   "ghidra:///path/to/ghidra-projects/large-binary-project" \
   /tmp/bsim-signatures \
-  --database "postgresql://ben:***REDACTED***@localhost:5432/bsim"
+  --database "postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim"
 
 # Commit signatures to database (batch processing)
 ./bsim commitsigs \
-  "postgresql://ben:***REDACTED***@localhost:5432/bsim" \
+  "postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim" \
   /tmp/bsim-signatures
 ```
 
@@ -243,7 +243,7 @@ After successful creation:
 
 Once created, connect to your large BSim database:
 
-- **URL**: `postgresql://ben:***REDACTED***@localhost:5432/bsim?ssl=true&sslmode=require`
+- **URL**: `postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim?ssl=true&sslmode=require`
 - **Template**: `large_32`
 - **Capacity**: 100M+ functions
 - **Architecture**: 32-bit optimized

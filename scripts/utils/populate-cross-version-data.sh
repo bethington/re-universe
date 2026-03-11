@@ -3,7 +3,7 @@
 # Cross-Version BSim Data Population Script
 # This script processes multiple versions of binaries for cross-version analysis
 
-DB_URL="postgresql://ben:***REDACTED***@localhost:5432/bsim"
+DB_URL="postgresql://${BSIM_DB_USER:-bsim_user}:${BSIM_DB_PASSWORD}@${BSIM_DB_HOST:-localhost}:${BSIM_DB_PORT:-5432}/${BSIM_DB_NAME:-bsim}"
 GHIDRA_DIR="./ghidra/Ghidra/RuntimeScripts/Linux/support"
 BINARIES_DIR="/path/to/your/binaries"  # Update this path
 PROJECT_DIR="/tmp/ghidra_projects"

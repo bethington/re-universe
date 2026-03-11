@@ -23,7 +23,7 @@
 // - Applies comprehensive function tagging (library, game logic, utility)
 // - Analyzes function complexity, calling patterns, and architectural features
 // - Populates all base tables required for BSim similarity operations
-// - Uses remote PostgreSQL database (10.0.10.30:5432) for enterprise deployment
+// - Uses remote PostgreSQL database (configured via db.env) for enterprise deployment
 //
 // WORKFLOW POSITION: Complete ingestion - directly enables Step3+ operations
 // NOTE: Step2_GenerateBSimSignatures is now DEPRECATED - signatures are generated
@@ -52,10 +52,10 @@ public class Step1_AddProgramToBSimDatabase extends GhidraScript {
     private String dbPass;
 
     private void loadDbConfig() throws Exception {
-        String host = "10.0.10.30";
+        String host = "localhost";
         String port = "5432";
         String dbName = "bsim";
-        dbUser = "ben";
+        dbUser = "bsim_user";
         dbPass = "";
 
         String scriptDir = getSourceFile().getParentFile().getAbsolutePath();

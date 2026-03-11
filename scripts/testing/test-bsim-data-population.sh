@@ -4,10 +4,10 @@
 # Validates all BSim population scripts and database integration
 
 GHIDRA_DIR="./ghidra/Ghidra/RuntimeScripts/Linux/support"
-SCRIPT_DIR="/home/ben/re-universe/ghidra-scripts"
+SCRIPT_DIR="/opt/re-universe/ghidra-scripts"
 PROJECT_DIR="/tmp/ghidra_test_projects"
 TEST_BINARY_DIR="/tmp/bsim_test_binaries"
-DB_URL="postgresql://ben:***REDACTED***@localhost:5432/bsim"
+DB_URL="postgresql://${BSIM_DB_USER:-bsim_user}:${BSIM_DB_PASSWORD}@${BSIM_DB_HOST:-localhost}:${BSIM_DB_PORT:-5432}/${BSIM_DB_NAME:-bsim}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -248,9 +248,9 @@ test_database_data() {
 test_automation_script() {
     log_info "Testing automation script functionality..."
 
-    if [[ -f "/home/ben/re-universe/automate-ghidra-bsim-population.sh" ]]; then
+    if [[ -f "/opt/re-universe/automate-ghidra-bsim-population.sh" ]]; then
         # Test status command
-        if bash /home/ben/re-universe/automate-ghidra-bsim-population.sh status > /tmp/test_automation.log 2>&1; then
+        if bash /opt/re-universe/automate-ghidra-bsim-population.sh status > /tmp/test_automation.log 2>&1; then
             log_success "Automation script status check passed"
             return 0
         else

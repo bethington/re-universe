@@ -24,7 +24,7 @@ cd "C:\Program Files\ghidra_11.4.2_PUBLIC\support"
 Run the following command to create your large BSim database:
 
 ```cmd
-bsim createdatabase "postgresql://ben:***REDACTED***@localhost:5432/bsim?ssl=true&sslmode=require" large_32 --user ben
+bsim createdatabase "postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim?ssl=true&sslmode=require" large_32 --user ben
 ```
 
 ### Expected Output:
@@ -42,11 +42,11 @@ Database creation complete!
 Add categories to organize your binaries:
 
 ```cmd
-bsim addexecategory "postgresql://ben:***REDACTED***@localhost:5432/bsim" UNKNOWN
-bsim addexecategory "postgresql://ben:***REDACTED***@localhost:5432/bsim" LIBRARY
-bsim addexecategory "postgresql://ben:***REDACTED***@localhost:5432/bsim" EXECUTABLE
-bsim addexecategory "postgresql://ben:***REDACTED***@localhost:5432/bsim" DRIVER
-bsim addexecategory "postgresql://ben:***REDACTED***@localhost:5432/bsim" MALWARE
+bsim addexecategory "postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim" UNKNOWN
+bsim addexecategory "postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim" LIBRARY
+bsim addexecategory "postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim" EXECUTABLE
+bsim addexecategory "postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim" DRIVER
+bsim addexecategory "postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim" MALWARE
 ```
 
 ## Step 5: Verify Database Creation
@@ -54,7 +54,7 @@ bsim addexecategory "postgresql://ben:***REDACTED***@localhost:5432/bsim" MALWAR
 Check that your database was created successfully:
 
 ```cmd
-bsim listdbs "postgresql://ben:***REDACTED***@localhost:5432/"
+bsim listdbs "postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/"
 ```
 
 ## Step 6: Test Connection in Ghidra
@@ -63,7 +63,7 @@ bsim listdbs "postgresql://ben:***REDACTED***@localhost:5432/"
 2. **Go to Tools → Binary Similarity → BSim**
 3. **Create New Server Configuration:**
    - **Name**: `Large BSim Database`
-   - **URL**: `postgresql://ben:***REDACTED***@localhost:5432/bsim?ssl=true&sslmode=require`
+   - **URL**: `postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim?ssl=true&sslmode=require`
    - **Test Connection** - Should show success
 
 ## Large Database Specifications
@@ -101,10 +101,10 @@ Then generate and commit signatures:
 bsim generatesigs ^
   "ghidra://localhost/LargeBinaryProject" ^
   "C:\temp\bsim_signatures" ^
-  --database "postgresql://ben:***REDACTED***@localhost:5432/bsim"
+  --database "postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim"
 
 bsim commitsigs ^
-  "postgresql://ben:***REDACTED***@localhost:5432/bsim" ^
+  "postgresql://<DB_USER>:<DB_PASSWORD>@localhost:5432/bsim" ^
   "C:\temp\bsim_signatures"
 ```
 
@@ -166,7 +166,7 @@ With the `large_32` template and optimizations:
 - **Port**: 5432
 - **Database**: bsim
 - **Username**: ben
-- **Password**: ***REDACTED***
+- **Password**: <DB_PASSWORD>
 - **SSL**: Required
 - **Template**: large_32
 - **Capacity**: 100M+ functions

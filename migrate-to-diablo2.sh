@@ -4,7 +4,7 @@
 
 set -e
 
-GHIDRA_SERVER="ghidra://10.0.10.30:13100"
+GHIDRA_SERVER="ghidra://${GHIDRA_SERVER_HOST:-localhost}:${GHIDRA_SERVER_PORT:-13100}"
 REPO_NAME="diablo2"
 BINARIES_DIR="/data"  # Mounted binaries folder
 GHIDRA_HOME="/opt/ghidra"

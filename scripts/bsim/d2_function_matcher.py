@@ -258,7 +258,7 @@ def main():
                        help='Apply name changes (default: dry run)')
     parser.add_argument('--export-json', help='Export matches to JSON file')
     parser.add_argument('--db-connection',
-                       default='postgresql://ben:***REDACTED***@localhost:5432/bsim',
+                       default=os.environ.get('BSIM_DATABASE_URL', 'postgresql://bsim_user@localhost:5432/bsim'),
                        help='Database connection string')
 
     args = parser.parse_args()

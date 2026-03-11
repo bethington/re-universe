@@ -16,7 +16,7 @@ while true; do
         echo "----------------------------------------"
     else
         # Check connectivity
-        if nc -zv 10.0.10.30 13100 2>/dev/null; then
+        if nc -zv ${GHIDRA_SERVER_HOST:-localhost} ${GHIDRA_SERVER_PORT:-13100} 2>/dev/null; then
             # Get resource usage
             STATS=$(docker stats --no-stream ghidra-server --format "CPU: {{.CPUPerc}}, Memory: {{.MemUsage}}")
             echo "$(date): ✅ Server running - $STATS"

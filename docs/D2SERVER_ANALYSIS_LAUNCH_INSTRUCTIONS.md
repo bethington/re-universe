@@ -13,7 +13,7 @@
 ### **Step 1: Launch Ghidra**
 ```bash
 # Navigate to Ghidra installation
-cd /home/ben/re-universe/ghidra/
+cd /opt/re-universe/ghidra/
 
 # Launch Ghidra GUI
 ./ghidraRun
@@ -24,7 +24,7 @@ cd /home/ben/re-universe/ghidra/
 In Ghidra GUI:
 1. File → New Project
 2. Choose "Non-Shared Project"
-3. Project Directory: /home/ben/re-universe/ghidra-projects/diablo2/
+3. Project Directory: /opt/re-universe/ghidra-projects/diablo2/
 4. Project Name: D2Server_v1.00_Analysis
 5. Click "Finish"
 ```
@@ -33,7 +33,7 @@ In Ghidra GUI:
 ```
 In Project Window:
 1. File → Import File
-2. Select: /home/ben/re-universe/ghidra-projects/diablo2/vanilla/1.00/D2Server.dll
+2. Select: /opt/re-universe/ghidra-projects/diablo2/vanilla/1.00/D2Server.dll
 3. Format: Portable Executable (PE) [should auto-detect]
 4. Options: Accept defaults (x86:LE:32:default)
 5. Click "OK" to import

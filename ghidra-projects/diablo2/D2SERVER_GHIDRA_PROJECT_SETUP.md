@@ -3,7 +3,7 @@
 ## 🎯 **READY TO BEGIN UNIQUE SERVER ANALYSIS**
 
 **Target Binary**: D2Server.dll (84,480 bytes)
-**Location**: `/home/ben/re-universe/ghidra-projects/diablo2/vanilla/1.00/D2Server.dll`
+**Location**: `/opt/re-universe/ghidra-projects/diablo2/vanilla/1.00/D2Server.dll`
 **File Type**: PE32 executable (DLL) Intel 80386, MS Windows
 **Status**: **READY FOR GHIDRA PROJECT CREATION**
 
@@ -12,7 +12,7 @@
 ### **Ghidra Project Configuration**
 ```
 Project Name: D2Server_v1.00_Analysis
-Project Location: /home/ben/re-universe/ghidra-projects/diablo2/
+Project Location: /opt/re-universe/ghidra-projects/diablo2/
 Binary Import: vanilla/1.00/D2Server.dll
 Analysis Mode: Full analysis with custom configurations
 ```

@@ -4,7 +4,7 @@
 # This script runs the Ghidra BSim population script on multiple binaries
 
 GHIDRA_DIR="./ghidra/Ghidra/RuntimeScripts/Linux/support"
-SCRIPT_DIR="/home/ben/re-universe/ghidra-scripts"
+SCRIPT_DIR="/opt/re-universe/ghidra-scripts"
 PROJECT_DIR="/tmp/ghidra_bsim_projects"
 PROJECT_NAME="BSim_CrossVersion_Analysis"
 BINARIES_DIR="/path/to/your/binaries"  # Update this path

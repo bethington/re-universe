@@ -72,3 +72,14 @@ ssl/*.key
 reports/functions_v2/
 .env.save
 *.save
+
+# Database dumps
+bsim-backup-*.sql
+*.dump
+
+# Build artifacts
+**/target/
+
+# Credentials files (db.env contains connection secrets)
+db.env
+**/db.env

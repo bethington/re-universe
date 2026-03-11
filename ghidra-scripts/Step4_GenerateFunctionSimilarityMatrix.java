@@ -51,10 +51,10 @@ public class Step4_GenerateFunctionSimilarityMatrix extends GhidraScript {
     private String dbPass;
 
     private void loadDbConfig() throws Exception {
-        String host = "10.0.10.30";
+        String host = "localhost";
         String port = "5432";
         String dbName = "bsim";
-        dbUser = "ben";
+        dbUser = "bsim_user";
         dbPass = "";
 
         String scriptDir = getSourceFile().getParentFile().getAbsolutePath();

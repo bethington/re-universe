@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     db_port: int = Field(default=5432, validation_alias=AliasChoices("BSIM_DB_PORT", "db_port"))
     db_name: str = Field(default="bsim", validation_alias=AliasChoices("BSIM_DB_NAME", "db_name"))
     db_user: str = Field(default="ben", validation_alias=AliasChoices("BSIM_DB_USER", "db_user"))
-    db_password: str = Field(default="***REDACTED***", validation_alias=AliasChoices("BSIM_DB_PASSWORD", "db_password"))
+    db_password: str = Field(default="", validation_alias=AliasChoices("BSIM_DB_PASSWORD", "db_password"))
 
     # Redis configuration
     redis_host: str = "redis-cache"

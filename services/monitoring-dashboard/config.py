@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     db_port: int = Field(default=5432, env="BSIM_DB_PORT")
     db_name: str = Field(default="bsim", env="BSIM_DB_NAME")
     db_user: str = Field(default="ben", env="BSIM_DB_USER")
-    db_password: str = Field(default="***REDACTED***", env="BSIM_DB_PASSWORD")
+    db_password: str = Field(default="", env="BSIM_DB_PASSWORD")
 
     # Redis configuration
     redis_host: str = Field(default="redis-cache", env="REDIS_HOST")

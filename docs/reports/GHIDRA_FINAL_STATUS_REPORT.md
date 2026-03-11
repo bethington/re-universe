@@ -65,7 +65,7 @@ Ports: 13100 (RMI), 13101 (SSL), 13102 (Block Stream)
 
 ### **Solution 1: Use Non-SSL Connection (RECOMMENDED)**
 ```
-URL: ghidra://benam:***REDACTED***@10.0.10.30:13100
+URL: ghidra://<USERNAME>:<PASSWORD>@<SERVER_IP>:13100
 Port: 13100 (RMI Registry - Non-SSL)
 Status: Should work immediately
 ```
@@ -130,7 +130,7 @@ Special: Contains legendary D2Server.dll
 - **Ghidra Server 12.0.3**: Running stable
 - **SSL/TLS**: Configured with modern protocols
 - **Authentication**: Password-based (user: benam)
-- **Network**: Accessible from 10.0.10.18 → 10.0.10.30
+- **Network**: Accessible from 10.0.10.18 → <SERVER_IP>
 - **Performance**: Indexed filesystem for large repositories
 
 ### **Automation Scripts**
@@ -214,8 +214,8 @@ The D2 research infrastructure has been successfully restored and enhanced. The 
 
 **Connection Instructions**:
 ```
-Non-SSL (Recommended): ghidra://benam:***REDACTED***@10.0.10.30:13100/diablo2
-SSL (Available):       ghidra://benam:***REDACTED***@10.0.10.30:13101/diablo2
+Non-SSL (Recommended): ghidra://<USERNAME>:<PASSWORD>@<SERVER_IP>:13100/diablo2
+SSL (Available):       ghidra://<USERNAME>:<PASSWORD>@<SERVER_IP>:13101/diablo2
 ```
 
 ### **🎯 IMMEDIATE RESEARCH CAPABILITY**
