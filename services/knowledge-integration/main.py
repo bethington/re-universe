@@ -16,6 +16,7 @@ import structlog
 
 from config import settings
 from logging_config import setup_logging, get_logger
+from knowledge_bridge import GhidraKnowledgeBridge, GhidraAnalysisWebhook
 
 setup_logging()
 logger = get_logger(__name__)
@@ -227,6 +228,8 @@ class KnowledgeIntegrator:
 # Global integrator instance
 integrator: Optional[KnowledgeIntegrator] = None
 scheduler: Optional[AsyncIOScheduler] = None
+knowledge_bridge: Optional[GhidraKnowledgeBridge] = None
+analysis_webhook: Optional[GhidraAnalysisWebhook] = None
 
 async def init_database_schema(db_pool: asyncpg.Pool):
     """Initialize database schema for knowledge integration."""
@@ -292,7 +295,7 @@ async def scheduled_integration():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan - startup and shutdown."""
-    global integrator, scheduler
+    global integrator, scheduler, knowledge_bridge, analysis_webhook
 
     # Startup
     logger.info("Starting Knowledge Integration Service")
@@ -331,6 +334,19 @@ async def lifespan(app: FastAPI):
     # Create integrator instance
     integrator = KnowledgeIntegrator(db_pool, redis_client)
 
+    # Initialize Ghidra Knowledge Bridge
+    if db_pool:
+        knowledge_bridge = GhidraKnowledgeBridge(
+            ghidra_url="http://ghidra-server:8089",
+            knowledge_url="http://localhost:8083",
+            db_url=f"postgresql://{settings.db_user}:{settings.db_password}@{settings.db_host}:{settings.db_port}/{settings.db_name}"
+        )
+        await knowledge_bridge.connect()
+
+        # Initialize webhook handler
+        analysis_webhook = GhidraAnalysisWebhook(knowledge_bridge)
+        logger.info("Ghidra Knowledge Bridge initialized")
+
     # Setup scheduler for periodic integration
     scheduler = AsyncIOScheduler()
     scheduler.add_job(
@@ -351,6 +367,9 @@ async def lifespan(app: FastAPI):
 
     if scheduler:
         scheduler.shutdown()
+
+    if knowledge_bridge:
+        await knowledge_bridge.close()
 
     if db_pool:
         await db_pool.close()
@@ -469,6 +488,43 @@ async def trigger_integration(background_tasks: BackgroundTasks):
 
     return {
         "message": "Knowledge integration process started",
+        "timestamp": datetime.utcnow()
+    }
+
+# Ghidra MCP Integration Endpoints
+@app.post("/webhook/ghidra/function-analysis")
+async def ghidra_function_analysis_webhook(analysis_data: dict):
+    """Webhook endpoint for Ghidra MCP function analysis results."""
+    if not analysis_webhook:
+        raise HTTPException(status_code=503, detail="Ghidra bridge not initialized")
+
+    result = await analysis_webhook.handle_function_analysis(analysis_data)
+
+    if result['status'] == 'error':
+        raise HTTPException(status_code=500, detail=result['error'])
+
+    return result
+
+@app.post("/webhook/bsim/similarity-results")
+async def bsim_similarity_webhook(similarity_data: dict):
+    """Webhook endpoint for BSim similarity analysis results."""
+    if not analysis_webhook:
+        raise HTTPException(status_code=503, detail="Ghidra bridge not initialized")
+
+    result = await analysis_webhook.handle_bsim_results(similarity_data)
+
+    if result['status'] == 'error':
+        raise HTTPException(status_code=500, detail=result['error'])
+
+    return result
+
+@app.get("/bridge/status")
+async def get_bridge_status():
+    """Get status of Ghidra Knowledge Bridge."""
+    return {
+        "bridge_initialized": knowledge_bridge is not None,
+        "webhook_handler_ready": analysis_webhook is not None,
+        "database_connected": integrator.db is not None if integrator else False,
         "timestamp": datetime.utcnow()
     }
 
