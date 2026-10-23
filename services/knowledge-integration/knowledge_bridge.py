@@ -9,6 +9,7 @@ import httpx
 import json
 from datetime import datetime
 from typing import Dict, List, Optional, Any
+import os
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -18,11 +19,39 @@ class GhidraKnowledgeBridge:
 
     def __init__(self, ghidra_url: str = "http://localhost:8089",
                  knowledge_url: str = "http://localhost:8083",
-                 db_url: str = "postgresql://ben:goodyx12@localhost:5432/bsim"):
+                 db_url: str = ""):
         self.ghidra_url = ghidra_url
         self.knowledge_url = knowledge_url
-        self.db_url = db_url
+        self.db_url = db_url or self._database_url_from_env()
         self.db_pool = None
+
+    @staticmethod
+    def _database_url_from_env() -> str:
+        """Build the connection string from the environment.
+
+        The password is not stored in this repository -- it comes from
+        BSIM_DB_PASSWORD (or BSIM_DATABASE_URL for the whole URL).
+        """
+        url = os.environ.get("BSIM_DATABASE_URL")
+        if url:
+            return url
+
+        password = os.environ.get("BSIM_DB_PASSWORD")
+        if not password:
+            raise RuntimeError(
+                "BSIM_DB_PASSWORD is not set. The Knowledge DB password is not "
+                "stored in this repository -- set BSIM_DB_PASSWORD (or "
+                "BSIM_DATABASE_URL) in the environment."
+            )
+
+        host = os.environ.get("BSIM_DB_HOST", "localhost")
+        port = os.environ.get("BSIM_DB_PORT", "5432")
+        user = os.environ.get("BSIM_DB_USER", "ben")
+        database = os.environ.get("BSIM_DB_NAME", "bsim")
+        return (
+            f"postgresql://{quote(user, safe='')}:{quote(password, safe='')}"
+            f"@{host}:{port}/{database}"
+        )
 
     async def connect(self):
         """Initialize database connection"""

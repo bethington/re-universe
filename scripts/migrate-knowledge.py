@@ -11,10 +11,37 @@ import re
 import os
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 from typing import Dict, List, Optional
 
 # Knowledge DB connection settings
-DATABASE_URL = "postgresql://ben:goodyx12@localhost:5432/bsim"
+#
+# The password is not stored in this repository. Export BSIM_DB_PASSWORD (or
+# BSIM_DATABASE_URL for the whole URL) before running this script.
+def _database_url() -> str:
+    url = os.environ.get("BSIM_DATABASE_URL")
+    if url:
+        return url
+
+    password = os.environ.get("BSIM_DB_PASSWORD")
+    if not password:
+        raise SystemExit(
+            "BSIM_DB_PASSWORD is not set. The Knowledge DB password is not "
+            "stored in this repository -- export BSIM_DB_PASSWORD (or "
+            "BSIM_DATABASE_URL) and run this again."
+        )
+
+    host = os.environ.get("BSIM_DB_HOST", "localhost")
+    port = os.environ.get("BSIM_DB_PORT", "5432")
+    user = os.environ.get("BSIM_DB_USER", "ben")
+    database = os.environ.get("BSIM_DB_NAME", "bsim")
+    return (
+        f"postgresql://{quote(user, safe='')}:{quote(password, safe='')}"
+        f"@{host}:{port}/{database}"
+    )
+
+
+DATABASE_URL = _database_url()
 
 class KnowledgeMigrator:
     def __init__(self):

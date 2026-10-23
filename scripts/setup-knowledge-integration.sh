@@ -37,8 +37,19 @@ log_error() {
 # Check prerequisites
 log_info "Checking prerequisites..."
 
+# The Knowledge DB password is not stored in this repository.
+if [ -z "${BSIM_DB_PASSWORD:-}" ] && [ -z "${BSIM_DATABASE_URL:-}" ]; then
+    log_error "BSIM_DB_PASSWORD is not set. The Knowledge DB password is not stored in this repository."
+    exit 1
+fi
+
+DB_HOST="${BSIM_DB_HOST:-localhost}"
+DB_PORT="${BSIM_DB_PORT:-5432}"
+DB_USER="${BSIM_DB_USER:-ben}"
+DB_NAME="${BSIM_DB_NAME:-bsim}"
+
 # Check if PostgreSQL is accessible
-if ! PGPASSWORD=goodyx12 psql -h localhost -p 5432 -U ben -d bsim -c "SELECT 1;" >/dev/null 2>&1; then
+if ! PGPASSWORD="${BSIM_DB_PASSWORD:-}" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" >/dev/null 2>&1; then
     log_error "PostgreSQL BSim database not accessible"
     exit 1
 fi
@@ -158,7 +169,7 @@ log_info "Step 5: Verifying complete integration"
 
 # Test migration results
 log_info "Checking migrated knowledge data..."
-INSIGHT_COUNT=$(PGPASSWORD=goodyx12 psql -h localhost -p 5432 -U ben -d bsim -t -c "SELECT COUNT(*) FROM function_insights WHERE source_file IS NOT NULL;" 2>/dev/null | xargs || echo "0")
+INSIGHT_COUNT=$(PGPASSWORD="${BSIM_DB_PASSWORD:-}" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT COUNT(*) FROM function_insights WHERE source_file IS NOT NULL;" 2>/dev/null | xargs || echo "0")
 
 if [ "$INSIGHT_COUNT" -gt "0" ]; then
     log_success "Found $INSIGHT_COUNT migrated knowledge insights"
