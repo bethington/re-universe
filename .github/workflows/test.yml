@@ -168,6 +168,13 @@ jobs:
   integration-test:
     runs-on: [self-hosted, docker, re-universe]
     timeout-minutes: 45
+    env:
+      # The runner's workspace directory is named after the repository, which
+      # would make `docker compose` pick the same project name as the live
+      # deployment on this host. Pin a CI-specific project name so a test run
+      # can never act on the live project or its volumes.
+      COMPOSE_PROJECT_NAME: re-universe-ci
+      CI: 'true'
     
     steps:
     - name: Checkout repository
@@ -181,7 +188,19 @@ jobs:
     
     - name: Run Full Integration Test Suite
       run: |
-        cd ~/re-universe && ./integration-test.sh
+        # Run the checkout -- the pull request's own code -- rather than the
+        # server's deployed copy, which is what this job used to do: it tested
+        # main, not the change under review.
+        #
+        # The suite is run from the runner's own workspace, not from the live
+        # deployment directory. `docker compose` derives its project name from
+        # the working directory, so a run here can never act on the live
+        # `re-universe` project or its volumes.
+        cd "$GITHUB_WORKSPACE"
+        # Symlink the live .env rather than copying it, so the deployment's
+        # secrets are not duplicated into the runner's workspace.
+        ln -sfn ~/re-universe/.env .env
+        ./integration-test.sh
     
     - name: Upload integration test artifacts
       if: always()

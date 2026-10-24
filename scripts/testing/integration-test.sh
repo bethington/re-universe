@@ -21,8 +21,12 @@ cleanup() {
     if [[ "$CLEANUP_ON_EXIT" == "true" ]]; then
         echo -e "\n${YELLOW}Cleaning up integration test...${NC}"
         
-        # Only stop containers if we're not in CI or if there was a failure
-        if [[ "${CI:-false}" != "true" ]] || [[ $? -ne 0 ]]; then
+        # Only stop containers outside CI. In CI this suite runs in the live
+        # deployment directory, so `docker compose down --volumes` there deletes
+        # the live volumes -- including the BSim corpus -- and a failed test
+        # would take the platform down with it. A CI run reports the failure and
+        # leaves the deployment alone.
+        if [[ "${CI:-false}" != "true" ]]; then
             ./stop.sh >/dev/null 2>&1 || true
             if command -v docker-compose &> /dev/null; then
                 docker-compose down --volumes --remove-orphans >/dev/null 2>&1 || true
