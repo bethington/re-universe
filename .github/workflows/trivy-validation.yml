@@ -73,17 +73,7 @@ jobs:
           exit 1
         fi
         echo "Trivy SARIF produced: $(wc -c < trivy-results.sarif) bytes"
-        python3 -c "
-import json
-d = json.load(open('trivy-results.sarif'))
-runs = d.get('runs') or []
-r = runs[0] if runs else {}
-results = r.get('results') or []
-rules = (r.get('tool') or {}).get('driver', {}).get('rules') or []
-print(f'SARIF runs: {len(runs)}')
-print(f'SARIF results: {len(results)}')
-print(f'SARIF rules: {len(rules)}')
-"
+        python3 -c 'import json,sys; d=json.load(open("trivy-results.sarif")); runs=d.get("runs") or []; r=runs[0] if runs else {}; res=r.get("results") or []; rules=(r.get("tool") or {}).get("driver",{}).get("rules") or []; print("SARIF runs: %d"%len(runs)); print("SARIF results: %d"%len(res)); print("SARIF rules: %d"%len(rules))'
 
     - name: Upload scan results as artifact
       if: always()
