@@ -17,7 +17,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Download NLTK data
-RUN python -c "import nltk; nltk.download('punkt'); nltk.download('vader_lexicon'); nltk.download('stopwords')"
+# nltk 3.9 renamed the 'punkt' tokenizer resource to 'punkt_tab'. Downloading
+# 'punkt' still reports success but does not provide the resource that
+# nltk.word_tokenize() actually looks up, so the download must use the new
+# name. 'punkt' is kept for compatibility with nltk < 3.9 consumers.
+RUN python -c "import nltk; nltk.download('punkt_tab'); nltk.download('punkt'); nltk.download('vader_lexicon'); nltk.download('stopwords')"
 
 # Copy application code
 COPY . .
