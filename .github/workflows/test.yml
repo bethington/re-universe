@@ -145,22 +145,38 @@ jobs:
     
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
-      continue-on-error: true
       env:
         # Trivy resolves the Maven dependency tree for Java projects, which
         # hits repo.maven.apache.org. Maven Central rate-limits that (HTTP
-        # 429), Trivy aborts, no SARIF is written, and the job fails for a
-        # reason that has nothing to do with the code. Skip the dependency
-        # tree: the filesystem scan still reports vulnerable OS packages and
-        # misconfigurations.
-        TRIVY_SKIP_DEPENDENCY_TREE: 'true'
+        # 429), Trivy aborts, no SARIF is written, and the scan silently
+        # produces nothing.
+        #
+        # The flag that controls this is `--offline-scan` (Trivy's
+        # "do not issue API requests to identify dependencies"), which binds
+        # to the env var TRIVY_OFFLINE_SCAN. The previously-used
+        # TRIVY_SKIP_DEPENDENCY_TREE does not correspond to any Trivy flag
+        # and was silently ignored, so the 429 was never actually avoided.
+        TRIVY_OFFLINE_SCAN: 'true'
       with:
         scan-type: 'fs'
         scan-ref: '.'
         format: 'sarif'
         output: 'trivy-results.sarif'
         cache: true
-    
+
+    - name: Verify Trivy produced results
+      # A failed scan is not the same as a clean scan. If Trivy aborts (for
+      # example on a Maven Central rate limit) it exits non-zero and writes
+      # no SARIF, and the upload steps below "succeed" while uploading
+      # nothing -- the job goes green having scanned nothing at all.
+      # Fail loudly instead of reporting a false clean.
+      run: |
+        if [ ! -s trivy-results.sarif ]; then
+          echo "::error::Trivy produced no SARIF output. The vulnerability scan did not complete; treat this as an unknown result, not a clean scan."
+          exit 1
+        fi
+        echo "Trivy SARIF produced: $(wc -c < trivy-results.sarif) bytes"
+
     - name: Upload Trivy scan results
       uses: github/codeql-action/upload-sarif@v3
       if: always()
