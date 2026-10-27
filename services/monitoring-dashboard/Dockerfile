@@ -18,6 +18,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# The static/ directory is empty and untracked: git cannot commit an empty
+# directory, so a fresh clone never contains it. But main.py mounts it with
+# StaticFiles(directory="static"), which raises RuntimeError at import time if
+# it is missing. Create it so the image builds and starts from any clean
+# checkout.
+RUN mkdir -p static
+
 # Expose port
 EXPOSE 8096
 
