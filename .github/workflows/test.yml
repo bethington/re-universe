@@ -178,7 +178,7 @@ jobs:
         echo "Trivy SARIF produced: $(wc -c < trivy-results.sarif) bytes"
 
     - name: Upload Trivy scan results
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       if: always()
       continue-on-error: true
       with:
